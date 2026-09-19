@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Core;
+
+final class Response
+{
+    public static function html(string $html, int $status = 200): never
+    {
+        http_response_code($status);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $html;
+        exit;
+    }
+
+    public static function json(array $payload, int $status = 200): never
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: no-store');
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    public static function success(mixed $data = null, string $message = 'Operace byla úspěšná.', int $status = 200): never
+    {
+        self::json([
+            'success' => true,
+            'data' => $data,
+            'message' => $message,
+        ], $status);
+    }
+
+    public static function error(string $message, int $status = 400, mixed $errors = null): never
+    {
+        $payload = [
+            'success' => false,
+            'data' => null,
+            'message' => $message,
+        ];
+        if ($errors !== null) {
+            $payload['errors'] = $errors;
+        }
+        self::json($payload, $status);
+    }
+
+    public static function redirect(string $url, int $status = 302): never
+    {
+        http_response_code($status);
+        header('Location: ' . $url);
+        exit;
+    }
+
+    public static function download(string $filename, string $content, string $mime = 'application/octet-stream'): never
+    {
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store');
+        echo $content;
+        exit;
+    }
+}

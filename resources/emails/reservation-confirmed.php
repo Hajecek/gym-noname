@@ -1,0 +1,1 @@
+<?php $body = 'Vaše rezervace je potvrzena na ' . ($starts_at ?? '') . ' – ' . ($ends_at ?? '') . '.'; include __DIR__ . '/generic.php';

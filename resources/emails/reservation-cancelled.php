@@ -1,0 +1,1 @@
+<?php $body = 'Rezervace na ' . ($starts_at ?? '') . ' byla zrušena.'; include __DIR__ . '/generic.php';

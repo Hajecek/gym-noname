@@ -1,0 +1,1 @@
+<?php $body = 'Vítejte v PRIVOFIT. Ověřte e-mail a můžete si rezervovat vlastní prostor pro trénink.'; include __DIR__ . '/generic.php';

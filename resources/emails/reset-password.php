@@ -1,0 +1,1 @@
+<?php $body = 'Obdrželi jsme žádost o obnovení hesla. Pokud to nebyli vy, e-mail ignorujte.'; include __DIR__ . '/generic.php';

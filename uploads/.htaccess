@@ -1,0 +1,5 @@
+# Deny PHP execution in avatar uploads
+<FilesMatch "\.(php|phtml|php[0-9]|phar|cgi|pl|py|sh)$">
+  Require all denied
+</FilesMatch>
+php_flag engine off

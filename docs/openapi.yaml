@@ -1,0 +1,264 @@
+openapi: 3.1.0
+info:
+  title: PRIVOFIT API
+  version: 1.0.0
+  description: |
+    REST API pro web i budoucí nativní aplikace (iOS SwiftUI, Android Kotlin).
+    Web používá serverové relace. Mobilní klienti používají Bearer access token
+    a rotující refresh token.
+servers:
+  - url: /api/v1
+tags:
+  - name: Auth
+  - name: Users
+  - name: Reservations
+  - name: Memberships
+  - name: Access
+  - name: Health
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Stav služby
+      responses:
+        "200":
+          description: Služba běží
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrace
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [username, first_name, last_name, email, password, password_confirmation, terms, privacy]
+              properties:
+                username: { type: string }
+                first_name: { type: string }
+                last_name: { type: string }
+                email: { type: string, format: email }
+                phone: { type: string }
+                password: { type: string, minLength: 12 }
+                password_confirmation: { type: string }
+                terms: { type: string }
+                privacy: { type: string }
+                marketing: { type: string }
+                avatar: { type: string, format: binary }
+      responses:
+        "201": { description: Účet vytvořen }
+        "422": { description: Validační chyba }
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Přihlášení
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+                totp: { type: string }
+                device_name: { type: string }
+                platform: { type: string, enum: [ios, android, web, other] }
+      responses:
+        "200":
+          description: Tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        "401": { description: Neplatné přihlášení nebo MFA }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Obnova access tokenu s rotací refresh tokenu
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "200": { description: Nové tokeny }
+        "401": { description: Neplatný nebo znovu použitý token }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      responses:
+        "200": { description: Odhlášeno }
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      responses:
+        "200": { description: Vždy obecná odpověď }
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      responses:
+        "200": { description: Heslo změněno }
+  /auth/verify-email:
+    post:
+      tags: [Auth]
+      responses:
+        "200": { description: E-mail ověřen }
+  /auth/resend-verification:
+    post:
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Odesláno }
+  /users/me:
+    get:
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Profil }
+    patch:
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Uloženo }
+  /users/me/avatar:
+    post:
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Avatar uložen }
+    delete:
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Avatar smazán }
+  /users/me/password:
+    patch:
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Heslo změněno }
+  /users/me/sessions:
+    get:
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Relace }
+  /users/me/sessions/{id}:
+    delete:
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Relace odhlášena }
+  /reservations/availability:
+    get:
+      tags: [Reservations]
+      parameters:
+        - in: query
+          name: date
+          schema: { type: string, format: date }
+      responses:
+        "200": { description: Dostupné sloty }
+  /reservations:
+    get:
+      tags: [Reservations]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Seznam }
+    post:
+      tags: [Reservations]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [start, duration]
+              properties:
+                start: { type: string, example: "2026-09-21 10:00" }
+                duration: { type: integer, example: 60 }
+                guests: { type: integer, example: 1 }
+      responses:
+        "201": { description: Vytvořeno }
+        "409": { description: Termín obsazen }
+  /reservations/{id}:
+    get:
+      tags: [Reservations]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Detail }
+        "403": { description: Cizí rezervace }
+  /reservations/{id}/cancel:
+    post:
+      tags: [Reservations]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Zrušeno }
+  /memberships/plans:
+    get:
+      tags: [Memberships]
+      responses:
+        "200": { description: Tarify }
+  /memberships/me:
+    get:
+      tags: [Memberships]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Aktivní členství }
+  /access/open:
+    post:
+      tags: [Access]
+      security: [{ bearerAuth: [] }]
+      description: Server autorizuje požadavek a teprve potom volá DoorProvider. Nuki token nikdy neopouští backend.
+      responses:
+        "200": { description: Příkaz přijat }
+        "403": { description: Chybí oprávnění }
+        "429": { description: Rate limit }
+  /access/status:
+    get:
+      tags: [Access]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Stav autorizace a zámku }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: HMAC
+  schemas:
+    Success:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string }
+        data:
+          type: object
+          additionalProperties: true
+    Error:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string }
+        data: { nullable: true }
+        errors: { type: object }

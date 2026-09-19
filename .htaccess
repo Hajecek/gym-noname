@@ -1,0 +1,41 @@
+Options -Indexes
+ServerSignature Off
+
+<IfModule mod_authz_core.c>
+    <FilesMatch "^(\.env|composer\.(json|lock)|phpunit\.xml(\.dist)?|bootstrap\.php)$">
+        Require all denied
+    </FilesMatch>
+    <FilesMatch "^\.">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Staré odkazy /public/... přesměruj na kořen projektu
+    RewriteCond %{REQUEST_URI} ^(.*?)/public(/.*)?$
+    RewriteRule ^public(/.*)?$ %1%2 [R=301,L]
+
+    RewriteRule ^(app|bin|config|database|docs|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteCond %{ENV:APP_FORCE_HTTPS} =1
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always unset X-Powered-By
+</IfModule>
+
+<IfModule mod_php.c>
+    php_flag expose_php Off
+</IfModule>

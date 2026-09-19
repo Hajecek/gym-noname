@@ -1,0 +1,1 @@
+<?php $body = $body ?? 'Potvrďte svou e-mailovou adresu kliknutím na tlačítko.'; include __DIR__ . '/generic.php';

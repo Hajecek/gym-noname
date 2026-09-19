@@ -1,0 +1,1 @@
+<?php $body = $body ?? 'Bezpečnostní upozornění k vašemu účtu PRIVOFIT.'; include __DIR__ . '/generic.php';

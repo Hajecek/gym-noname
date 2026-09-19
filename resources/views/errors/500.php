@@ -1,0 +1,1 @@
+<section class="section"><div class="container card"><h1>Něco se pokazilo</h1><p class="muted">Zkuste to prosím později.</p><a class="btn btn-primary" href="<?= e(url('/')) ?>">Úvod</a></div></section>
