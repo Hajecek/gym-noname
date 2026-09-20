@@ -212,7 +212,11 @@
                 <div class="interest-copy">
                     <div class="cta-top"><span>ZJIŠŤUJEME ZÁJEM</span></div>
                     <h2>Ještě neotevíráme.</h2>
-                    <p>Nech e-mail. Ozveme se, až bude tvůj prostor připravený.</p>
+                    <p>PRIVOFIT je soukromé fitness — celé studio jen pro tebe, bez cizích lidí a bez front. Teď sbíráme e-maily, abychom věděli, kolik lidí o to stojí.</p>
+                    <ul class="interest-points">
+                        <li>Nic se teď neplatí a nic se nerezervuje</li>
+                        <li>Až spustíme první termíny, ozveme se ti jako první</li>
+                    </ul>
                 </div>
                 <div class="interest-action">
                     <?php $source = 'home'; require dirname(__DIR__) . '/partials/interest-form.php'; ?>

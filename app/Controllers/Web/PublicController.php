@@ -79,7 +79,7 @@ final class PublicController extends Controller
         $this->publicView('public/interest', [
             'title' => 'Zjišťujeme zájem — PRIVOFIT',
             'page' => 'interest',
-            'description' => 'PRIVOFIT ještě neotevírá. Teď zjišťujeme, kolik lidí by o soukromé fitness stálo.',
+            'description' => 'PRIVOFIT ještě neotevírá. Nech e-mail a ozveme se, až půjde rezervovat první trénink v soukromém studiu.',
         ]);
     }
 

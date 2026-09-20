@@ -3121,37 +3121,62 @@ textarea {
 .interest-split {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-  gap: 28px 48px;
+  gap: 32px 48px;
   align-items: center;
   position: relative;
   z-index: 4;
 }
 .interest-copy {
-  max-width: 460px;
+  max-width: 520px;
 }
 .last-cta .interest-split .cta-top {
   justify-content: flex-start;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 .interest-split .cta-top > span {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.18em;
 }
 .last-cta .interest-split h2,
 .interest-page .interest-split h1 {
-  font-size: clamp(26px, 3.2vw, 38px);
-  line-height: 1.08;
+  font-size: clamp(30px, 3.6vw, 44px);
+  line-height: 1.06;
   font-weight: 700;
-  letter-spacing: -1.4px;
-  margin: 6px 0 10px;
+  letter-spacing: -1.6px;
+  margin: 8px 0 14px;
   color: #101714;
 }
 .last-cta .interest-split p,
 .interest-page .interest-split .interest-copy p {
-  font-size: 16px;
-  line-height: 1.4;
+  font-size: 17px;
+  line-height: 1.5;
   color: #33400b;
   margin: 0;
+}
+.interest-points {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.interest-points li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #101714;
+}
+.interest-points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #101714;
 }
 .interest-action {
   min-width: 0;
@@ -3172,8 +3197,9 @@ textarea {
   background: #fff;
   color: #101714;
   border-radius: 999px;
-  padding: 14px 18px;
+  padding: 16px 20px;
   font: inherit;
+  font-size: 16px;
 }
 .interest-form input[type="email"]:focus {
   outline: 2px solid #101714;
@@ -3185,9 +3211,9 @@ textarea {
   flex-shrink: 0;
   justify-content: center;
   gap: 8px;
-  padding: 14px 20px;
+  padding: 16px 22px;
   border-radius: 999px;
-  font-size: 15px;
+  font-size: 16px;
 }
 .interest-form .button > span {
   font-size: 18px;
@@ -3200,20 +3226,21 @@ textarea {
   overflow: hidden;
 }
 .interest-note {
-  margin: 10px 0 0;
-  font-size: 13px;
+  margin: 12px 0 0;
+  font-size: 14px;
   color: #33400b99;
 }
 .interest-page {
   position: relative;
   isolation: isolate;
-  padding: 28px 0 64px;
+  max-width: 1248px;
+  padding: 36px 0 72px;
   min-height: 0;
 }
 .interest-page .cta-surface {
   position: relative;
   z-index: 2;
-  padding: 28px 32px;
+  padding: 40px 32px;
   color: var(--ink);
 }
 .interest-back {
@@ -3237,9 +3264,9 @@ textarea {
   }
   .last-cta .interest-split h2,
   .interest-page .interest-split h1 {
-    font-size: clamp(24px, 6.4vw, 32px);
-    letter-spacing: -1px;
-    margin: 4px 0 8px;
+    font-size: clamp(28px, 7vw, 36px);
+    letter-spacing: -1.2px;
+    margin: 6px 0 12px;
   }
   .interest-form {
     flex-direction: column;
@@ -3366,15 +3393,15 @@ input[data-avatar-input] {
   font-size: 38px;
 }
 .last-cta .cta-surface {
-  padding: 26px 32px;
+  padding: 40px 32px;
 }
 @media (max-width: 850px) {
   .interest-page {
-    padding: 12px 0 48px;
+    padding: 16px 0 52px;
   }
   .interest-page .cta-surface,
   .last-cta .cta-surface {
-    padding: 22px;
+    padding: 28px 22px;
     border-radius: 20px;
   }
 }
