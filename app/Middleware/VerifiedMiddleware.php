@@ -24,7 +24,7 @@ final class VerifiedMiddleware
             throw new HttpException(403, 'Nejprve ověřte svou e-mailovou adresu.');
         }
         Session::flash('error', 'Nejprve ověřte svou e-mailovou adresu. Zkontrolujte schránku.');
-        header('Location: ' . $app->url('/app/overeni'));
+        header('Location: ' . $app->url('/user/overeni'));
         exit;
     }
 }

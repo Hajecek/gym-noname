@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Controllers\Web;
+namespace App\Controllers\User;
 
 use App\Controllers\Controller;
 use App\Core\HttpException;
@@ -20,7 +20,7 @@ final class ReservationController extends Controller
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             $date = Clock::nowLocal()->format('Y-m-d');
         }
-        $this->view('app/reservations', [
+        $this->view('user/reservations', [
             'title' => 'Rezervace',
             'availability' => $service->availability($date),
             'mine' => $service->forUser((int) $user['id']),
@@ -42,7 +42,7 @@ final class ReservationController extends Controller
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
         }
-        $this->redirect('/app/rezervace');
+        $this->redirect('/user/rezervace');
     }
 
     public function cancel(Request $request, array $params): never
@@ -54,6 +54,6 @@ final class ReservationController extends Controller
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
         }
-        $this->redirect('/app/rezervace');
+        $this->redirect('/user/rezervace');
     }
 }

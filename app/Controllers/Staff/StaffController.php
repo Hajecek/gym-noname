@@ -20,7 +20,7 @@ final class StaffController extends Controller
             'occupancy' => $service->occupancyNow(),
             'door' => AccessControlService::make($this->app->db())->doorStatus(),
             'issues' => $this->app->db()->fetchAll("SELECT * FROM operational_issues WHERE status != 'closed' ORDER BY created_at DESC LIMIT 30"),
-        ], 'layouts/app');
+        ], 'layouts/user');
     }
 
     public function issue(\App\Core\Request $request): never

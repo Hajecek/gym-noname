@@ -29,8 +29,8 @@ ServerSignature Off
     RewriteRule ^app/(Core|Controllers|Database|Middleware|Services|Support)(/|$) - [F,L]
     RewriteRule ^app/.*\.(php|phtml|phar)$ - [F,L]
 
-    # /app je zákaznická aplikace, ne výpis složky se zdrojáky
-    RewriteRule ^app/?$ index.php [L]
+    # Staré URL /app i /app/... jdou do front controlleru; PHP je přesměruje na /user
+    RewriteRule ^app(/.*)?$ index.php [L]
 
     RewriteCond %{HTTPS} !=on
     RewriteCond %{HTTP:X-Forwarded-Proto} !=https
@@ -40,6 +40,10 @@ ServerSignature Off
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [L]
+</IfModule>
+
+<IfModule mod_mime.c>
+    AddType image/vnd.microsoft.icon .ico
 </IfModule>
 
 <IfModule mod_headers.c>

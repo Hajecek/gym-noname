@@ -88,13 +88,13 @@ final class AuthController extends Controller
                 'remember' => (bool) $request->input('remember'),
             ], 'layouts/brand');
         } catch (MfaSetupRequiredException) {
-            $this->redirect('/app/zabezpeceni/mfa');
+            $this->redirect('/user/zabezpeceni/mfa');
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
             $this->redirect('/prihlaseni');
         }
-        $intended = Session::pull('intended', '/app');
-        $this->redirect(is_string($intended) ? $intended : '/app');
+        $intended = Session::pull('intended', '/user');
+        $this->redirect(is_string($intended) ? $intended : '/user');
     }
 
     public function logout(Request $request): never
@@ -168,9 +168,9 @@ final class AuthController extends Controller
             $this->authService()->confirmEmailChange((string) $request->query('token', ''));
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
-            $this->redirect('/app/profil');
+            $this->redirect('/user/profil');
         }
         $this->flashSuccess('E-mailová adresa byla změněna.');
-        $this->redirect('/app/profil');
+        $this->redirect('/user/profil');
     }
 }

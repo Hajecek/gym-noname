@@ -17,7 +17,7 @@ abstract class Controller
     {
     }
 
-    protected function view(string $template, array $data = [], ?string $layout = 'layouts/app'): never
+    protected function view(string $template, array $data = [], ?string $layout = 'layouts/user'): never
     {
         $user = $this->app->auth()->user();
         $data['user'] = $user;

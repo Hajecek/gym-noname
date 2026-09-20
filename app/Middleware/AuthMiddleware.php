@@ -18,11 +18,11 @@ final class AuthMiddleware
             $required = (array) config('security.mfa_required_roles', []);
             $path = $request->path();
             if ($user && in_array($user['role'], $required, true) && (int) $user['mfa_enabled'] !== 1) {
-                if (!str_starts_with($path, '/app/zabezpeceni/mfa') && $path !== '/odhlaseni' && !str_starts_with($path, '/api/v1/auth/')) {
+                if (!str_starts_with($path, '/user/zabezpeceni/mfa') && $path !== '/odhlaseni' && !str_starts_with($path, '/api/v1/auth/')) {
                     if ($request->wantsJson()) {
                         throw new HttpException(403, 'Pro tento účet je nutné nastavit MFA.');
                     }
-                    header('Location: ' . $app->url('/app/zabezpeceni/mfa'));
+                    header('Location: ' . $app->url('/user/zabezpeceni/mfa'));
                     exit;
                 }
             }

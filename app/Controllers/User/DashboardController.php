@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Controllers\Web;
+namespace App\Controllers\User;
 
 use App\Controllers\Controller;
 use App\Core\HttpException;
@@ -22,7 +22,7 @@ final class DashboardController extends Controller
         $current = $reservations->current((int) $user['id']);
         $canOpen = $access->canAttempt($user);
 
-        $this->view('app/dashboard', [
+        $this->view('user/dashboard', [
             'title' => 'Domů',
             'membership' => $memberships->activeForUser((int) $user['id']),
             'upcoming' => $reservations->upcoming((int) $user['id']),
@@ -37,25 +37,25 @@ final class DashboardController extends Controller
 
     public function verifyNotice(): never
     {
-        $this->view('app/verify-notice', ['title' => 'Ověření e-mailu']);
+        $this->view('user/verify-notice', ['title' => 'Ověření e-mailu']);
     }
 
     public function resendVerification(Request $request): never
     {
         $user = $this->requireUser();
         if (!empty($user['email_verified_at'])) {
-            $this->redirect('/app');
+            $this->redirect('/user');
         }
         \App\Services\Auth\AuthService::make($this->app->db())->sendVerification($user);
         $this->flashSuccess('Ověřovací e-mail byl znovu odeslán.');
-        $this->redirect('/app/overeni');
+        $this->redirect('/user/overeni');
     }
 
     public function access(): never
     {
         $user = $this->requireUser();
         $access = AccessControlService::make($this->app->db());
-        $this->view('app/access', [
+        $this->view('user/access', [
             'title' => 'Vstup',
             'state' => $access->canAttempt($user),
             'status' => $access->doorStatus(),
@@ -73,6 +73,6 @@ final class DashboardController extends Controller
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
         }
-        $this->redirect('/app/vstup');
+        $this->redirect('/user/vstup');
     }
 }

@@ -100,39 +100,16 @@ summary:focus-visible,
 .brand {
   display: flex;
   align-items: center;
-  font-family: var(--display);
-  font-size: 31px;
-  letter-spacing: -1.9px;
-  font-weight: 800;
-  line-height: 1;
+  line-height: 0;
   white-space: nowrap;
+  flex-shrink: 0;
 }
-.brand-light {
-  font-weight: 600;
-}
-.brand-dot {
-  font-size: 12px;
-  align-self: flex-start;
-  margin: 2px 0 0 5px;
-  letter-spacing: 0;
-  color: var(--secondary);
-}
-.brand-icon {
-  font-family: var(--display);
-  display: grid;
-  place-items: center;
-  background: var(--lime);
-  color: var(--ink);
+.brand-mark {
+  display: block;
   height: 38px;
-  width: 38px;
-  border-radius: 12px 12px 12px 3px;
-  margin-right: 11px;
-  font-size: 37px;
-  font-weight: 800;
-  padding: 0 2px 9px 0;
-  line-height: 1;
+  width: auto;
 }
-.brand-icon > span {
+.brand-mark-icon {
   display: none;
 }
 .header nav {
@@ -924,14 +901,8 @@ footer {
   padding: 18px 0 36px;
   border-bottom: 1px solid var(--line);
 }
-.footer-top .brand {
-  font-size: 25px;
-}
-.footer-top .brand-icon {
-  width: 32px;
+.footer-top .brand-mark {
   height: 32px;
-  font-size: 32px;
-  border-radius: 9px 9px 9px 3px;
 }
 .footer-top > p {
   font-size: 14px;
@@ -1417,13 +1388,8 @@ label small {
     gap: 16px;
     height: 79px;
   }
-  .header .brand {
-    font-size: 26px;
-  }
-  .brand-icon {
-    width: 33px;
-    height: 33px;
-    font-size: 33px;
+  .header .brand-mark {
+    height: 32px;
   }
   .nav-actions .button {
     display: none;
@@ -1834,8 +1800,8 @@ body {
     0 15px 50px #0005,
     0 1px 0 #ffffff08 inset;
 }
-.header .brand {
-  font-size: 28px;
+.header .brand-mark {
+  height: 34px;
 }
 .header nav {
   gap: 25px;
@@ -2136,14 +2102,8 @@ body {
     gap: 12px;
     border-radius: 16px;
   }
-  .header .brand {
-    font-size: 25px;
-  }
-  .header .brand-icon {
-    width: 31px;
-    height: 31px;
-    font-size: 31px;
-    margin-right: 8px;
+  .header .brand-mark {
+    height: 30px;
   }
   .header .nav-actions {
     gap: 10px;
@@ -2244,11 +2204,8 @@ body {
   .trainer-stage #three-stage {
     bottom: 184px;
   }
-  .header .brand {
-    font-size: 22px;
-  }
-  .header .brand-dot {
-    display: none;
+  .header .brand-mark {
+    height: 26px;
   }
 }
 /* An uncluttered hero, with the character as its dominant visual. */

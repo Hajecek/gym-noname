@@ -14,7 +14,7 @@ final class GuestMiddleware
         if (!$app->auth()->check()) {
             return;
         }
-        header('Location: ' . $app->url('/app'));
+        header('Location: ' . $app->url('/user'));
         exit;
     }
 }

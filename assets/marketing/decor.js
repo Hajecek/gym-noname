@@ -84,6 +84,14 @@ let cardTexture,
   head,
   eyes = [],
   pupils = [];
+const brandLogo = new Image();
+brandLogo.decoding = "async";
+brandLogo.onload = () => paintCard();
+{
+  const base = document.documentElement.getAttribute("data-base") || "/";
+  const prefix = base.endsWith("/") ? base : base + "/";
+  brandLogo.src = `${prefix}assets/brand/logo-transparent-dark.png?v=2`;
+}
 function paintCard(detail = {}) {
   if (!cardContext) return;
   const ctx = cardContext;
@@ -100,9 +108,16 @@ function paintCard(detail = {}) {
     ctx.arc(1070, 380, 150 + i * 37, 0, Math.PI * 2);
     ctx.stroke();
   }
+  if (brandLogo.complete && brandLogo.naturalWidth) {
+    const h = 78;
+    const w = brandLogo.naturalWidth * (h / brandLogo.naturalHeight);
+    ctx.drawImage(brandLogo, 72, 48, w, h);
+  } else {
+    ctx.fillStyle = "#101714";
+    ctx.font = "800 73px Syne,sans-serif";
+    ctx.fillText("privofit", 72, 125);
+  }
   ctx.fillStyle = "#101714";
-  ctx.font = "800 73px Syne,sans-serif";
-  ctx.fillText("privofit", 72, 125);
   ctx.font = "600 21px Figtree,sans-serif";
   ctx.fillText("TVŮJ PROSTOR. TVOJE TEMPO.", 76, 179);
   ctx.font = "500 19px Figtree,sans-serif";

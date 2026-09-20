@@ -88,6 +88,11 @@ final class Application
 
             $match = $this->router->dispatch($request);
             if ($match === null) {
+                $path = $request->path();
+                if ($path === '/app' || str_starts_with($path, '/app/')) {
+                    $target = '/user' . substr($path, 4);
+                    Response::redirect($this->url($target === '/user' ? '/user' : $target), $request->method() === 'GET' ? 301 : 307);
+                }
                 $this->abort(404);
             }
 

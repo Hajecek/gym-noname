@@ -18,11 +18,14 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <title><?= e($title) ?></title>
     <meta name="description" content="<?= e($description) ?>">
-    <link rel="icon" href="<?= e(url('/assets/marketing/favicon.svg')) ?>">
+    <link rel="icon" href="<?= e(url('/favicon.ico')) ?>?v=3" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= e(asset('brand/favicon-32.png')) ?>?v=3">
+    <link rel="icon" type="image/png" sizes="48x48" href="<?= e(asset('brand/favicon-48.png')) ?>?v=3">
+    <link rel="apple-touch-icon" href="<?= e(asset('icons/apple-touch-icon.png')) ?>?v=3">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=13">
+    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=14">
     <link rel="manifest" href="<?= e(url('/manifest.json')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="PRIVOFIT">
@@ -31,7 +34,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
 <a class="skip-link" href="#main">Přeskočit na obsah</a>
 <div class="scroll-progress" aria-hidden="true"></div>
 <header class="header"<?= $hideChrome ? ' hidden' : '' ?>>
-    <a class="brand" href="<?= e(url('/')) ?>" aria-label="PRIVOFIT – úvod"><span class="brand-icon">p<span></span></span>privo<span class="brand-light">fit</span><span class="brand-dot">®</span></a>
+    <?php $brandHref = url('/'); $brandLabel = 'PRIVOFIT – úvod'; require dirname(__DIR__) . '/partials/brand-logo.php'; ?>
     <nav aria-label="Hlavní navigace">
         <a href="<?= e(url('/#prostor')) ?>">Proč PRIVOFIT</a>
         <a href="<?= e(url('/#jak-to-funguje')) ?>">Jak to funguje</a>
@@ -41,8 +44,8 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     </nav>
     <div class="nav-actions">
         <?php if ($user): ?>
-            <a href="<?= e(url('/app')) ?>" class="login-link">Aplikace</a>
-            <a href="<?= e(url('/app')) ?>" class="button button-small">Pokračovat <span>↗</span></a>
+            <a href="<?= e(url('/user')) ?>" class="login-link">Aplikace</a>
+            <a href="<?= e(url('/user')) ?>" class="button button-small">Pokračovat <span>↗</span></a>
         <?php else: ?>
             <a href="<?= e(url('/prihlaseni')) ?>" class="login-link">Přihlášení</a>
             <a href="<?= e(url('/registrace')) ?>" class="button button-small">Začít po svém <span>↗</span></a>
@@ -57,7 +60,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
 </div>
 <footer class="wrapper"<?= $hideChrome ? ' hidden' : '' ?>>
     <div class="footer-top">
-        <a class="brand" href="<?= e(url('/')) ?>"><span class="brand-icon">p<span></span></span>privo<span class="brand-light">fit</span><span class="brand-dot">®</span></a>
+        <?php $brandHref = url('/'); $brandLabel = 'PRIVOFIT – úvod'; require dirname(__DIR__) . '/partials/brand-logo.php'; ?>
         <p>Tvůj prostor. Tvoje tempo. Tvoje pravidla.</p>
         <a href="#" class="back-top">Zpátky nahoru ↑</a>
     </div>
@@ -69,7 +72,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
 <script nonce="<?= e($cspNonce) ?>" src="<?= e(url('/assets/marketing/app.js')) ?>?v=8"></script>
 <script type="module" nonce="<?= e($cspNonce) ?>">
 const sceneUrl = <?= json_encode(url('/assets/marketing/scene.js') . '?v=8', JSON_UNESCAPED_SLASHES) ?>;
-const decorUrl = <?= json_encode(url('/assets/marketing/decor.js') . '?v=8', JSON_UNESCAPED_SLASHES) ?>;
+const decorUrl = <?= json_encode(url('/assets/marketing/decor.js') . '?v=9', JSON_UNESCAPED_SLASHES) ?>;
 const phoneUrl = <?= json_encode(url('/assets/marketing/phone.js') . '?v=8', JSON_UNESCAPED_SLASHES) ?>;
 const welcomeUrl = <?= json_encode(url('/assets/marketing/welcome.js') . '?v=8', JSON_UNESCAPED_SLASHES) ?>;
 const isLoginPage = document.body.dataset.page === "login";

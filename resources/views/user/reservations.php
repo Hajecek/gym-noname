@@ -1,11 +1,11 @@
-<div class="page-head"><div><h1>Rezervace</h1><p class="muted">Soukromé studio. Ve stejném čase může běžet jen jedna rezervace.</p></div></div>
-<form class="card" method="get" style="margin-bottom:16px">
+<div class="page-head"><div><p class="eyebrow">TVŮJ ČAS</p><h1>Rezervace</h1><p class="muted">Soukromé studio. Ve stejném čase může běžet jen jedna rezervace.</p></div></div>
+<form class="card" method="get" action="<?= e(url('/user/rezervace')) ?>" style="margin-bottom:16px">
     <div class="field"><label>Datum</label><input type="date" name="date" value="<?= e($date) ?>" onchange="this.form.submit()"></div>
 </form>
 <?php if (!empty($availability['closed'])): ?>
     <div class="card">Tento den je studio zavřené.</div>
 <?php else: ?>
-    <form method="post" class="card">
+    <form method="post" class="card" action="<?= e(url('/user/rezervace')) ?>">
         <?= csrf_field() ?>
         <input type="hidden" name="start" required>
         <div class="slots" style="margin-bottom:16px">
@@ -45,7 +45,7 @@
 <td><?= e($item['status']) ?></td>
 <td>
 <?php if (in_array($item['status'], ['confirmed','pending_payment'], true)): ?>
-<form method="post" action="<?= e(url('/app/rezervace/' . $item['public_id'] . '/zrusit')) ?>"><?= csrf_field() ?><button class="btn btn-danger">Zrušit</button></form>
+<form method="post" action="<?= e(url('/user/rezervace/' . $item['public_id'] . '/zrusit')) ?>"><?= csrf_field() ?><button class="btn btn-danger">Zrušit</button></form>
 <?php endif; ?>
 </td>
 </tr>

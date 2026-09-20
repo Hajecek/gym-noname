@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PRIVOFIT – logo ke stažení</title>
+  <style>
+    :root { --lime:#c6f21a; --ink:#101714; --fog:#e8f0e4; --night:#0b1210; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Figtree, Helvetica, sans-serif;
+      background: var(--night);
+      color: var(--fog);
+      padding: 48px 24px 80px;
+    }
+    h1 { font-family: Syne, sans-serif; font-size: 28px; margin: 0 0 8px; }
+    h2 { font-family: Syne, sans-serif; font-size: 18px; margin: 40px 0 16px; }
+    p { color: rgba(232,240,228,.62); max-width: 56ch; }
+    .grid { display: grid; gap: 24px; max-width: 980px; }
+    @media (min-width: 800px) { .grid.icons { grid-template-columns: repeat(3, 1fr); } }
+    figure {
+      margin: 0;
+      padding: 24px;
+      border: 1px solid rgba(232,240,228,.12);
+      border-radius: 16px;
+      background: rgba(255,255,255,.035);
+    }
+    figure.light { background: #fff; color: var(--ink); }
+    figure.checker {
+      background-color: #18211e;
+      background-image:
+        linear-gradient(45deg, #24302b 25%, transparent 25%),
+        linear-gradient(-45deg, #24302b 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #24302b 75%),
+        linear-gradient(-45deg, transparent 75%, #24302b 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    }
+    figure.checker-light {
+      color: var(--ink);
+      background-color: #eef3ea;
+      background-image:
+        linear-gradient(45deg, #dfe8d9 25%, transparent 25%),
+        linear-gradient(-45deg, #dfe8d9 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #dfe8d9 75%),
+        linear-gradient(-45deg, transparent 75%, #dfe8d9 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    }
+    figure img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+    .icon img { width: 180px; }
+    figcaption {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    figcaption span { font-size: 14px; }
+    a {
+      color: var(--ink);
+      background: var(--lime);
+      text-decoration: none;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    figure.light a, figure.checker-light a { background: var(--night); color: var(--fog); }
+  </style>
+</head>
+<body>
+  <h1>PRIVOFIT logo</h1>
+  <p>Všechny rohy ikony jsou stejně kulaté. Průhledné varianty mají šachovnicové pozadí jen tady v náhledu — v souboru je pozadí opravdu průhledné.</p>
+
+  <h2>Ikona</h2>
+  <div class="grid icons">
+    <figure class="icon checker">
+      <img src="logo-icon.png" alt="PRIVOFIT ikona, průhledné pozadí">
+      <figcaption>
+        <span>PNG, průhledné</span>
+        <a href="logo-icon.png" download="privofit-icon.png">Stáhnout</a>
+      </figcaption>
+    </figure>
+    <figure class="icon">
+      <img src="logo-icon-dark.png" alt="PRIVOFIT ikona na tmavém pozadí">
+      <figcaption>
+        <span>PNG, tmavé pozadí</span>
+        <a href="logo-icon-dark.png" download="privofit-icon-dark.png">Stáhnout</a>
+      </figcaption>
+    </figure>
+    <figure class="icon light">
+      <img src="logo-icon-light.png" alt="PRIVOFIT ikona na bílém pozadí">
+      <figcaption>
+        <span>PNG, bílé pozadí</span>
+        <a href="logo-icon-light.png" download="privofit-icon-light.png">Stáhnout</a>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h2>Celé logo</h2>
+  <div class="grid">
+    <figure class="checker">
+      <img src="logo-transparent.png" alt="PRIVOFIT logo, světlý text, průhledné pozadí">
+      <figcaption>
+        <span>PNG, průhledné, světlý text (na tmavé pozadí)</span>
+        <a href="logo-transparent.png" download="privofit-logo-transparent.png">Stáhnout</a>
+      </figcaption>
+    </figure>
+    <figure class="checker-light">
+      <img src="logo-transparent-dark.png" alt="PRIVOFIT logo, tmavý text, průhledné pozadí">
+      <figcaption>
+        <span>PNG, průhledné, tmavý text (na světlé pozadí)</span>
+        <a href="logo-transparent-dark.png" download="privofit-logo-transparent-dark.png">Stáhnout</a>
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="logo.png" alt="PRIVOFIT logo na tmavém pozadí">
+      <figcaption>
+        <span>PNG, tmavé pozadí</span>
+        <a href="logo.png" download="privofit-logo.png">Stáhnout</a>
+      </figcaption>
+    </figure>
+    <figure class="light">
+      <img src="logo-light.png" alt="PRIVOFIT logo na bílém pozadí">
+      <figcaption>
+        <span>PNG, bílé pozadí</span>
+        <a href="logo-light.png" download="privofit-logo-light.png">Stáhnout</a>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h2>Vektor (SVG)</h2>
+  <div class="grid icons">
+    <figure class="icon checker">
+      <img src="logo-icon.svg" alt="PRIVOFIT ikona SVG">
+      <figcaption>
+        <span>Ikona SVG, průhledné</span>
+        <a href="logo-icon.svg" download="privofit-icon.svg">Stáhnout</a>
+      </figcaption>
+    </figure>
+    <figure class="checker">
+      <img src="logo.svg" alt="PRIVOFIT logo SVG světlý text">
+      <figcaption>
+        <span>Logo SVG, světlý text</span>
+        <a href="logo.svg" download="privofit-logo.svg">Stáhnout</a>
+      </figcaption>
+    </figure>
+    <figure class="checker-light">
+      <img src="logo-dark.svg" alt="PRIVOFIT logo SVG tmavý text">
+      <figcaption>
+        <span>Logo SVG, tmavý text</span>
+        <a href="logo-dark.svg" download="privofit-logo-dark.svg">Stáhnout</a>
+      </figcaption>
+    </figure>
+  </div>
+</body>
+</html>

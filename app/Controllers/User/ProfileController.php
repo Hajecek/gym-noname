@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Controllers\Web;
+namespace App\Controllers\User;
 
 use App\Controllers\Controller;
 use App\Core\HttpException;
@@ -22,7 +22,7 @@ final class ProfileController extends Controller
     {
         $user = $this->requireUser();
         $auth = AuthService::make($this->app->db());
-        $this->view('app/profile', [
+        $this->view('user/profile', [
             'title' => 'Profil',
             'sessions' => $auth->sessions((int) $user['id']),
             'currentSession' => $this->app->auth()->sessionRowId(),
@@ -37,7 +37,7 @@ final class ProfileController extends Controller
     {
         $user = $this->requireUser();
         $service = new MembershipService($this->app->db());
-        $this->view('app/membership', [
+        $this->view('user/membership', [
             'title' => 'Členství',
             'plans' => $service->plans(),
             'current' => $service->activeForUser((int) $user['id']),
@@ -55,7 +55,7 @@ final class ProfileController extends Controller
             Session::set('errors', $e->errors);
             $this->flashError($e->getMessage());
         }
-        $this->redirect('/app/profil');
+        $this->redirect('/user/profil');
     }
 
     public function password(Request $request): never
@@ -74,7 +74,7 @@ final class ProfileController extends Controller
             Session::set('errors', $e->errors);
             $this->flashError($e->getMessage());
         }
-        $this->redirect('/app/profil');
+        $this->redirect('/user/profil');
     }
 
     public function email(Request $request): never
@@ -86,7 +86,7 @@ final class ProfileController extends Controller
         } catch (ValidationException $e) {
             $this->flashError($e->getMessage());
         }
-        $this->redirect('/app/profil');
+        $this->redirect('/user/profil');
     }
 
     public function avatar(Request $request): never
@@ -95,7 +95,7 @@ final class ProfileController extends Controller
         $file = $request->file('avatar');
         if (!$file) {
             $this->flashError('Vyberte obrázek.');
-            $this->redirect('/app/profil');
+            $this->redirect('/user/profil');
         }
         try {
             (new AvatarService($this->app->db()))->storeFromUpload($user, $file, [
@@ -107,7 +107,7 @@ final class ProfileController extends Controller
         } catch (\RuntimeException $e) {
             $this->flashError($e->getMessage());
         }
-        $this->redirect('/app/profil');
+        $this->redirect('/user/profil');
     }
 
     public function deleteAvatar(): never
@@ -115,7 +115,7 @@ final class ProfileController extends Controller
         $user = $this->requireUser();
         (new AvatarService($this->app->db()))->delete($user);
         $this->flashSuccess('Profilový obrázek byl odstraněn.');
-        $this->redirect('/app/profil');
+        $this->redirect('/user/profil');
     }
 
     public function revokeSession(Request $request, array $params): never
@@ -123,7 +123,7 @@ final class ProfileController extends Controller
         $user = $this->requireUser();
         AuthService::make($this->app->db())->revokeSession((int) $user['id'], (int) $params['id']);
         $this->flashSuccess('Relace byla odhlášena.');
-        $this->redirect('/app/profil');
+        $this->redirect('/user/profil');
     }
 
     public function logoutAll(): never
@@ -131,7 +131,7 @@ final class ProfileController extends Controller
         $user = $this->requireUser();
         AuthService::make($this->app->db())->logoutAll((int) $user['id'], $this->app->auth()->sessionRowId());
         $this->flashSuccess('Všechna ostatní zařízení byla odhlášena.');
-        $this->redirect('/app/profil');
+        $this->redirect('/user/profil');
     }
 
     public function notifications(Request $request): never
@@ -151,7 +151,7 @@ final class ProfileController extends Controller
             ]
         );
         $this->flashSuccess('Nastavení oznámení bylo uloženo.');
-        $this->redirect('/app/profil');
+        $this->redirect('/user/profil');
     }
 
     public function export(): never
@@ -172,14 +172,14 @@ final class ProfileController extends Controller
         $user = $this->requireUser();
         $this->app->db()->update('users', ['deletion_requested_at' => \App\Support\Clock::utc()], 'id = :id', ['id' => (int) $user['id']]);
         $this->flashSuccess('Žádost o výmaz byla zaznamenána. Ozveme se podle lhůt ochrany osobních údajů.');
-        $this->redirect('/app/profil');
+        $this->redirect('/user/profil');
     }
 
     public function showMfa(): never
     {
         $user = $this->requireUser();
         $setup = AuthService::make($this->app->db())->beginTotpSetup($user);
-        $this->view('app/mfa', [
+        $this->view('user/mfa', [
             'title' => 'Dvoufaktorové ověření',
             'setup' => $setup,
         ]);
@@ -192,10 +192,10 @@ final class ProfileController extends Controller
             $codes = AuthService::make($this->app->db())->confirmTotp($user, (string) $request->input('code', ''));
             Session::set('recovery_codes', $codes);
             $this->flashSuccess('MFA je aktivní. Uložte si záložní kódy.');
-            $this->redirect('/app/zabezpeceni/mfa/kody');
+            $this->redirect('/user/zabezpeceni/mfa/kody');
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
-            $this->redirect('/app/zabezpeceni/mfa');
+            $this->redirect('/user/zabezpeceni/mfa');
         }
     }
 
@@ -203,7 +203,7 @@ final class ProfileController extends Controller
     {
         $this->requireUser();
         $codes = Session::pull('recovery_codes', []);
-        $this->view('app/mfa-codes', [
+        $this->view('user/mfa-codes', [
             'title' => 'Záložní kódy',
             'codes' => is_array($codes) ? $codes : [],
         ]);

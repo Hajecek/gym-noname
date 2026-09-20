@@ -20,13 +20,13 @@ final class ForceMfaMiddleware
             return;
         }
         $path = $request->path();
-        if (str_starts_with($path, '/app/zabezpeceni/mfa') || $path === '/odhlaseni') {
+        if (str_starts_with($path, '/user/zabezpeceni/mfa') || $path === '/odhlaseni') {
             return;
         }
         if ($request->wantsJson()) {
             throw new \App\Core\HttpException(403, 'Pro tento účet je nutné nastavit MFA.');
         }
-        header('Location: ' . $app->url('/app/zabezpeceni/mfa'));
+        header('Location: ' . $app->url('/user/zabezpeceni/mfa'));
         exit;
     }
 }

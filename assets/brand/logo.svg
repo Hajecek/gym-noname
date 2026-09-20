@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 70" role="img" aria-label="PRIVOFIT">
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Syne:wght@600;800&amp;display=swap");
+  </style>
+  <defs>
+    <clipPath id="tile"><rect x="16" y="16" width="38" height="38" rx="12" ry="12"/></clipPath>
+  </defs>
+  <rect x="16" y="16" width="38" height="38" rx="12" ry="12" fill="#c6f21a"/>
+  <text clip-path="url(#tile)" x="32.9" y="39.2" text-anchor="middle" fill="#101714" font-family="Syne, Arial Black, sans-serif" font-size="37" font-weight="800">p</text>
+  <text x="65" y="45" fill="#e8f0e4" font-family="Syne, sans-serif" font-size="31" font-weight="800" letter-spacing="-1.9">privo<tspan font-weight="600">fit</tspan></text>
+  <text x="251" y="28" fill="rgba(232,240,228,.62)" font-family="Syne, sans-serif" font-size="12" font-weight="800">®</text>
+</svg>

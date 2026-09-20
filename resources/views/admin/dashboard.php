@@ -1,4 +1,4 @@
-<div class="page-head"><h1>Administrace</h1></div>
+<div class="page-head"><div><p class="eyebrow">ADMINISTRACE</p><h1>Přehled</h1></div></div>
 <div class="stat-grid">
 <article class="card"><div class="stat-label">Aktivní členové</div><div class="stat-value"><?= (int) $stats['active_members'] ?></div></article>
 <article class="card"><div class="stat-label">Dnešní rezervace</div><div class="stat-value"><?= (int) $stats['today_reservations'] ?></div></article>

@@ -6,7 +6,7 @@ namespace App\Core;
 
 final class View
 {
-    public static function render(string $template, array $data = [], ?string $layout = 'layouts/app'): string
+    public static function render(string $template, array $data = [], ?string $layout = 'layouts/user'): string
     {
         $content = self::renderPartial($template, $data);
         if ($layout === null) {

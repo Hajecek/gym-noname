@@ -1,6 +1,6 @@
-const CACHE = 'privofit-static-v2';
+const CACHE = 'privofit-static-v5';
 const ASSETS = [
-  './assets/css/app.css',
+  './assets/user/style.css',
   './assets/js/app.js',
 ];
 

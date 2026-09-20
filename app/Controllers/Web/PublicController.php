@@ -156,15 +156,15 @@ final class PublicController extends Controller
             'name' => 'PRIVOFIT',
             'short_name' => 'PRIVOFIT',
             'description' => 'Soukromé fitness studio. Tvůj prostor. Tvůj trénink.',
-            'start_url' => $this->app->url('/app'),
+            'start_url' => $this->app->url('/user'),
             'scope' => $this->app->url('/'),
             'display' => 'standalone',
-            'background_color' => '#0B1220',
-            'theme_color' => '#0B1220',
+            'background_color' => '#0b1210',
+            'theme_color' => '#0b1210',
             'lang' => 'cs',
             'icons' => [
-                ['src' => $this->app->url('/assets/icons/icon-192.png'), 'sizes' => '192x192', 'type' => 'image/png'],
-                ['src' => $this->app->url('/assets/icons/icon-512.png'), 'sizes' => '512x512', 'type' => 'image/png'],
+                ['src' => $this->app->url('/assets/icons/icon-192.png'), 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
+                ['src' => $this->app->url('/assets/icons/icon-512.png'), 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
             ],
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
