@@ -3,16 +3,19 @@ $errors = $errors ?? [];
 $hasAvatar = !empty($user['avatar_path']);
 $fullName = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
 $planName = $membership['plan_name'] ?? 'Bez tarifu';
+$mfaEnabled = !empty($mfaEnabled);
+$mfaRequired = !empty($mfaRequired);
 ?>
 <div class="page-head">
     <div>
         <p class="eyebrow">ÚČET</p>
         <h1>Profil</h1>
-        <p class="muted">Fotka, osobní údaje a zabezpečení na jednom místě.</p>
+        <p class="muted">Fotka, údaje, přístup a zabezpečení.</p>
     </div>
 </div>
 
-<section class="profile-hero card">
+<section class="card profile-hero">
+    <p class="eyebrow">Identita</p>
     <form class="profile-hero-main" method="post" action="<?= e(url('/user/profil/avatar')) ?>" enctype="multipart/form-data" data-avatar-picker>
         <?= csrf_field() ?>
         <input id="profile-avatar-file" data-avatar-input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" hidden>
@@ -23,10 +26,13 @@ $planName = $membership['plan_name'] ?? 'Bez tarifu';
             </span>
         </label>
         <div class="profile-hero-copy">
-            <p class="eyebrow">Tvoje identita</p>
             <h2><?= e($fullName !== '' ? $fullName : $user['username']) ?></h2>
-            <p class="muted">@<?= e($user['username']) ?> · člen od <?= e(format_datetime($user['created_at'], 'd. m. Y')) ?></p>
-            <p class="profile-plan"><?= e($planName) ?></p>
+            <p class="muted">@<?= e($user['username']) ?></p>
+            <div class="profile-meta">
+                <span class="profile-chip profile-chip-plan"><?= e($planName) ?></span>
+                <span class="profile-chip">Člen od <?= e(format_datetime($user['created_at'], 'd. m. Y')) ?></span>
+                <span class="profile-chip"><?= e(role_label($user['role'] ?? 'user')) ?></span>
+            </div>
             <p class="avatar-picker-error" data-avatar-error hidden></p>
             <div class="profile-hero-actions">
                 <button class="btn btn-primary button-small" type="submit" data-avatar-save hidden>Uložit fotku</button>
@@ -43,52 +49,63 @@ $planName = $membership['plan_name'] ?? 'Bez tarifu';
 <form id="avatar-delete-form" method="post" action="<?= e(url('/user/profil/avatar/smazat')) ?>"><?= csrf_field() ?></form>
 <?php endif; ?>
 
-<div class="profile-grid">
-    <form class="card" method="post" action="<?= e(url('/user/profil')) ?>">
-        <?= csrf_field() ?>
-        <p class="eyebrow">O tobě</p>
-        <h3>Osobní údaje</h3>
-        <div class="field">
-            <label>Uživatelské jméno</label>
-            <input name="username" value="<?= e($user['username']) ?>" autocomplete="username">
-            <span class="field-error"><?= e($errors['username'][0] ?? '') ?></span>
-        </div>
-        <div class="row-2">
-            <div class="field"><label>Jméno</label><input name="first_name" value="<?= e($user['first_name']) ?>" autocomplete="given-name"></div>
-            <div class="field"><label>Příjmení</label><input name="last_name" value="<?= e($user['last_name']) ?>" autocomplete="family-name"></div>
-        </div>
-        <div class="field"><label>Telefon</label><input name="phone" value="<?= e($user['phone'] ?? '') ?>" autocomplete="tel"></div>
-        <button class="btn btn-primary">Uložit změny</button>
-    </form>
-
-    <div class="profile-stack">
-        <form class="card" method="post" action="<?= e(url('/user/profil/email')) ?>">
-            <?= csrf_field() ?>
-            <p class="eyebrow">Přístup</p>
-            <h3>E-mail</h3>
-            <p class="muted profile-current"><?= e($user['email']) ?></p>
-            <div class="field"><label>Nový e-mail</label><input type="email" name="email" required autocomplete="email"></div>
-            <button class="btn btn-secondary">Odeslat ověření</button>
-        </form>
-        <form class="card" method="post" action="<?= e(url('/user/profil/heslo')) ?>">
-            <?= csrf_field() ?>
-            <h3>Heslo</h3>
-            <div class="field"><label>Současné heslo</label><input type="password" name="current_password" required autocomplete="current-password"></div>
-            <div class="field"><label>Nové heslo</label><input name="password" type="password" required minlength="12" autocomplete="new-password"></div>
-            <div class="field"><label>Potvrzení</label><input name="password_confirmation" type="password" required minlength="12" autocomplete="new-password"></div>
-            <button class="btn btn-primary">Změnit heslo</button>
-        </form>
+<form class="card profile-section" method="post" action="<?= e(url('/user/profil')) ?>">
+    <?= csrf_field() ?>
+    <p class="eyebrow">Osobní údaje</p>
+    <h3>O tobě</h3>
+    <div class="field">
+        <label>Uživatelské jméno</label>
+        <input name="username" value="<?= e($user['username']) ?>" autocomplete="username">
+        <span class="field-error"><?= e($errors['username'][0] ?? '') ?></span>
     </div>
-</div>
+    <div class="row-2">
+        <div class="field"><label>Jméno</label><input name="first_name" value="<?= e($user['first_name']) ?>" autocomplete="given-name"></div>
+        <div class="field"><label>Příjmení</label><input name="last_name" value="<?= e($user['last_name']) ?>" autocomplete="family-name"></div>
+    </div>
+    <div class="field"><label>Telefon</label><input name="phone" value="<?= e($user['phone'] ?? '') ?>" autocomplete="tel"></div>
+    <button class="btn btn-primary">Uložit změny</button>
+</form>
 
-<section class="card profile-panel">
+<form class="card profile-section" method="post" action="<?= e(url('/user/profil/email')) ?>">
+    <?= csrf_field() ?>
+    <p class="eyebrow">Přístup</p>
+    <h3>E-mail</h3>
+    <p class="profile-current-label">Aktuální e-mail</p>
+    <p class="profile-current"><?= e($user['email']) ?></p>
+    <div class="field"><label>Nový e-mail</label><input type="email" name="email" required autocomplete="email"></div>
+    <button class="btn btn-secondary">Odeslat ověření</button>
+</form>
+
+<form class="card profile-section" method="post" action="<?= e(url('/user/profil/heslo')) ?>">
+    <?= csrf_field() ?>
+    <h3>Heslo</h3>
+    <div class="field"><label>Současné heslo</label><input type="password" name="current_password" required autocomplete="current-password"></div>
+    <div class="field"><label>Nové heslo</label><input name="password" type="password" required minlength="12" autocomplete="new-password"></div>
+    <div class="field"><label>Potvrzení</label><input name="password_confirmation" type="password" required minlength="12" autocomplete="new-password"></div>
+    <button class="btn btn-primary">Změnit heslo</button>
+</form>
+
+<section class="card profile-section">
+    <p class="eyebrow">Zabezpečení</p>
     <div class="profile-panel-head">
-        <div>
-            <p class="eyebrow">Zabezpečení</p>
-            <h3>Aktivní zařízení</h3>
-        </div>
-        <a class="btn btn-secondary button-small" href="<?= e(url('/user/zabezpeceni/mfa')) ?>">Nastavit MFA</a>
+        <h3>Dvoufaktorové ověření</h3>
+        <span class="badge <?= $mfaEnabled ? 'badge-ok' : 'badge-warn' ?>"><?= $mfaEnabled ? 'Aktivní' : 'Vypnuto' ?></span>
     </div>
+    <p class="muted">Po hesle zadáš šestimístný kód z autentizační aplikace. Bez telefonu použiješ záložní kód.</p>
+    <?php if ($mfaRequired): ?>
+        <p class="profile-note">Pro účet <?= e(role_label($user['role'] ?? 'admin')) ?> je zapnutí povinné.</p>
+    <?php endif; ?>
+    <div class="profile-hero-actions">
+        <?php if ($mfaEnabled): ?>
+            <a class="btn btn-secondary" href="<?= e(url('/user/zabezpeceni/mfa')) ?>">Spravovat</a>
+        <?php else: ?>
+            <a class="btn btn-primary" href="<?= e(url('/user/zabezpeceni/mfa')) ?>">Zapnout 2FA</a>
+        <?php endif; ?>
+    </div>
+</section>
+
+<section class="card profile-section">
+    <h3>Aktivní zařízení</h3>
     <ul class="session-list">
         <?php foreach ($sessions as $session): ?>
             <?php $isCurrent = (int) $session['id'] === (int) $currentSession; ?>
@@ -115,10 +132,12 @@ $planName = $membership['plan_name'] ?? 'Bez tarifu';
     </form>
 </section>
 
-<section class="card profile-panel">
-    <p class="eyebrow">Soukromí</p>
-    <h3>Ochrana osobních údajů</h3>
-    <p class="muted">Export obsahuje údaje účtu, rezervace, členství a platby.</p>
+<section class="card profile-section profile-privacy">
+    <div>
+        <p class="eyebrow">Soukromí</p>
+        <h3>Ochrana osobních údajů</h3>
+        <p class="muted">Export obsahuje údaje účtu, rezervace, členství a platby.</p>
+    </div>
     <div class="profile-hero-actions">
         <a class="btn btn-secondary" href="<?= e(url('/user/profil/export')) ?>">Exportovat data</a>
         <form method="post" action="<?= e(url('/user/profil/vymaz')) ?>"><?= csrf_field() ?><button class="btn btn-danger">Žádost o výmaz</button></form>

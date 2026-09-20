@@ -158,7 +158,11 @@ final class MobileApiService
             if (!in_array($row['status'], ['confirmed', 'pending_payment'], true)) {
                 continue;
             }
-            $items[] = $this->reservationPayload($row, $user);
+            try {
+                $items[] = $this->reservationPayload($row, $user);
+            } catch (\Throwable) {
+                continue;
+            }
         }
         return $items;
     }
@@ -449,13 +453,9 @@ final class MobileApiService
             $room = $this->db->fetch('SELECT name FROM rooms WHERE id = :id', ['id' => (int) $row['room_id']]);
             $row['room_name'] = $room['name'] ?? 'Studio';
         }
-        $hours = $this->db->fetchColumn(
-            "SELECT setting_value FROM app_settings WHERE setting_key = 'reservation.cancellation_hours'"
-        );
-        $limitHours = (int) ($hours ?: 12);
         $starts = new \DateTimeImmutable($row['starts_at'], new \DateTimeZone('UTC'));
         $canCancel = in_array($row['status'], ['confirmed', 'pending_payment'], true)
-            && $starts->modify('-' . $limitHours . ' hours') >= Clock::nowUtc();
+            && $starts > Clock::nowUtc();
         return [
             'id' => $row['public_id'],
             'start' => Clock::iso($row['starts_at']),

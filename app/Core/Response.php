@@ -61,4 +61,13 @@ final class Response
         echo $content;
         exit;
     }
+
+    public static function send(string $content, string $mime, int $status = 200): never
+    {
+        http_response_code($status);
+        header('Content-Type: ' . $mime);
+        header('Cache-Control: no-store');
+        echo $content;
+        exit;
+    }
 }

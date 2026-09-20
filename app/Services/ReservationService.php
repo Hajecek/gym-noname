@@ -126,95 +126,145 @@ final class ReservationService
         $membership = $this->memberships->activeForUser((int) $user['id']);
         $useMembership = !$paidCheckout && $membership && ($membership['entries_remaining'] === null || (int) $membership['entries_remaining'] > 0);
 
-        return $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $buffer, $guestCount, $price, $membership, $useMembership, $ignoreReservationIds) {
-            $db->query('SELECT id FROM rooms WHERE id = :id FOR UPDATE', ['id' => (int) $room['id']]);
-            $occupied = array_values(array_filter(
-                $this->occupiedIntervals((int) $room['id'], $startUtc->modify('-6 hours')->format('Y-m-d H:i:s'), $endUtc->modify('+6 hours')->format('Y-m-d H:i:s')),
-                static fn (array $row): bool => !in_array((int) ($row['id'] ?? 0), $ignoreReservationIds, true)
-            ));
-            if ($this->overlaps($occupied, $startUtc, $endUtc, $buffer)) {
+        $this->expireHolds();
+        $this->ensureOccupancyTable();
+        $lockName = 'pf-room-' . (int) $room['id'];
+        $got = $this->db->fetchColumn("SELECT GET_LOCK('{$lockName}', 8)");
+        if ((int) $got !== 1) {
+            throw new HttpException(409, 'Tento termín se právě rezervuje. Zkus to za chvíli znovu.');
+        }
+
+        try {
+            return $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $buffer, $guestCount, $price, $membership, $useMembership, $ignoreReservationIds) {
+                $db->query('SELECT id FROM rooms WHERE id = :id FOR UPDATE', ['id' => (int) $room['id']]);
+                $db->query(
+                    "SELECT id FROM reservations
+                     WHERE room_id = :rid AND status IN ('pending_payment', 'confirmed')
+                       AND starts_at < :end AND ends_at > :start
+                     FOR UPDATE",
+                    [
+                        'rid' => (int) $room['id'],
+                        'start' => $startUtc->modify('-1 hour')->format('Y-m-d H:i:s'),
+                        'end' => $endUtc->modify('+1 hour')->format('Y-m-d H:i:s'),
+                    ]
+                );
+                $occupied = array_values(array_filter(
+                    $this->occupiedIntervals((int) $room['id'], $startUtc->modify('-6 hours')->format('Y-m-d H:i:s'), $endUtc->modify('+6 hours')->format('Y-m-d H:i:s')),
+                    static fn (array $row): bool => !in_array((int) ($row['id'] ?? 0), $ignoreReservationIds, true)
+                ));
+                if ($this->overlaps($occupied, $startUtc, $endUtc, $buffer)) {
+                    throw new HttpException(409, 'Tento termín je již obsazený.');
+                }
+
+                $status = $useMembership ? 'confirmed' : 'pending_payment';
+                $membershipId = $useMembership ? (int) $membership['id'] : null;
+                if ($useMembership && $membership['entries_remaining'] !== null) {
+                    $this->memberships->consumeEntry((int) $membership['id'], (int) $user['id']);
+                }
+
+                $id = (int) $db->insert('reservations', [
+                    'public_id' => Crypto::uuid(),
+                    'room_id' => (int) $room['id'],
+                    'user_id' => (int) $user['id'],
+                    'membership_id' => $membershipId,
+                    'status' => $status,
+                    'starts_at' => $startUtc->format('Y-m-d H:i:s'),
+                    'ends_at' => $endUtc->format('Y-m-d H:i:s'),
+                    'buffer_minutes' => $buffer,
+                    'guest_count' => $guestCount,
+                    'price' => $useMembership ? 0 : $price,
+                    'currency' => 'CZK',
+                    'created_at' => Clock::utc(),
+                    'updated_at' => Clock::utc(),
+                ]);
+                $this->claimOccupancy($db, (int) $room['id'], $startUtc->format('Y-m-d H:i:s'), $id);
+
+                $door = $db->fetch('SELECT id FROM doors WHERE room_id = :rid AND is_active = 1 LIMIT 1', ['rid' => (int) $room['id']]);
+                if ($door && $status === 'confirmed') {
+                    $early = $this->settings->int('access.early_minutes', 10);
+                    $late = $this->settings->int('access.late_minutes', 10);
+                    try {
+                        $db->insert('access_permissions', [
+                            'user_id' => (int) $user['id'],
+                            'door_id' => (int) $door['id'],
+                            'reservation_id' => $id,
+                            'valid_from' => $startUtc->modify('-' . $early . ' minutes')->format('Y-m-d H:i:s'),
+                            'valid_until' => $endUtc->modify('+' . $late . ' minutes')->format('Y-m-d H:i:s'),
+                            'created_at' => Clock::utc(),
+                        ]);
+                    } catch (\Throwable) {
+                        // rezervace platí i bez záznamu ke dveřím
+                    }
+                }
+
+                $reservation = $db->fetch('SELECT * FROM reservations WHERE id = :id', ['id' => $id]);
+                if ($status === 'confirmed') {
+                    try {
+                        $this->mail->queue('reservation-confirmed', $user['email'], [
+                            'subject' => 'Potvrzení rezervace PRIVOFIT',
+                            'first_name' => $user['first_name'],
+                            'starts_at' => Clock::format($reservation['starts_at']),
+                            'ends_at' => Clock::format($reservation['ends_at']),
+                        ], (int) $user['id']);
+                    } catch (\Throwable) {
+                        // rezervace platí i bez e-mailu
+                    }
+                }
+                return $reservation;
+            });
+        } catch (\PDOException $e) {
+            if ($this->isDuplicateKey($e)) {
                 throw new HttpException(409, 'Tento termín je již obsazený.');
             }
-
-            $status = $useMembership ? 'confirmed' : 'pending_payment';
-            $membershipId = $useMembership ? (int) $membership['id'] : null;
-            if ($useMembership && $membership['entries_remaining'] !== null) {
-                $this->memberships->consumeEntry((int) $membership['id'], (int) $user['id']);
+            throw $e;
+        } finally {
+            try {
+                $this->db->query("SELECT RELEASE_LOCK('{$lockName}')");
+            } catch (\Throwable) {
             }
-
-            $id = (int) $db->insert('reservations', [
-                'public_id' => Crypto::uuid(),
-                'room_id' => (int) $room['id'],
-                'user_id' => (int) $user['id'],
-                'membership_id' => $membershipId,
-                'status' => $status,
-                'starts_at' => $startUtc->format('Y-m-d H:i:s'),
-                'ends_at' => $endUtc->format('Y-m-d H:i:s'),
-                'buffer_minutes' => $buffer,
-                'guest_count' => $guestCount,
-                'price' => $useMembership ? 0 : $price,
-                'currency' => 'CZK',
-                'created_at' => Clock::utc(),
-                'updated_at' => Clock::utc(),
-            ]);
-
-            $door = $db->fetch('SELECT id FROM doors WHERE room_id = :rid AND is_active = 1 LIMIT 1', ['rid' => (int) $room['id']]);
-            if ($door && $status === 'confirmed') {
-                $early = $this->settings->int('access.early_minutes', 10);
-                $late = $this->settings->int('access.late_minutes', 10);
-                try {
-                    $db->insert('access_permissions', [
-                        'user_id' => (int) $user['id'],
-                        'door_id' => (int) $door['id'],
-                        'reservation_id' => $id,
-                        'valid_from' => $startUtc->modify('-' . $early . ' minutes')->format('Y-m-d H:i:s'),
-                        'valid_until' => $endUtc->modify('+' . $late . ' minutes')->format('Y-m-d H:i:s'),
-                        'created_at' => Clock::utc(),
-                    ]);
-                } catch (\Throwable) {
-                    // rezervace platí i bez záznamu ke dveřím
-                }
-            }
-
-            $reservation = $db->fetch('SELECT * FROM reservations WHERE id = :id', ['id' => $id]);
-            if ($status === 'confirmed') {
-                try {
-                    $this->mail->queue('reservation-confirmed', $user['email'], [
-                        'subject' => 'Potvrzení rezervace PRIVOFIT',
-                        'first_name' => $user['first_name'],
-                        'starts_at' => Clock::format($reservation['starts_at']),
-                        'ends_at' => Clock::format($reservation['ends_at']),
-                    ], (int) $user['id']);
-                } catch (\Throwable) {
-                    // rezervace platí i bez e-mailu
-                }
-            }
-            return $reservation;
-        });
+        }
     }
 
     public function cancel(array $user, string $publicId, bool $admin = false): void
     {
         $reservation = $this->owned($user, $publicId, $admin);
+        if (($reservation['status'] ?? '') === 'cancelled') {
+            return;
+        }
         if (!in_array($reservation['status'], ['pending_payment', 'confirmed'], true)) {
             throw new HttpException(422, 'Tuto rezervaci nelze zrušit.');
         }
-        $hours = $this->settings->int('reservation.cancellation_hours', 12);
         $starts = new \DateTimeImmutable($reservation['starts_at'], new \DateTimeZone('UTC'));
-        if (!$admin && $starts->modify('-' . $hours . ' hours') < Clock::nowUtc()) {
-            throw new HttpException(422, 'Storno je možné nejpozději ' . $hours . ' hodin před začátkem.');
+        if (!$admin && $starts <= Clock::nowUtc()) {
+            throw new HttpException(422, 'Termín už začal, nelze ho zrušit.');
         }
         $this->db->update('reservations', [
             'status' => 'cancelled',
             'cancelled_at' => Clock::utc(),
             'cancelled_by' => (int) $user['id'],
+            'updated_at' => Clock::utc(),
         ], 'id = :id', ['id' => (int) $reservation['id']]);
-        $this->db->query('DELETE FROM access_permissions WHERE reservation_id = :id', ['id' => (int) $reservation['id']]);
-        $this->mail->queue('reservation-cancelled', $user['email'] ?? $this->db->fetch('SELECT email, first_name FROM users WHERE id = :id', ['id' => (int) $reservation['user_id']])['email'], [
-            'subject' => 'Zrušení rezervace PRIVOFIT',
-            'first_name' => $user['first_name'],
-            'starts_at' => Clock::format($reservation['starts_at']),
-        ], (int) $reservation['user_id']);
+        $this->releaseOccupancy((int) $reservation['id']);
+        try {
+            $this->db->query('DELETE FROM access_permissions WHERE reservation_id = :id', ['id' => (int) $reservation['id']]);
+        } catch (\Throwable) {
+        }
+        try {
+            $recipient = $user['email'] ?? null;
+            if (!$recipient) {
+                $owner = $this->db->fetch('SELECT email, first_name FROM users WHERE id = :id', ['id' => (int) $reservation['user_id']]);
+                $recipient = $owner['email'] ?? null;
+            }
+            if (is_string($recipient) && $recipient !== '') {
+                $this->mail->queue('reservation-cancelled', $recipient, [
+                    'subject' => 'Zrušení rezervace PRIVOFIT',
+                    'first_name' => $user['first_name'] ?? '',
+                    'starts_at' => Clock::format($reservation['starts_at']),
+                ], (int) $reservation['user_id']);
+            }
+        } catch (\Throwable) {
+            // zrušení platí i bez e-mailu
+        }
     }
 
     public function owned(array $user, string $publicId, bool $admin = false): array
@@ -278,6 +328,7 @@ final class ReservationService
         );
         foreach ($rows as $row) {
             $this->db->update('reservations', ['status' => 'expired'], 'id = :id', ['id' => (int) $row['id']]);
+            $this->releaseOccupancy((int) $row['id']);
         }
         $this->db->query(
             "UPDATE reservations SET status = 'completed'
@@ -394,6 +445,58 @@ final class ReservationService
         return false;
     }
 
+    private function ensureOccupancyTable(): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+        $ready = true;
+        try {
+            $this->db->query(
+                "CREATE TABLE IF NOT EXISTS reservation_occupancy (
+                    room_id BIGINT UNSIGNED NOT NULL,
+                    starts_at DATETIME NOT NULL,
+                    reservation_id BIGINT UNSIGNED NOT NULL,
+                    PRIMARY KEY (room_id, starts_at),
+                    KEY idx_reservation_occupancy_reservation (reservation_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+        } catch (\Throwable) {
+        }
+    }
+
+    private function claimOccupancy(Database $db, int $roomId, string $startsAt, int $reservationId): void
+    {
+        try {
+            $db->insert('reservation_occupancy', [
+                'room_id' => $roomId,
+                'starts_at' => $startsAt,
+                'reservation_id' => $reservationId,
+            ]);
+        } catch (\PDOException $e) {
+            if ($this->isDuplicateKey($e)) {
+                throw new HttpException(409, 'Tento termín je již obsazený.');
+            }
+        } catch (\Throwable) {
+        }
+    }
+
+    private function releaseOccupancy(int $reservationId): void
+    {
+        try {
+            $this->db->query('DELETE FROM reservation_occupancy WHERE reservation_id = :id', ['id' => $reservationId]);
+        } catch (\Throwable) {
+        }
+    }
+
+    private function isDuplicateKey(\PDOException $e): bool
+    {
+        $sqlState = (string) ($e->errorInfo[0] ?? $e->getCode());
+        $driver = (int) ($e->errorInfo[1] ?? 0);
+        return $sqlState === '23000' || $driver === 1062;
+    }
+
     public function slotPrice(): string
     {
         return $this->priceForDuration($this->settings->int('reservation.min_minutes', 60));
@@ -475,6 +578,13 @@ final class ReservationService
                 'uid' => (int) $user['id'],
                 'start' => $start,
             ]);
+            $held = $this->db->fetchAll(
+                "SELECT id FROM reservations WHERE user_id = :uid AND status = 'expired' AND starts_at = :start",
+                ['uid' => (int) $user['id'], 'start' => $start]
+            );
+            foreach ($held as $row) {
+                $this->releaseOccupancy((int) $row['id']);
+            }
         }
     }
 
@@ -545,6 +655,7 @@ final class ReservationService
             'id' => (int) $reservation['id'],
             'pending' => 'pending_payment',
         ]);
+        $this->releaseOccupancy((int) $reservation['id']);
     }
 
     /** @return array{id:string,start:string,end:string,room:string} */

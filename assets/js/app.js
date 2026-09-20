@@ -111,4 +111,20 @@
       if (event.key === 'Escape') setOpen(false);
     });
   }
+
+  document.querySelectorAll("[data-copy]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const value = btn.getAttribute("data-copy") || "";
+      try {
+        await navigator.clipboard.writeText(value);
+        const previous = btn.textContent;
+        btn.textContent = "Zkopírováno";
+        window.setTimeout(() => {
+          btn.textContent = previous;
+        }, 1600);
+      } catch {
+        btn.textContent = "Zkopíruj ručně";
+      }
+    });
+  });
 })();

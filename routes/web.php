@@ -62,6 +62,8 @@ $router->get('/user/profil/export', [ProfileController::class, 'export'], [AuthM
 $router->post('/user/profil/vymaz', [ProfileController::class, 'requestDeletion'], [AuthMiddleware::class]);
 $router->get('/user/zabezpeceni/mfa', [ProfileController::class, 'showMfa'], [AuthMiddleware::class]);
 $router->post('/user/zabezpeceni/mfa', [ProfileController::class, 'confirmMfa'], [AuthMiddleware::class]);
+$router->post('/user/zabezpeceni/mfa/vypnout', [ProfileController::class, 'disableMfa'], [AuthMiddleware::class]);
+$router->get('/user/zabezpeceni/mfa/qr', [ProfileController::class, 'mfaQr'], [AuthMiddleware::class]);
 $router->get('/user/zabezpeceni/mfa/kody', [ProfileController::class, 'recoveryCodes'], [AuthMiddleware::class]);
 
 $router->get('/provoz', [StaffController::class, 'index'], [AuthMiddleware::class, StaffMiddleware::class]);

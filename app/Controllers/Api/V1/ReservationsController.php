@@ -68,7 +68,14 @@ final class ReservationsController extends Controller
 
     public function reservations(): never
     {
-        $this->send($this->api()->reservations($this->requireUser()));
+        try {
+            $this->send($this->api()->reservations($this->requireUser()));
+        } catch (HttpException $e) {
+            $this->jsonError($e->getMessage(), $e->status);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('API reservations', ['error' => $e->getMessage()]);
+            $this->send([]);
+        }
     }
 
     public function show(Request $request, array $params): never
@@ -84,14 +91,21 @@ final class ReservationsController extends Controller
     public function cancel(Request $request, array $params): never
     {
         try {
+            $requestId = $this->str($request, 'requestID', 'request_id');
+            if ($requestId === '') {
+                $requestId = trim((string) ($request->header('Idempotency-Key') ?? ''));
+            }
             $this->api()->cancel(
                 $this->requireUser(),
                 (string) $params['id'],
-                $this->str($request, 'requestID', 'request_id')
+                $requestId
             );
             $this->send(['ok' => true]);
         } catch (HttpException $e) {
             $this->jsonError($e->getMessage(), $e->status);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('API reservations/cancel', ['error' => $e->getMessage()]);
+            $this->jsonError('Rezervaci se nepodařilo zrušit.', 500);
         }
     }
 }

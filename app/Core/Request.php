@@ -28,6 +28,12 @@ final class Request
         if (str_ends_with($this->basePath, '/public')) {
             $this->basePath = substr($this->basePath, 0, -7) ?: '';
         }
+        // api/v1/reservations.php nesmí být document root — jinak by
+        // GET /api/v1/reservations skončil jako /reservations (404)
+        // a POST .../cancel by nedorazil do routeru.
+        if (preg_match('#^(.*?)/api/v\d+$#', $this->basePath, $match) === 1) {
+            $this->basePath = $match[1];
+        }
 
         $uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
         $uri = parse_url($uri, PHP_URL_PATH) ?: '/';

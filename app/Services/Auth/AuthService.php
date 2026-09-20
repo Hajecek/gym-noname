@@ -596,23 +596,47 @@ final class AuthService
 
     public function beginTotpSetup(array $user): array
     {
+        if ((int) $user['mfa_enabled'] === 1) {
+            throw new HttpException(400, 'Dvoufaktorové ověření už je aktivní.');
+        }
         $totp = TOTP::generate();
         $totp->setLabel($user['email']);
         $totp->setIssuer('PRIVOFIT');
-        $this->db->query('DELETE FROM totp_secrets WHERE user_id = :id AND confirmed_at IS NULL', ['id' => (int) $user['id']]);
+        $this->db->query('DELETE FROM totp_secrets WHERE user_id = :id', ['id' => (int) $user['id']]);
         $this->db->insert('totp_secrets', [
             'user_id' => (int) $user['id'],
             'secret_encrypted' => Crypto::encrypt($totp->getSecret()),
             'created_at' => Clock::utc(),
         ]);
+        $otpauth = $totp->getProvisioningUri();
+        $secret = $totp->getSecret();
         return [
-            'secret' => $totp->getSecret(),
-            'otpauth' => $totp->getProvisioningUri(),
+            'secret' => $secret,
+            'secret_grouped' => strtoupper(trim(chunk_split($secret, 4, ' '))),
+            'otpauth' => $otpauth,
         ];
+    }
+
+    public function totpProvisioningUri(array $user): string
+    {
+        $row = $this->db->fetch(
+            'SELECT * FROM totp_secrets WHERE user_id = :id ORDER BY id DESC LIMIT 1',
+            ['id' => (int) $user['id']]
+        );
+        if (!$row) {
+            throw new HttpException(404, 'Nejprve zahajte nastavení MFA.');
+        }
+        $totp = TOTP::createFromSecret(Crypto::decrypt($row['secret_encrypted']));
+        $totp->setLabel((string) $user['email']);
+        $totp->setIssuer('PRIVOFIT');
+        return $totp->getProvisioningUri();
     }
 
     public function confirmTotp(array $user, string $code): array
     {
+        if ((int) $user['mfa_enabled'] === 1) {
+            throw new HttpException(400, 'Dvoufaktorové ověření už je aktivní.');
+        }
         $row = $this->db->fetch('SELECT * FROM totp_secrets WHERE user_id = :id ORDER BY id DESC LIMIT 1', ['id' => (int) $user['id']]);
         if (!$row) {
             throw new HttpException(400, 'Nejprve zahajte nastavení MFA.');
@@ -637,6 +661,37 @@ final class AuthService
         }
         $this->audit->log((int) $user['id'], 'mfa.enable', 'user', $user['id'], null, ['mfa' => true]);
         return $codes;
+    }
+
+    public function disableTotp(array $user, string $password): void
+    {
+        if (self::mfaRequiredFor($user)) {
+            throw new HttpException(403, 'Pro tento účet nelze dvoufaktorové ověření vypnout.');
+        }
+        if ((int) $user['mfa_enabled'] !== 1) {
+            throw new HttpException(400, 'Dvoufaktorové ověření není zapnuté.');
+        }
+        if (!Crypto::verifyPassword($password, (string) $user['password_hash'])) {
+            throw new ValidationException(['current_password' => ['Současné heslo není správné.']], 'Současné heslo není správné.');
+        }
+        $this->db->update('users', ['mfa_enabled' => 0], 'id = :id', ['id' => (int) $user['id']]);
+        $this->db->query('DELETE FROM totp_secrets WHERE user_id = :id', ['id' => (int) $user['id']]);
+        $this->db->query('DELETE FROM recovery_codes WHERE user_id = :id', ['id' => (int) $user['id']]);
+        $this->audit->log((int) $user['id'], 'mfa.disable', 'user', $user['id'], ['mfa' => true], ['mfa' => false]);
+    }
+
+    public function remainingRecoveryCodes(int $userId): int
+    {
+        $row = $this->db->fetch(
+            'SELECT COUNT(*) AS c FROM recovery_codes WHERE user_id = :id AND used_at IS NULL',
+            ['id' => $userId]
+        );
+        return (int) ($row['c'] ?? 0);
+    }
+
+    public static function mfaRequiredFor(array $user): bool
+    {
+        return in_array($user['role'] ?? '', (array) config('security.mfa_required_roles', []), true);
     }
 
     public function sessions(int $userId): array

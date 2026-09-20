@@ -29,6 +29,8 @@ final class ProfileController extends Controller
             'membership' => (new MembershipService($this->app->db()))->activeForUser((int) $user['id']),
             'reservations' => ReservationService::make($this->app->db())->forUser((int) $user['id']),
             'payments' => (new PaymentService($this->app->db()))->forUser((int) $user['id']),
+            'mfaEnabled' => (int) $user['mfa_enabled'] === 1,
+            'mfaRequired' => AuthService::mfaRequiredFor($user),
             'errors' => Session::pull('errors', []),
         ]);
     }
@@ -178,10 +180,15 @@ final class ProfileController extends Controller
     public function showMfa(): never
     {
         $user = $this->requireUser();
-        $setup = AuthService::make($this->app->db())->beginTotpSetup($user);
+        $auth = AuthService::make($this->app->db());
+        $enabled = (int) $user['mfa_enabled'] === 1;
         $this->view('user/mfa', [
             'title' => 'Dvoufaktorové ověření',
-            'setup' => $setup,
+            'enabled' => $enabled,
+            'mfaRequired' => AuthService::mfaRequiredFor($user),
+            'recoveryLeft' => $enabled ? $auth->remainingRecoveryCodes((int) $user['id']) : 0,
+            'setup' => $enabled ? null : $auth->beginTotpSetup($user),
+            'errors' => Session::pull('errors', []),
         ]);
     }
 
@@ -191,8 +198,25 @@ final class ProfileController extends Controller
         try {
             $codes = AuthService::make($this->app->db())->confirmTotp($user, (string) $request->input('code', ''));
             Session::set('recovery_codes', $codes);
-            $this->flashSuccess('MFA je aktivní. Uložte si záložní kódy.');
+            $this->flashSuccess('Dvoufaktorové ověření je aktivní. Ulož si záložní kódy.');
             $this->redirect('/user/zabezpeceni/mfa/kody');
+        } catch (HttpException $e) {
+            $this->flashError($e->getMessage());
+            $this->redirect('/user/zabezpeceni/mfa');
+        }
+    }
+
+    public function disableMfa(Request $request): never
+    {
+        $user = $this->requireUser();
+        try {
+            AuthService::make($this->app->db())->disableTotp($user, (string) $request->input('current_password', ''));
+            $this->flashSuccess('Dvoufaktorové ověření bylo vypnuto.');
+            $this->redirect('/user/profil');
+        } catch (ValidationException $e) {
+            Session::set('errors', $e->errors);
+            $this->flashError($e->getMessage());
+            $this->redirect('/user/zabezpeceni/mfa');
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
             $this->redirect('/user/zabezpeceni/mfa');
@@ -207,5 +231,15 @@ final class ProfileController extends Controller
             'title' => 'Záložní kódy',
             'codes' => is_array($codes) ? $codes : [],
         ]);
+    }
+
+    public function mfaQr(): never
+    {
+        $user = $this->requireUser();
+        if ((int) $user['mfa_enabled'] === 1) {
+            throw new HttpException(404, 'QR kód není k dispozici.');
+        }
+        $uri = AuthService::make($this->app->db())->totpProvisioningUri($user);
+        Response::send(\App\Support\QrSvg::render($uri), 'image/svg+xml; charset=UTF-8');
     }
 }

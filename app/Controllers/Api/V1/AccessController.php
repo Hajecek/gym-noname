@@ -12,7 +12,20 @@ final class AccessController extends Controller
 {
     public function eligibility(): never
     {
-        $this->send($this->api()->eligibility($this->requireUser()));
+        try {
+            $this->send($this->api()->eligibility($this->requireUser()));
+        } catch (HttpException $e) {
+            $this->jsonError($e->getMessage(), $e->status);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('API eligibility', ['error' => $e->getMessage()]);
+            $this->send([
+                'allowed' => false,
+                'reason' => 'Stav vstupu teď nelze ověřit.',
+                'doorID' => 'door',
+                'expiresAt' => \App\Support\Clock::iso(\App\Support\Clock::utc()),
+                'doorName' => 'Vstupní dveře',
+            ]);
+        }
     }
 
     public function commands(Request $request): never

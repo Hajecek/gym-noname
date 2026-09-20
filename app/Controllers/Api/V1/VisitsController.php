@@ -8,6 +8,13 @@ final class VisitsController extends Controller
 {
     public function visits(): never
     {
-        $this->send($this->api()->visits($this->requireUser()));
+        try {
+            $this->send($this->api()->visits($this->requireUser()));
+        } catch (\App\Core\HttpException $e) {
+            $this->jsonError($e->getMessage(), $e->status);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('API visits', ['error' => $e->getMessage()]);
+            $this->send([]);
+        }
     }
 }

@@ -87,6 +87,32 @@ final class ApplicationFlowTest extends TestCase
         ReservationService::make($this->db)->create($user, $start, 60, 1);
     }
 
+    public function testCancelFreesTheSlotForSomeoneElse(): void
+    {
+        $user = $this->createVerifiedUser('cnl');
+        $this->grantMembership((int) $user['id']);
+        $startLocal = Clock::nowLocal()->modify('+13 days')->setTime(7, 0);
+        $start = $startLocal->format('Y-m-d H:i');
+        $startUtc = \App\Support\Clock::toUtc($startLocal)->format('Y-m-d H:i:s');
+        $this->db->query(
+            "UPDATE reservations SET status = 'cancelled' WHERE starts_at = :s AND status IN ('pending_payment', 'confirmed')",
+            ['s' => $startUtc]
+        );
+        try {
+            $this->db->query('DELETE FROM reservation_occupancy WHERE starts_at = :s', ['s' => $startUtc]);
+        } catch (\Throwable) {
+        }
+        $service = ReservationService::make($this->db);
+        $first = $service->create($user, $start, 60, 1);
+        $this->assertSame('confirmed', $first['status']);
+        $service->cancel($user, $first['public_id']);
+        $fresh = $this->db->fetch('SELECT status FROM reservations WHERE id = :id', ['id' => (int) $first['id']]);
+        $this->assertSame('cancelled', $fresh['status']);
+        $second = $service->create($user, $start, 60, 1);
+        $this->assertSame('confirmed', $second['status']);
+        $this->assertNotSame($first['id'], $second['id']);
+    }
+
     public function testDoorOpenWithoutReservationIsDenied(): void
     {
         $user = $this->createVerifiedUser('door');
