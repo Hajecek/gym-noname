@@ -16,7 +16,7 @@
                     Jen ty, tvůj playlist a prostor posunout se dál.
                 </p>
                 <div class="hero-actions">
-                    <a class="button magnetic" href="<?= e(url('/registrace')) ?>">Chci cvičit po svém <span>↗</span></a>
+                    <a class="button magnetic" href="<?= e(url('/zajem')) ?>">Chci cvičit po svém <span>↗</span></a>
                     <a class="text-button" href="#prostor">Prozkoumat prostor <span>↓</span></a>
                 </div>
                 <div class="hero-note">
@@ -205,14 +205,17 @@
             </details>
         </div>
     </section>
-    <section class="last-cta wrapper reveal">
+    <section class="last-cta wrapper reveal" id="zajem">
         <div id="peek-stage" aria-hidden="true"></div>
         <div class="cta-surface">
-            <div class="cta-top"><span>TVŮJ DALŠÍ KROK</span><span>↗</span></div>
+            <div class="cta-top"><span>PŘEDOBJEDNÁVKA</span><span>↗</span></div>
             <h2>TAK CO,<br><span>JDEŠ DO TOHO?</span></h2>
             <div class="cta-bottom">
-                <p>Udělej si čas na sebe.<br>Zbytek počká.</p>
-                <a class="button button-dark magnetic" href="<?= e(url('/registrace')) ?>">Chci svůj prostor <span>↗</span></a>
+                <div class="interest-copy">
+                    <p>Ještě neotevíráme. Nech e-mail<br>a dáme vědět, až bude tvůj prostor připravený.</p>
+                    <?php $source = 'home'; require dirname(__DIR__) . '/partials/interest-form.php'; ?>
+                    <p class="interest-note">Žádný spam. Jen zpráva, až PRIVOFIT spustíme.</p>
+                </div>
             </div>
         </div>
     </section>

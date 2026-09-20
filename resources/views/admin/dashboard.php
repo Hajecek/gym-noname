@@ -6,6 +6,7 @@
 <article class="card"><div class="stat-label">Tržby 30 dní</div><div class="stat-value"><?= e(money_format_czk($stats['revenue'])) ?></div></article>
 <article class="card"><div class="stat-label">Vstupy dnes</div><div class="stat-value"><?= (int) $stats['entries'] ?></div></article>
 <article class="card"><div class="stat-label">Neúspěšné vstupy</div><div class="stat-value"><?= (int) $stats['failed_access'] ?></div></article>
+<article class="card"><div class="stat-label">Zájem / předobjednávky</div><div class="stat-value"><a href="<?= e(url('/admin/zajem')) ?>"><?= (int) $stats['interest'] ?></a></div></article>
 </div>
 <div class="card" style="margin-top:16px">
 <h3>Vstupní systém</h3>

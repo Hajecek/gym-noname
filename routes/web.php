@@ -22,6 +22,8 @@ $router->get('/cenik', [PublicController::class, 'pricing']);
 $router->get('/faq', [PublicController::class, 'faq']);
 $router->get('/kontakt', [PublicController::class, 'contact']);
 $router->post('/kontakt', [PublicController::class, 'sendContact']);
+$router->get('/zajem', [PublicController::class, 'interest']);
+$router->post('/zajem', [PublicController::class, 'signupInterest']);
 $router->get('/dokument/{slug}', [PublicController::class, 'legal']);
 $router->get('/manifest.json', [PublicController::class, 'manifest']);
 $router->get('/avatar/{id}', [PublicController::class, 'avatar']);
@@ -83,5 +85,7 @@ $router->get('/admin/clenstvi', [AdminController::class, 'plans'], [AuthMiddlewa
 $router->post('/admin/clenstvi', [AdminController::class, 'savePlan'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/vstup', [AdminController::class, 'access'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->post('/admin/vstup/test', [AdminController::class, 'testOpen'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->get('/admin/zajem', [AdminController::class, 'interest'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->get('/admin/zajem/export', [AdminController::class, 'exportInterest'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/nastaveni', [AdminController::class, 'settings'], [AuthMiddleware::class, OwnerMiddleware::class]);
 $router->post('/admin/nastaveni', [AdminController::class, 'saveSettings'], [AuthMiddleware::class, OwnerMiddleware::class]);

@@ -3147,3 +3147,137 @@ textarea {
 #scene-fallback {
   display: none !important;
 }
+#zajem {
+  scroll-margin-top: 28px;
+}
+.interest-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: min(340px, 100%);
+  position: relative;
+  z-index: 4;
+}
+.interest-copy {
+  max-width: min(420px, 100%);
+  position: relative;
+  z-index: 4;
+}
+.last-cta .cta-bottom {
+  display: block;
+}
+.interest-copy .interest-form {
+  margin-top: 18px;
+}
+.interest-form input[type="email"] {
+  width: 100%;
+  border: 1px solid #10171433;
+  background: #fff;
+  color: #101714;
+  border-radius: 999px;
+  padding: 16px 22px;
+  font: inherit;
+}
+.interest-form input[type="email"]:focus {
+  outline: 2px solid #c6f21a;
+  outline-offset: 2px;
+}
+.interest-form .button {
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+}
+.interest-honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.interest-note {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: #33400b99;
+}
+@media (max-width: 850px) {
+  .interest-form {
+    margin-top: 18px;
+  }
+}
+.interest-page {
+  position: relative;
+  isolation: isolate;
+  padding: 28px 0 72px;
+  min-height: calc(100vh - 280px);
+}
+.interest-page .cta-surface {
+  position: relative;
+  z-index: 2;
+  padding: 40px 300px 48px 48px;
+  color: var(--ink);
+}
+.interest-page h1 {
+  font-size: clamp(34px, 4.6vw, 58px);
+  line-height: 1.06;
+  font-weight: 700;
+  letter-spacing: -2.4px;
+  margin: 22px 0 24px;
+}
+.interest-page h1 > span {
+  color: #101714;
+}
+.interest-page-copy {
+  max-width: 540px;
+  position: relative;
+  z-index: 4;
+}
+.interest-page-copy p {
+  font-size: 17px;
+  line-height: 1.45;
+  color: #33400b;
+  margin: 0 0 14px;
+}
+.interest-page .interest-form {
+  margin: 10px 0 0;
+  max-width: 380px;
+}
+.interest-page #peek-stage {
+  position: absolute;
+  right: 40px;
+  top: -40px;
+  width: 320px;
+  height: 360px;
+  z-index: 1;
+  pointer-events: none;
+}
+.interest-back {
+  display: inline-block;
+  margin-top: 22px;
+  color: #101714;
+  font-weight: 600;
+  font-size: 14px;
+}
+.interest-back:hover {
+  color: #293a1c;
+}
+@media (max-width: 850px) {
+  .interest-page {
+    padding: 12px 0 48px;
+    min-height: 0;
+  }
+  .interest-page .cta-surface {
+    padding: 28px 22px 32px;
+    border-radius: 20px;
+  }
+  .interest-page h1 {
+    font-size: clamp(30px, 8vw, 44px);
+    letter-spacing: -1.6px;
+    margin: 18px 0 20px;
+  }
+  .interest-page-copy p {
+    font-size: 16px;
+  }
+  .interest-page #peek-stage {
+    display: none;
+  }
+}

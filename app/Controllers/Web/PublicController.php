@@ -74,6 +74,71 @@ final class PublicController extends Controller
         $this->redirect('/kontakt');
     }
 
+    public function interest(Request $request): never
+    {
+        $this->publicView('public/interest', [
+            'title' => 'Zjišťujeme zájem — PRIVOFIT',
+            'page' => 'interest',
+            'description' => 'PRIVOFIT ještě neotevírá. Teď zjišťujeme, kolik lidí by o soukromé fitness stálo.',
+        ]);
+    }
+
+    public function signupInterest(Request $request): never
+    {
+        $back = $this->interestReturnPath($request);
+        $limiter = new RateLimiter($this->app->db());
+        if (!$limiter->attempt('interest', $request->ip(), 8, 60)) {
+            $this->flashError('Příliš mnoho pokusů. Zkus to za chvíli znovu.');
+            $this->redirect($back);
+        }
+
+        if (trim((string) $request->input('website', '')) !== '') {
+            $this->flashSuccess('Díky. Až otevřeme, ozveme se.');
+            $this->redirect($back);
+        }
+
+        $email = mb_strtolower(trim((string) $request->input('email', '')));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) {
+            $this->rememberOld($request);
+            $this->flashError('Zadej platný e-mail, ať víme, kam se ozvat.');
+            $this->redirect($back);
+        }
+
+        $source = $this->interestSource($request);
+        $existing = $this->app->db()->fetch('SELECT id FROM interest_signups WHERE email = :e', ['e' => $email]);
+        if ($existing) {
+            $this->flashSuccess('Tento e-mail už evidujeme. Ozveme se, až bude PRIVOFIT připravené.');
+            $this->redirect($back);
+        }
+
+        try {
+            $this->app->db()->insert('interest_signups', [
+                'email' => $email,
+                'source' => substr($source, 0, 40),
+                'ip_address' => $request->ip(),
+                'user_agent' => substr($request->userAgent(), 0, 255) ?: null,
+                'created_at' => Clock::utc(),
+            ]);
+        } catch (\PDOException $e) {
+            if ($e->getCode() !== '23000') {
+                throw $e;
+            }
+        }
+
+        $this->flashSuccess('Díky. Až otevřeme, ozveme se na tento e-mail.');
+        $this->redirect($back);
+    }
+
+    private function interestSource(Request $request): string
+    {
+        return preg_replace('/[^a-z0-9_-]/', '', mb_strtolower((string) $request->input('source', 'home'))) ?: 'home';
+    }
+
+    private function interestReturnPath(Request $request): string
+    {
+        return $this->interestSource($request) === 'home' ? '/#zajem' : '/zajem';
+    }
+
     public function legal(Request $request, array $params): never
     {
         $slug = $params['slug'] ?? 'obchodni-podminky';

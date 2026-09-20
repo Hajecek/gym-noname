@@ -7,6 +7,7 @@ namespace App\Controllers\Admin;
 use App\Controllers\Controller;
 use App\Core\HttpException;
 use App\Core\Request;
+use App\Core\Response;
 use App\Services\Access\AccessControlService;
 use App\Services\AuditService;
 use App\Services\Auth\AuthService;
@@ -30,7 +31,12 @@ final class AdminController extends Controller
             'entries' => (int) $db->fetchColumn("SELECT COUNT(*) FROM access_logs WHERE authorization_result = 'granted' AND created_at >= :a", ['a' => $todayStart]),
             'failed_access' => (int) $db->fetchColumn("SELECT COUNT(*) FROM access_logs WHERE authorization_result = 'denied' AND created_at >= :a", ['a' => $todayStart]),
             'door' => AccessControlService::make($db)->doorStatus(),
+            'interest' => 0,
         ];
+        try {
+            $stats['interest'] = (int) $db->fetchColumn('SELECT COUNT(*) FROM interest_signups');
+        } catch (\PDOException) {
+        }
         $this->view('admin/dashboard', ['title' => 'Administrace', 'stats' => $stats], 'layouts/admin');
     }
 
@@ -331,5 +337,47 @@ final class AdminController extends Controller
         (new AuditService($this->app->db()))->log($this->app->auth()->id(), 'settings.update', 'app_settings', null, null, $request->all(), $request->ip());
         $this->flashSuccess('Nastavení bylo uloženo.');
         $this->redirect('/admin/nastaveni');
+    }
+
+    public function interest(Request $request): never
+    {
+        $q = trim((string) $request->query('q', ''));
+        $sql = 'SELECT * FROM interest_signups';
+        $params = [];
+        if ($q !== '') {
+            $sql .= ' WHERE email LIKE :q';
+            $params['q'] = '%' . $q . '%';
+        }
+        $sql .= ' ORDER BY created_at DESC LIMIT 500';
+        $this->view('admin/interest', [
+            'title' => 'Předobjednávky',
+            'signups' => $this->app->db()->fetchAll($sql, $params),
+            'q' => $q,
+            'total' => (int) $this->app->db()->fetchColumn('SELECT COUNT(*) FROM interest_signups'),
+        ], 'layouts/admin');
+    }
+
+    public function exportInterest(): never
+    {
+        $rows = $this->app->db()->fetchAll(
+            'SELECT email, source, ip_address, created_at FROM interest_signups ORDER BY created_at DESC'
+        );
+        $handle = fopen('php://temp', 'r+');
+        if ($handle === false) {
+            throw new HttpException(500, 'Export se nepodařilo připravit.');
+        }
+        fputcsv($handle, ['email', 'zdroj', 'ip', 'vytvořeno']);
+        foreach ($rows as $row) {
+            fputcsv($handle, [
+                $row['email'],
+                $row['source'],
+                $row['ip_address'] ?? '',
+                $row['created_at'],
+            ]);
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle) ?: '';
+        fclose($handle);
+        Response::download('privofit-zajem.csv', $csv, 'text/csv; charset=UTF-8');
     }
 }

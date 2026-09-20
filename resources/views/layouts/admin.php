@@ -16,6 +16,7 @@ function admin_active(string $prefix): string {
             <a class="<?= admin_active('/admin/clenstvi') ?>" href="<?= e(url('/admin/clenstvi')) ?>">Členství</a>
             <a class="<?= admin_active('/admin/obsah') ?>" href="<?= e(url('/admin/obsah')) ?>">Obsah</a>
             <a class="<?= admin_active('/admin/vstup') ?>" href="<?= e(url('/admin/vstup')) ?>">Vstupní systém</a>
+            <a class="<?= admin_active('/admin/zajem') ?>" href="<?= e(url('/admin/zajem')) ?>">Předobjednávky</a>
             <?php if (($user['role'] ?? '') === 'owner'): ?>
                 <a class="<?= admin_active('/admin/nastaveni') ?>" href="<?= e(url('/admin/nastaveni')) ?>">Nastavení</a>
             <?php endif; ?>

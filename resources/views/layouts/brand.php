@@ -22,7 +22,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=8">
+    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=13">
     <link rel="manifest" href="<?= e(url('/manifest.json')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="PRIVOFIT">
@@ -37,6 +37,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
         <a href="<?= e(url('/#jak-to-funguje')) ?>">Jak to funguje</a>
         <a href="<?= e(url('/#vstup')) ?>">Vstup do fitka</a>
         <a href="<?= e(url('/#otazky')) ?>">Otázky</a>
+        <a href="<?= e(url('/zajem')) ?>">Zájem</a>
     </nav>
     <div class="nav-actions">
         <?php if ($user): ?>
@@ -49,8 +50,8 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     </div>
     <button class="menu-toggle" aria-label="Otevřít menu" aria-expanded="false">☰</button>
 </header>
-<?php if ($msg = flash('success')): ?><div class="flash flash-success wrapper"><?= e($msg) ?></div><?php endif; ?>
-<?php if ($msg = flash('error')): ?><div class="flash flash-error wrapper"><?= e($msg) ?></div><?php endif; ?>
+<?php if ($msg = flash('success')): ?><div class="flash flash-success wrapper" role="status"><?= e($msg) ?></div><?php endif; ?>
+<?php if ($msg = flash('error')): ?><div class="flash flash-error wrapper" role="alert"><?= e($msg) ?></div><?php endif; ?>
 <div id="main">
 <?= $content ?? '' ?>
 </div>
