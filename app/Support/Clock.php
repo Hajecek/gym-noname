@@ -53,6 +53,11 @@ final class Clock
         if ($utc === null || $utc === '') {
             return null;
         }
-        return (new \DateTimeImmutable($utc, new \DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
+        if (preg_match('/Z$|[+\-]\d{2}:?\d{2}$/', $utc) === 1) {
+            return (new \DateTimeImmutable($utc))->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z');
+        }
+        $dt = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $utc, new \DateTimeZone('UTC'))
+            ?: new \DateTimeImmutable($utc, new \DateTimeZone('UTC'));
+        return $dt->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z');
     }
 }

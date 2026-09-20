@@ -252,7 +252,7 @@ final class MobileApiService
                 $holds[] = $hold;
             }
 
-            $settlement = $this->settleCheckout($user, $unit, $count, $total, $requestId, $applePay);
+            $settlement = $this->settleCheckout($user, $unit, $count, $total, $requestId, $applePay, $holds);
             $confirmed = [];
             foreach ($holds as $hold) {
                 $confirmed[] = $this->reservations->confirmPending($hold, $user);
@@ -496,9 +496,10 @@ final class MobileApiService
     }
 
     /**
+     * @param list<array<string, mixed>> $holds
      * @return array{provider:string,reference:?string}
      */
-    private function settleCheckout(array $user, float $unit, int $count, string $total, string $requestId, array $applePay): array
+    private function settleCheckout(array $user, float $unit, int $count, string $total, string $requestId, array $applePay, array $holds = []): array
     {
         if ($unit <= 0) {
             $membership = $this->memberships->activeForUser((int) $user['id']);
@@ -516,13 +517,16 @@ final class MobileApiService
             throw new HttpException(503, 'Stripe není nakonfigurovaný.');
         }
 
+        $slotLocal = isset($holds[0]['starts_at']) ? Clock::format((string) $holds[0]['starts_at'], 'j. n. Y H:i') : Clock::nowLocal()->format('j. n. Y H:i');
         $paymentData = $this->applePayJson($applePay);
         $gateway = StripeGateway::fromConfig();
-        $description = 'PRIVOFIT rezervace';
+        $description = 'PRIVOFIT rezervace ' . $slotLocal . ' (Europe/Prague)';
         $meta = [
             'user' => (string) ($user['public_id'] ?? $user['id'] ?? ''),
             'request' => $requestId,
             'slots' => (string) $count,
+            'local_time' => $slotLocal,
+            'timezone' => 'Europe/Prague',
         ];
 
         if ($paymentData !== null) {
