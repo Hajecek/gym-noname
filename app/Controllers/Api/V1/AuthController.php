@@ -26,11 +26,10 @@ final class AuthController extends Controller
     public function login(Request $request): never
     {
         try {
-            $user = $this->auth()->login(
+            $user = $this->auth()->loginFromApp(
                 $this->str($request, 'identifier', 'email'),
                 (string) $request->input('password', ''),
                 $request,
-                false,
                 $request->input('totp') !== null ? (string) $request->input('totp') : null
             );
             $this->send($this->api()->issueSession($user, $request));

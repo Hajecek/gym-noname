@@ -59,6 +59,9 @@ final class Application
     public function run(): void
     {
         $this->sendSecurityHeaders();
+        if ((int) ($_SERVER['REDIRECT_STATUS'] ?? 0) === 404) {
+            http_response_code(200);
+        }
         $request = $this->request;
 
         if (!$request->isApi()) {
@@ -164,8 +167,16 @@ final class Application
         $path = '/' . ltrim($path, '/');
         $configured = rtrim((string) $this->config('app.url', ''), '/');
         if ($configured !== '' && preg_match('#^https?://#i', $configured) === 1) {
-            $configured = rtrim((string) (parse_url($configured, PHP_URL_PATH) ?: ''), '/');
+            $prefix = rtrim((string) (parse_url($configured, PHP_URL_PATH) ?: ''), '/');
+            return $prefix . ($path === '/' ? '/' : $path);
         }
+
+        $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        $host = preg_replace('/:\d+$/', '', $host) ?? $host;
+        if ($host !== '' && $host !== 'localhost' && !str_ends_with($host, '.local') && !preg_match('/^\d+\.\d+\.\d+\.\d+$/', $host)) {
+            return $path === '/' ? '/' : $path;
+        }
+
         if ($configured !== '') {
             return $configured . ($path === '/' ? '/' : $path);
         }

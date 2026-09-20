@@ -1,5 +1,7 @@
 /.env
 /.env.local
+/.env.production
+/.env.wedos
 /vendor/
 /storage/logs/*
 !/storage/logs/.gitkeep

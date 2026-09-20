@@ -23,7 +23,7 @@ final class Request
             }
         }
 
-        $scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+        $scriptName = self::stripHostingPrefix(str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '')));
         $this->basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
         if (str_ends_with($this->basePath, '/public')) {
             $this->basePath = substr($this->basePath, 0, -7) ?: '';
@@ -31,7 +31,7 @@ final class Request
 
         $uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
         $uri = parse_url($uri, PHP_URL_PATH) ?: '/';
-        $uri = rawurldecode($uri);
+        $uri = self::stripHostingPrefix(rawurldecode($uri));
 
         if ($this->basePath !== '' && $this->basePath !== '/' && str_starts_with($uri, $this->basePath)) {
             $uri = substr($uri, strlen($this->basePath)) ?: '/';
@@ -44,6 +44,19 @@ final class Request
         if ($this->path === '/index.php') {
             $this->path = '/';
         }
+    }
+
+    /**
+     * Wedos interně servíruje web z /domains/domena.cz — to nesmí být součástí veřejné URL.
+     */
+    private static function stripHostingPrefix(string $path): string
+    {
+        $stripped = preg_replace('#^/domains/[^/]+#', '', $path);
+        if (!is_string($stripped) || $stripped === '') {
+            return '/';
+        }
+
+        return $stripped;
     }
 
     public function method(): string

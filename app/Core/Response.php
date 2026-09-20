@@ -9,6 +9,7 @@ final class Response
     public static function html(string $html, int $status = 200): never
     {
         http_response_code($status);
+        header('Status: ' . $status . ' ' . ($status === 200 ? 'OK' : 'Error'), true, $status);
         header('Content-Type: text/html; charset=UTF-8');
         echo $html;
         exit;

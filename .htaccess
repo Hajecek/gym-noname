@@ -20,6 +20,14 @@ ServerSignature Off
 <IfModule mod_rewrite.c>
     RewriteEngine On
     DirectorySlash On
+
+    # Wedos: veřejné URL nesmí obsahovat /domains/privofit.cz/ ani lokální /privofit/
+    RewriteCond %{THE_REQUEST} \s/+domains/privofit\.cz(?:/([^?\s]*))? [NC]
+    RewriteRule ^ /%1 [R=301,L,NE]
+    RewriteCond %{HTTP_HOST} ^(www\.)?privofit\.cz$ [NC]
+    RewriteCond %{THE_REQUEST} \s/+privofit[/?\s] [NC]
+    RewriteRule ^privofit(?:/(.*))?$ /$1 [R=301,L,NE]
+
     RewriteRule ^$ index.php [L]
 
     RewriteCond %{HTTP:Authorization} .
@@ -45,6 +53,10 @@ ServerSignature Off
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [L]
+</IfModule>
+
+<IfModule mod_setenvif.c>
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 </IfModule>
 
 <IfModule mod_mime.c>

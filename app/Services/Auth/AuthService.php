@@ -146,6 +146,22 @@ final class AuthService
 
     public function login(string $identifier, string $password, Request $request, bool $remember = false, ?string $totp = null): array
     {
+        $user = $this->verifyCredentials($identifier, $password, $request, $totp);
+        return $this->establishWebSession($user, $request, $remember);
+    }
+
+    public function loginFromApp(string $identifier, string $password, Request $request, ?string $totp = null): array
+    {
+        $user = $this->verifyCredentials($identifier, $password, $request, $totp);
+        $this->db->update('users', [
+            'last_login_at' => Clock::utc(),
+            'last_login_ip' => $request->ip(),
+        ], 'id = :id', ['id' => (int) $user['id']]);
+        return $this->findById((int) $user['id']);
+    }
+
+    public function verifyCredentials(string $identifier, string $password, Request $request, ?string $totp = null): array
+    {
         $identifier = trim($identifier);
         $lookupKey = $identifier;
         if (str_contains($identifier, '@')) {
@@ -181,7 +197,7 @@ final class AuthService
                 'successful' => 0,
                 'created_at' => Clock::utc(),
             ]);
-            throw new HttpException(401, $generic);
+            throw new HttpException(422, $generic);
         }
 
         if ((int) $user['mfa_enabled'] === 1) {
@@ -189,7 +205,7 @@ final class AuthService
                 throw new MfaRequiredException($user);
             }
             if (!$this->verifyTotp($user, $totp) && !$this->consumeRecoveryCode($user, $totp)) {
-                throw new HttpException(401, 'Neplatný ověřovací kód.');
+                throw new HttpException(422, 'Neplatný ověřovací kód.');
             }
         }
 
@@ -200,7 +216,7 @@ final class AuthService
             'created_at' => Clock::utc(),
         ]);
 
-        return $this->establishWebSession($user, $request, $remember);
+        return $user;
     }
 
     public function completeMfaLogin(int $userId, string $totp, Request $request, bool $remember = false): array

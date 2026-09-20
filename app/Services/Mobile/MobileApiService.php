@@ -71,7 +71,15 @@ final class MobileApiService
 
     public function issueSession(array $user, Request $request): array
     {
-        return $this->sessionPayload($this->auth->issueApiTokens($user, $request, 'iOS', 'ios'));
+        $platform = strtolower(trim((string) $request->input('platform', 'ios')));
+        if (!in_array($platform, ['ios', 'android', 'web', 'other'], true)) {
+            $platform = 'ios';
+        }
+        $deviceName = trim((string) $request->input('deviceName', $request->input('device_name', 'iOS')));
+        if ($deviceName === '') {
+            $deviceName = 'iOS';
+        }
+        return $this->sessionPayload($this->auth->issueApiTokens($user, $request, $deviceName, $platform));
     }
 
     public function gymInfo(): array
