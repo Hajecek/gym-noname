@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Core\Database;
 use App\Core\Env;
+use App\Services\AppPushService;
 use App\Services\MailService;
 use App\Services\MembershipService;
 use App\Services\ReservationService;
@@ -24,7 +25,14 @@ if (PHP_SAPI !== 'cli') {
 
 $db = new Database();
 $expired = ReservationService::make($db)->expireHolds();
-(new MembershipService($db))->expireOverdue();
+$memberships = new MembershipService($db);
+$expiredMembers = $memberships->expireOverdue();
+$push = AppPushService::make($db);
+foreach ($expiredMembers as $userId) {
+    if (!$memberships->activeForUser($userId)) {
+        $push->membershipExpired($userId);
+    }
+}
 $sent = (new MailService($db))->processPending(50);
 $db->query('DELETE FROM rate_limit_events WHERE created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)');
 $db->query('DELETE FROM login_attempts WHERE created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 14 DAY)');

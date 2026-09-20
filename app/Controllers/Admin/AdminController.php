@@ -9,6 +9,7 @@ use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Access\AccessControlService;
+use App\Services\AppPushService;
 use App\Services\AuditService;
 use App\Services\Auth\AuthService;
 use App\Services\Content\ContentService;
@@ -92,6 +93,9 @@ final class AdminController extends Controller
             'blocked_reason' => $status === 'blocked' ? (string) $request->input('blocked_reason', '') : null,
         ], 'id = :id', ['id' => (int) $user['id']]);
         (new AuditService($this->app->db()))->log((int) $actor['id'], 'user.status', 'user', $user['id'], $user['status'], $status, $request->ip());
+        if ($status !== (string) $user['status']) {
+            AppPushService::make($this->app->db())->accountStatusChanged($user, $status);
+        }
         $this->flashSuccess('Stav účtu byl uložen.');
         $this->redirect('/admin/zakaznici/' . $user['public_id']);
     }
@@ -124,6 +128,7 @@ final class AdminController extends Controller
         $actor = $this->requireUser();
         $user = $this->app->db()->fetch('SELECT * FROM users WHERE public_id = :id', ['id' => $params['id']]);
         (new MembershipService($this->app->db()))->assignPlan((int) $user['id'], (int) $request->input('plan_id'), 'active', (int) $actor['id']);
+        AppPushService::make($this->app->db())->membershipAssigned((int) $user['id']);
         $this->flashSuccess('Členství bylo přiřazeno.');
         $this->redirect('/admin/zakaznici/' . $user['public_id']);
     }

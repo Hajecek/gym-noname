@@ -23,12 +23,32 @@ final class Application
     {
         $root = dirname(__DIR__, 2);
         Env::load($root . '/.env');
+        if (self::isProductionHost()) {
+            Env::load($root . '/.env.production');
+        }
         date_default_timezone_set((string) Env::get('APP_TIMEZONE', 'UTC'));
 
         $app = new self();
         self::$instance = $app;
         $app->boot($root);
         return $app;
+    }
+
+    private static function isProductionHost(): bool
+    {
+        $candidates = [
+            $_SERVER['HTTP_HOST'] ?? '',
+            $_SERVER['SERVER_NAME'] ?? '',
+            $_SERVER['HTTP_X_FORWARDED_HOST'] ?? '',
+        ];
+        foreach ($candidates as $raw) {
+            $host = strtolower(trim(explode(',', (string) $raw)[0]));
+            $host = preg_replace('/:\d+$/', '', $host) ?? $host;
+            if ($host === 'privofit.cz' || $host === 'www.privofit.cz' || str_ends_with($host, '.privofit.cz')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static function getInstance(): self
@@ -66,11 +86,6 @@ final class Application
 
         if (!$request->isApi()) {
             Session::start();
-        } else {
-            // API může používat session cookie nebo bearer token
-            if (!$request->bearerToken()) {
-                Session::start();
-            }
         }
 
         try {
@@ -216,6 +231,10 @@ final class Application
             header($name . ': ' . $value);
         }
         header('X-Powered-By: PRIVOFIT');
+        if ($this->request->isApi()) {
+            header('Cache-Control: no-store');
+            return;
+        }
         $nonce = Crypto::token(16);
         Session::start();
         Session::set('_csp_nonce', $nonce);

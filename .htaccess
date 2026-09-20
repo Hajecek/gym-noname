@@ -34,6 +34,10 @@ ServerSignature Off
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
+    # GET /api/v1/reservations by jinak trefil soubor api/v1/reservations.php (MultiViews)
+    # a vrátil prázdnou odpověď místo JSON pole rezervací.
+    RewriteRule ^api(/|$) index.php [L]
+
     # Staré odkazy /public/... přesměruj na kořen projektu
     RewriteCond %{REQUEST_URI} ^(.*?)/public(/.*)?$
     RewriteRule ^public(/.*)?$ %1%2 [R=301,L]

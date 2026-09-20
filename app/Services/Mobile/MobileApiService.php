@@ -312,10 +312,14 @@ final class MobileApiService
 
     public function inbox(array $user): array
     {
-        $rows = $this->db->fetchAll(
-            'SELECT * FROM notifications WHERE user_id = :uid ORDER BY created_at DESC LIMIT 40',
-            ['uid' => (int) $user['id']]
-        );
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT * FROM notifications WHERE user_id = :uid ORDER BY created_at DESC LIMIT 40',
+                ['uid' => (int) $user['id']]
+            );
+        } catch (\Throwable) {
+            return [];
+        }
         $items = [];
         foreach ($rows as $row) {
             $payload = json_decode((string) $row['payload_json'], true) ?: [];

@@ -106,15 +106,30 @@ final class MembershipService
         }
     }
 
-    public function expireOverdue(?int $userId = null): void
+    public function expireOverdue(?int $userId = null): array
     {
-        $sql = "UPDATE memberships SET status = 'expired' WHERE status = 'active' AND ends_at IS NOT NULL AND ends_at < :now";
+        $sql = "SELECT DISTINCT user_id FROM memberships WHERE status = 'active' AND ends_at IS NOT NULL AND ends_at < :now";
         $params = ['now' => Clock::utc()];
         if ($userId) {
             $sql .= ' AND user_id = :uid';
             $params['uid'] = $userId;
         }
-        $this->db->query($sql, $params);
+        $rows = $this->db->fetchAll($sql, $params);
+        $ids = [];
+        foreach ($rows as $row) {
+            $ids[] = (int) $row['user_id'];
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $update = "UPDATE memberships SET status = 'expired' WHERE status = 'active' AND ends_at IS NOT NULL AND ends_at < :now";
+        $updateParams = ['now' => Clock::utc()];
+        if ($userId) {
+            $update .= ' AND user_id = :uid';
+            $updateParams['uid'] = $userId;
+        }
+        $this->db->query($update, $updateParams);
+        return $ids;
     }
 
     public function history(int $userId): array

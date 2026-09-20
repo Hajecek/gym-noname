@@ -394,7 +394,11 @@ final class ReservationService
     /** @return list<array{id:string,start:string,end:string,room:string}> */
     public function availableSlotsForApp(int $days = 14): array
     {
-        $room = $this->room();
+        try {
+            $room = $this->room();
+        } catch (HttpException) {
+            return [];
+        }
         $duration = $this->settings->int('reservation.min_minutes', 60);
         $out = [];
         $day = Clock::nowLocal()->setTime(0, 0);

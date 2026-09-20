@@ -21,6 +21,9 @@ final class Auth
             $this->hydrateBearer($request->bearerToken());
             return;
         }
+        if ($request->isApi()) {
+            return;
+        }
 
         Session::start();
         $userId = Session::get('user_id');

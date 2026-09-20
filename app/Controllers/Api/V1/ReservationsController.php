@@ -18,7 +18,14 @@ final class ReservationsController extends Controller
 
     public function slots(): never
     {
-        $this->send($this->api()->slots());
+        try {
+            $this->send($this->api()->slots());
+        } catch (HttpException $e) {
+            if ($e->status === 404) {
+                $this->send([]);
+            }
+            $this->jsonError($e->getMessage(), $e->status);
+        }
     }
 
     public function quote(Request $request): never

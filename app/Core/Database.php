@@ -27,13 +27,22 @@ final class Database
 
         $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $host, $port, $name, $charset);
 
-        $this->pdo = new PDO($dsn, $user, $pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
-        $this->pdo->exec("SET time_zone = '+00:00'");
-        $this->pdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
+        try {
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_TIMEOUT => 5,
+            ];
+            if (defined('PDO::MYSQL_ATTR_CONNECT_TIMEOUT')) {
+                $options[PDO::MYSQL_ATTR_CONNECT_TIMEOUT] = 5;
+            }
+            $this->pdo = new PDO($dsn, $user, $pass, $options);
+            $this->pdo->exec("SET time_zone = '+00:00'");
+            $this->pdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
+        } catch (PDOException $e) {
+            throw new HttpException(503, 'Databáze je teď nedostupná.');
+        }
 
         return $this->pdo;
     }
