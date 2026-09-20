@@ -35,7 +35,9 @@ final class Migrator
                 continue;
             }
             $sql = (string) file_get_contents($file);
-            $this->db->pdo()->exec($sql);
+            foreach ($this->statements($sql) as $statement) {
+                $this->db->pdo()->exec($statement);
+            }
             $this->db->insert('schema_migrations', [
                 'version' => $version,
                 'applied_at' => Clock::utc(),
@@ -43,5 +45,27 @@ final class Migrator
             $ran[] = $version;
         }
         return $ran;
+    }
+
+    /** @return list<string> */
+    private function statements(string $sql): array
+    {
+        $parts = preg_split('/;\s*(?:--[^\n]*)?\s*$/m', $sql) ?: [];
+        $statements = [];
+        foreach ($parts as $part) {
+            $lines = [];
+            foreach (preg_split("/\r\n|\n|\r/", $part) ?: [] as $line) {
+                $trimmed = ltrim($line);
+                if ($trimmed === '' || str_starts_with($trimmed, '--')) {
+                    continue;
+                }
+                $lines[] = $line;
+            }
+            $statement = trim(implode("\n", $lines));
+            if ($statement !== '') {
+                $statements[] = $statement;
+            }
+        }
+        return $statements;
     }
 }

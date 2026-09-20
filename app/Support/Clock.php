@@ -47,4 +47,12 @@ final class Clock
     {
         return new \DateTimeImmutable($dateTime, new \DateTimeZone(self::displayTimezone()));
     }
+
+    public static function iso(?string $utc): ?string
+    {
+        if ($utc === null || $utc === '') {
+            return null;
+        }
+        return (new \DateTimeImmutable($utc, new \DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
+    }
 }

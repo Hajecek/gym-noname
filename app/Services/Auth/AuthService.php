@@ -71,10 +71,10 @@ final class AuthService
         if (in_array($username, (array) config('app.reserved_usernames', []), true)) {
             $validator->add('username', 'Toto uživatelské jméno není k dispozici.');
         }
-        if ($this->db->fetch('SELECT id FROM users WHERE username = :u', ['u' => $username])) {
+        if ($this->db->fetch('SELECT id FROM users WHERE username = :u AND deleted_at IS NULL', ['u' => $username])) {
             $validator->add('username', 'Toto uživatelské jméno je již obsazené.');
         }
-        if ($this->db->fetch('SELECT id FROM users WHERE email = :e', ['e' => $email])) {
+        if ($this->db->fetch('SELECT id FROM users WHERE email = :e AND deleted_at IS NULL', ['e' => $email])) {
             $validator->add('email', 'Tento e-mail nelze použít.');
         }
         if (!empty($input['phone']) && $phone === null) {
@@ -651,6 +651,68 @@ final class AuthService
             throw new HttpException(404, 'Uživatel nebyl nalezen.');
         }
         return $user;
+    }
+
+    public function registerFromApp(array $input, Request $request): array
+    {
+        $first = trim((string) ($input['firstName'] ?? $input['first_name'] ?? ''));
+        $last = trim((string) ($input['lastName'] ?? $input['last_name'] ?? ''));
+        $username = $this->normalizeUsername((string) ($input['username'] ?? ''));
+        $username = strtr($username, [' ' => '_', '-' => '_']);
+        $username = preg_replace('/[^a-z0-9._]/', '', $username) ?? $username;
+        $prepared = $input;
+        $prepared['first_name'] = $first;
+        $prepared['last_name'] = $last !== '' ? $last : ($first !== '' ? $first : 'Člen');
+        $prepared['username'] = $username;
+        $prepared['email'] = (string) ($input['email'] ?? '');
+        $prepared['password'] = (string) ($input['password'] ?? '');
+        $prepared['password_confirmation'] = (string) ($input['password_confirmation'] ?? $prepared['password']);
+        $prepared['terms'] = '1';
+        $prepared['privacy'] = '1';
+        $user = $this->register($prepared, $request);
+        if ((string) env_value('APP_ENV', 'local') === 'local') {
+            $this->db->update('users', [
+                'email_verified_at' => Clock::utc(),
+                'status' => 'active',
+            ], 'id = :id AND status != :blocked', [
+                'id' => (int) $user['id'],
+                'blocked' => 'blocked',
+            ]);
+            $user = $this->findById((int) $user['id']);
+        }
+        return $user;
+    }
+
+    public function forgotPasswordFromApp(string $identifier, Request $request): void
+    {
+        $identifier = trim($identifier);
+        if ($identifier !== '' && !str_contains($identifier, '@')) {
+            $user = $this->db->fetch(
+                'SELECT email FROM users WHERE username = :u AND deleted_at IS NULL',
+                ['u' => $this->normalizeUsername($identifier)]
+            );
+            $identifier = (string) ($user['email'] ?? 'nobody@invalid.example');
+        }
+        $this->forgotPassword($identifier, $request);
+    }
+
+    public function deleteAccount(array $user): void
+    {
+        $id = (int) $user['id'];
+        $this->logoutAll($id);
+        $this->db->update('users', [
+            'status' => 'deleted',
+            'deleted_at' => Clock::utc(),
+            'email' => 'deleted+' . $id . '@invalid.local',
+            'username' => 'deleted_' . $id,
+            'password_hash' => self::dummyPasswordHash(),
+            'updated_at' => Clock::utc(),
+        ], 'id = :id', ['id' => $id]);
+    }
+
+    private static function dummyPasswordHash(): string
+    {
+        return Crypto::hashPassword(Crypto::token(24));
     }
 
     public function normalizeEmail(string $email): string

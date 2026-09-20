@@ -13,6 +13,9 @@ final class PasswordBreachService
         if (!(bool) env_value('HIBP_ENABLED', true)) {
             return false;
         }
+        if ((string) env_value('APP_ENV', 'local') === 'local') {
+            return false;
+        }
 
         $sha1 = strtoupper(sha1($password));
         $prefix = substr($sha1, 0, 5);

@@ -22,6 +22,9 @@ ServerSignature Off
     DirectorySlash On
     RewriteRule ^$ index.php [L]
 
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
     # Staré odkazy /public/... přesměruj na kořen projektu
     RewriteCond %{REQUEST_URI} ^(.*?)/public(/.*)?$
     RewriteRule ^public(/.*)?$ %1%2 [R=301,L]

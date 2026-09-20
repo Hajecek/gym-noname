@@ -23,6 +23,8 @@ return [
     ],
     'payment' => [
         'provider' => env_value('PAYMENT_PROVIDER', 'manual'),
+        'stripe_secret' => env_value('STRIPE_SECRET_KEY', ''),
+        'stripe_publishable' => env_value('STRIPE_PUBLISHABLE_KEY', ''),
     ],
     'cron_token' => env_value('CRON_TOKEN', ''),
 ];

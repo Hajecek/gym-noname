@@ -82,7 +82,7 @@ final class ReservationService
         ];
     }
 
-    public function create(array $user, string $localStart, int $durationMinutes, int $guestCount, ?int $roomId = null): array
+    public function create(array $user, string $localStart, int $durationMinutes, int $guestCount, ?int $roomId = null, bool $paidCheckout = false): array
     {
         if (empty($user['email_verified_at'])) {
             throw new HttpException(403, 'Nejprve ověřte e-mailovou adresu.');
@@ -124,7 +124,7 @@ final class ReservationService
 
         $price = $this->priceForDuration($durationMinutes);
         $membership = $this->memberships->activeForUser((int) $user['id']);
-        $useMembership = $membership && ($membership['entries_remaining'] === null || (int) $membership['entries_remaining'] > 0);
+        $useMembership = !$paidCheckout && $membership && ($membership['entries_remaining'] === null || (int) $membership['entries_remaining'] > 0);
 
         return $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $buffer, $guestCount, $price, $membership, $useMembership) {
             $db->query('SELECT id FROM rooms WHERE id = :id FOR UPDATE', ['id' => (int) $room['id']]);
@@ -381,6 +381,156 @@ final class ReservationService
             }
         }
         return false;
+    }
+
+    public function slotPrice(): string
+    {
+        return $this->priceForDuration($this->settings->int('reservation.min_minutes', 60));
+    }
+
+    /** @return list<array{id:string,start:string,end:string,room:string}> */
+    public function availableSlotsForApp(int $days = 14): array
+    {
+        $room = $this->room();
+        $duration = $this->settings->int('reservation.min_minutes', 60);
+        $out = [];
+        $day = Clock::nowLocal()->setTime(0, 0);
+        for ($i = 0; $i < $days; $i++) {
+            $date = $day->modify('+' . $i . ' days')->format('Y-m-d');
+            $availability = $this->availability($date, (int) $room['id']);
+            if (!empty($availability['closed'])) {
+                continue;
+            }
+            foreach ($availability['slots'] as $slot) {
+                if (empty($slot['available'])) {
+                    continue;
+                }
+                $start = new \DateTimeImmutable((string) $slot['start_at'], new \DateTimeZone('UTC'));
+                $end = $start->modify('+' . $duration . ' minutes');
+                $out[] = [
+                    'id' => $room['public_id'] . '_' . $start->format('YmdHis'),
+                    'start' => Clock::iso($start->format('Y-m-d H:i:s')),
+                    'end' => Clock::iso($end->format('Y-m-d H:i:s')),
+                    'room' => (string) $room['name'],
+                ];
+            }
+        }
+        return $out;
+    }
+
+    /** @param list<string> $slotIds @return list<array{id:string,start:string,end:string,room:string}> */
+    public function resolveSlotIds(array $slotIds): array
+    {
+        if ($slotIds === []) {
+            throw new HttpException(422, 'Vyberte alespoň jeden termín.');
+        }
+        $resolved = [];
+        foreach ($slotIds as $id) {
+            $resolved[] = $this->decodeSlotId($id);
+        }
+        return $resolved;
+    }
+
+    public function createFromSlotId(array $user, string $slotId, bool $paidCheckout): array
+    {
+        $slot = $this->decodeSlotId($slotId);
+        $startUtc = new \DateTimeImmutable($slot['start'], new \DateTimeZone('UTC'));
+        $local = Clock::toLocal($startUtc->format('Y-m-d H:i:s'))->format('Y-m-d H:i:s');
+        $room = $this->db->fetch('SELECT * FROM rooms WHERE public_id = :pid AND is_active = 1', [
+            'pid' => $this->roomPublicIdFromSlot($slotId),
+        ]);
+        $duration = $this->settings->int('reservation.min_minutes', 60);
+        return $this->create($user, $local, $duration, 1, $room ? (int) $room['id'] : null, $paidCheckout);
+    }
+
+    public function confirmPending(array $reservation, array $user): array
+    {
+        if (($reservation['status'] ?? '') === 'confirmed') {
+            return $this->db->fetch('SELECT r.*, rm.name AS room_name FROM reservations r INNER JOIN rooms rm ON rm.id = r.room_id WHERE r.id = :id', [
+                'id' => (int) $reservation['id'],
+            ]) ?? $reservation;
+        }
+        $this->db->update('reservations', [
+            'status' => 'confirmed',
+            'updated_at' => Clock::utc(),
+        ], 'id = :id AND status = :pending', [
+            'id' => (int) $reservation['id'],
+            'pending' => 'pending_payment',
+        ]);
+        $fresh = $this->db->fetch('SELECT r.*, rm.name AS room_name FROM reservations r INNER JOIN rooms rm ON rm.id = r.room_id WHERE r.id = :id', [
+            'id' => (int) $reservation['id'],
+        ]);
+        if (!$fresh) {
+            return $reservation;
+        }
+        $door = $this->db->fetch('SELECT id FROM doors WHERE room_id = :rid AND is_active = 1 LIMIT 1', ['rid' => (int) $fresh['room_id']]);
+        if ($door) {
+            $early = $this->settings->int('access.early_minutes', 10);
+            $late = $this->settings->int('access.late_minutes', 10);
+            $startUtc = new \DateTimeImmutable($fresh['starts_at'], new \DateTimeZone('UTC'));
+            $endUtc = new \DateTimeImmutable($fresh['ends_at'], new \DateTimeZone('UTC'));
+            $exists = $this->db->fetch('SELECT id FROM access_permissions WHERE reservation_id = :id', ['id' => (int) $fresh['id']]);
+            if (!$exists) {
+                $this->db->insert('access_permissions', [
+                    'user_id' => (int) $user['id'],
+                    'door_id' => (int) $door['id'],
+                    'reservation_id' => (int) $fresh['id'],
+                    'valid_from' => $startUtc->modify('-' . $early . ' minutes')->format('Y-m-d H:i:s'),
+                    'valid_until' => $endUtc->modify('+' . $late . ' minutes')->format('Y-m-d H:i:s'),
+                    'created_at' => Clock::utc(),
+                ]);
+            }
+        }
+        $this->mail->queue('reservation-confirmed', $user['email'], [
+            'subject' => 'Potvrzení rezervace PRIVOFIT',
+            'first_name' => $user['first_name'],
+            'starts_at' => Clock::format($fresh['starts_at']),
+            'ends_at' => Clock::format($fresh['ends_at']),
+        ], (int) $user['id']);
+        return $fresh;
+    }
+
+    public function failPending(array $reservation): void
+    {
+        if (($reservation['status'] ?? '') !== 'pending_payment') {
+            return;
+        }
+        $this->db->update('reservations', [
+            'status' => 'expired',
+            'updated_at' => Clock::utc(),
+        ], 'id = :id AND status = :pending', [
+            'id' => (int) $reservation['id'],
+            'pending' => 'pending_payment',
+        ]);
+    }
+
+    /** @return array{id:string,start:string,end:string,room:string} */
+    private function decodeSlotId(string $slotId): array
+    {
+        if (!preg_match('/^([0-9a-f-]{36})_(\d{14})$/i', $slotId, $match)) {
+            throw new HttpException(422, 'Neplatný termín.');
+        }
+        $room = $this->db->fetch('SELECT * FROM rooms WHERE public_id = :pid AND is_active = 1', ['pid' => $match[1]]);
+        if (!$room) {
+            throw new HttpException(422, 'Prostor termínu nebyl nalezen.');
+        }
+        $start = \DateTimeImmutable::createFromFormat('YmdHis', $match[2], new \DateTimeZone('UTC'));
+        if (!$start) {
+            throw new HttpException(422, 'Neplatný čas termínu.');
+        }
+        $duration = $this->settings->int('reservation.min_minutes', 60);
+        $end = $start->modify('+' . $duration . ' minutes');
+        return [
+            'id' => $slotId,
+            'start' => Clock::iso($start->format('Y-m-d H:i:s')),
+            'end' => Clock::iso($end->format('Y-m-d H:i:s')),
+            'room' => (string) $room['name'],
+        ];
+    }
+
+    private function roomPublicIdFromSlot(string $slotId): string
+    {
+        return substr($slotId, 0, 36);
     }
 
     private function priceForDuration(int $minutes): string
