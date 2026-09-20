@@ -82,7 +82,7 @@ final class ReservationService
         ];
     }
 
-    public function create(array $user, string $localStart, int $durationMinutes, int $guestCount, ?int $roomId = null, bool $paidCheckout = false): array
+    public function create(array $user, string $localStart, int $durationMinutes, int $guestCount, ?int $roomId = null, bool $paidCheckout = false, array $ignoreReservationIds = []): array
     {
         if (empty($user['email_verified_at'])) {
             throw new HttpException(403, 'Nejprve ověřte e-mailovou adresu.');
@@ -126,9 +126,12 @@ final class ReservationService
         $membership = $this->memberships->activeForUser((int) $user['id']);
         $useMembership = !$paidCheckout && $membership && ($membership['entries_remaining'] === null || (int) $membership['entries_remaining'] > 0);
 
-        return $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $buffer, $guestCount, $price, $membership, $useMembership) {
+        return $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $buffer, $guestCount, $price, $membership, $useMembership, $ignoreReservationIds) {
             $db->query('SELECT id FROM rooms WHERE id = :id FOR UPDATE', ['id' => (int) $room['id']]);
-            $occupied = $this->occupiedIntervals((int) $room['id'], $startUtc->modify('-6 hours')->format('Y-m-d H:i:s'), $endUtc->modify('+6 hours')->format('Y-m-d H:i:s'));
+            $occupied = array_values(array_filter(
+                $this->occupiedIntervals((int) $room['id'], $startUtc->modify('-6 hours')->format('Y-m-d H:i:s'), $endUtc->modify('+6 hours')->format('Y-m-d H:i:s')),
+                static fn (array $row): bool => !in_array((int) ($row['id'] ?? 0), $ignoreReservationIds, true)
+            ));
             if ($this->overlaps($occupied, $startUtc, $endUtc, $buffer)) {
                 throw new HttpException(409, 'Tento termín je již obsazený.');
             }
@@ -355,7 +358,7 @@ final class ReservationService
     private function occupiedIntervals(int $roomId, string $from, string $to): array
     {
         $reservations = $this->db->fetchAll(
-            "SELECT starts_at, ends_at, buffer_minutes
+            "SELECT id, starts_at, ends_at, buffer_minutes
              FROM reservations
              WHERE room_id = :rid AND status IN ('pending_payment', 'confirmed')
                AND starts_at < :to AND ends_at > :from",
@@ -431,7 +434,7 @@ final class ReservationService
         return $resolved;
     }
 
-    public function createFromSlotId(array $user, string $slotId, bool $paidCheckout): array
+    public function createFromSlotId(array $user, string $slotId, bool $paidCheckout, array $ignoreReservationIds = []): array
     {
         $slot = $this->decodeSlotId($slotId);
         $startUtc = new \DateTimeImmutable($slot['start'], new \DateTimeZone('UTC'));
@@ -440,7 +443,27 @@ final class ReservationService
             'pid' => $this->roomPublicIdFromSlot($slotId),
         ]);
         $duration = $this->settings->int('reservation.min_minutes', 60);
-        return $this->create($user, $local, $duration, 1, $room ? (int) $room['id'] : null, $paidCheckout);
+        return $this->create($user, $local, $duration, 1, $room ? (int) $room['id'] : null, $paidCheckout, $ignoreReservationIds);
+    }
+
+    /** @param list<string> $slotIds */
+    public function releasePendingForSlots(array $user, array $slotIds): void
+    {
+        foreach ($slotIds as $slotId) {
+            try {
+                $slot = $this->decodeSlotId((string) $slotId);
+            } catch (HttpException) {
+                continue;
+            }
+            $start = (new \DateTimeImmutable($slot['start'], new \DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+            $this->db->update('reservations', [
+                'status' => 'expired',
+                'updated_at' => Clock::utc(),
+            ], "user_id = :uid AND status = 'pending_payment' AND starts_at = :start", [
+                'uid' => (int) $user['id'],
+                'start' => $start,
+            ]);
+        }
     }
 
     public function confirmPending(array $reservation, array $user): array

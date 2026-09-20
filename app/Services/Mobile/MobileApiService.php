@@ -235,24 +235,32 @@ final class MobileApiService
         $count = count($quote['slots']);
         $unit = (float) $quote['pricePerSlot'];
         $total = number_format($unit * $count, 2, '.', '');
-        $paidCheckout = $unit > 0;
+        $chargeCard = $unit > 0;
         $holds = [];
         try {
+            $this->reservations->releasePendingForSlots($user, $slotIds);
+            $ignoreIds = [];
             foreach ($slotIds as $slotId) {
-                $holds[] = $this->reservations->createFromSlotId($user, (string) $slotId, $paidCheckout);
+                $hold = $this->reservations->createFromSlotId($user, (string) $slotId, true, $ignoreIds);
+                $ignoreIds[] = (int) $hold['id'];
+                $holds[] = $hold;
             }
             $reference = null;
-            if ($paidCheckout) {
-                $paymentData = $this->applePayJson($applePay);
+            if ($chargeCard) {
                 $amountMinor = (int) round(((float) $total) * 100);
-                $charge = StripeGateway::fromConfig()->chargeApplePay(
-                    $paymentData,
-                    $amountMinor,
-                    'czk',
-                    $requestId,
-                    'PRIVOFIT rezervace'
-                );
+                $gateway = StripeGateway::fromConfig();
+                $paymentData = $this->applePayJson($applePay);
+                $charge = $paymentData === null
+                    ? $gateway->chargeTestCard($amountMinor, 'czk', $requestId, 'PRIVOFIT rezervace (local test)')
+                    : $gateway->chargeApplePay($paymentData, $amountMinor, 'czk', $requestId, 'PRIVOFIT rezervace');
                 $reference = $charge['id'];
+            } else {
+                $membership = $this->memberships->activeForUser((int) $user['id']);
+                if ($membership && $membership['entries_remaining'] !== null) {
+                    for ($i = 0; $i < $count; $i++) {
+                        $this->memberships->consumeEntry((int) $membership['id'], (int) $user['id']);
+                    }
+                }
             }
 
             $confirmed = [];
@@ -265,7 +273,7 @@ final class MobileApiService
                 'client_request_id' => $requestId,
                 'user_id' => (int) $user['id'],
                 'reservation_id' => $firstId,
-                'provider' => $paidCheckout ? 'stripe' : 'membership',
+                'provider' => $chargeCard ? 'stripe' : 'membership',
                 'provider_reference' => $reference,
                 'amount' => $total,
                 'currency' => 'CZK',
@@ -469,15 +477,28 @@ final class MobileApiService
         ];
     }
 
-    private function applePayJson(array $applePay): string
+    private function applePayJson(array $applePay): ?string
     {
         $raw = (string) ($applePay['paymentData'] ?? '');
         $decoded = base64_decode($raw, true);
         $json = $decoded !== false ? $decoded : $raw;
-        if ($json === '' || $json === 'demo') {
+        $parsed = json_decode($json, true);
+        $looksLikeApplePay = is_array($parsed)
+            && isset($parsed['data'], $parsed['signature'], $parsed['header']);
+        if (!$looksLikeApplePay) {
+            if ($this->allowLocalStripeTest()) {
+                return null;
+            }
             throw new HttpException(422, 'Chybí Apple Pay token.');
         }
         return $json;
+    }
+
+    private function allowLocalStripeTest(): bool
+    {
+        $env = (string) env_value('APP_ENV', 'production');
+        $key = trim((string) env_value('STRIPE_SECRET_KEY', ''));
+        return $env === 'local' && str_starts_with($key, 'sk_test_');
     }
 
     private function paymentPayloadFromRow(array $payment, array $user): array

@@ -34,11 +34,9 @@ final class StripeGateway
      */
     public function chargeApplePay(string $paymentDataJson, int $amountMinor, string $currency, string $idempotencyKey, string $description): array
     {
-        if ($amountMinor < 1) {
-            throw new HttpException(422, 'Neplatná částka.');
-        }
+        $this->assertAmount($amountMinor);
         $token = $this->createApplePayToken($paymentDataJson, $idempotencyKey . ':token');
-        $intent = $this->request('POST', '/v1/payment_intents', [
+        return $this->confirmIntent([
             'amount' => (string) $amountMinor,
             'currency' => strtolower($currency),
             'confirm' => 'true',
@@ -48,7 +46,43 @@ final class StripeGateway
             'payment_method_data[type]' => 'card',
             'payment_method_data[card][token]' => $token,
         ], $idempotencyKey . ':pi');
+    }
 
+    /**
+     * Simulátor iOS nedoručí skutečný Apple Pay JSON. V APP_ENV=local + sk_test
+     * se účtuje Stripe test karta, ne falešný úspěch bez Stripe.
+     *
+     * @return array{id:string,status:string}
+     */
+    public function chargeTestCard(int $amountMinor, string $currency, string $idempotencyKey, string $description): array
+    {
+        if (!str_starts_with($this->secretKey, 'sk_test_')) {
+            throw new HttpException(422, 'Chybí Apple Pay token.');
+        }
+        $this->assertAmount($amountMinor);
+        return $this->confirmIntent([
+            'amount' => (string) $amountMinor,
+            'currency' => strtolower($currency),
+            'confirm' => 'true',
+            'off_session' => 'true',
+            'confirmation_method' => 'automatic',
+            'description' => $description,
+            'payment_method' => 'pm_card_visa',
+            'payment_method_types' => ['card'],
+        ], $idempotencyKey . ':test-pi');
+    }
+
+    private function assertAmount(int $amountMinor): void
+    {
+        if ($amountMinor < 1) {
+            throw new HttpException(422, 'Neplatná částka.');
+        }
+    }
+
+    /** @param array<string, mixed> $fields @return array{id:string,status:string} */
+    private function confirmIntent(array $fields, string $idempotencyKey): array
+    {
+        $intent = $this->request('POST', '/v1/payment_intents', $fields, $idempotencyKey);
         $status = (string) ($intent['status'] ?? '');
         if ($status !== 'succeeded') {
             throw new HttpException(402, 'Platba ve Stripe neprošla.');
@@ -75,7 +109,7 @@ final class StripeGateway
         return $id;
     }
 
-    /** @param array<string, string> $fields */
+    /** @param array<string, mixed> $fields */
     private function request(string $method, string $path, array $fields, string $idempotencyKey): array
     {
         $ch = curl_init('https://api.stripe.com' . $path);
