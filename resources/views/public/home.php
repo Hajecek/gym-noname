@@ -208,11 +208,13 @@
     <section class="last-cta wrapper reveal" id="zajem">
         <div id="peek-stage" aria-hidden="true"></div>
         <div class="cta-surface">
-            <div class="cta-top"><span>PŘEDOBJEDNÁVKA</span><span>↗</span></div>
-            <h2>TAK CO,<br><span>JDEŠ DO TOHO?</span></h2>
-            <div class="cta-bottom">
+            <div class="interest-split">
                 <div class="interest-copy">
-                    <p>Ještě neotevíráme. Nech e-mail<br>a dáme vědět, až bude tvůj prostor připravený.</p>
+                    <div class="cta-top"><span>ZJIŠŤUJEME ZÁJEM</span></div>
+                    <h2>Ještě neotevíráme.</h2>
+                    <p>Nech e-mail. Ozveme se, až bude tvůj prostor připravený.</p>
+                </div>
+                <div class="interest-action">
                     <?php $source = 'home'; require dirname(__DIR__) . '/partials/interest-form.php'; ?>
                     <p class="interest-note">Žádný spam. Jen zpráva, až PRIVOFIT spustíme.</p>
                 </div>

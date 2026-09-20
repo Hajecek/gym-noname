@@ -857,7 +857,7 @@ h2 {
   font-weight: 600;
   letter-spacing: 2px;
 }
-.cta-top > span:last-child {
+.cta-top > span:not(:first-child) {
   font-size: 26px;
 }
 .last-cta h2 {
@@ -2935,7 +2935,7 @@ body {
 /* A dedicated registration page, without marketing navigation. */
 body.standalone-registration{padding-top:0;background:radial-gradient(ellipse at 17% 46%,#c6f21a07,transparent 49%),var(--night)}.standalone-registration .header,.standalone-registration>footer,.standalone-registration .auth-switch,.standalone-registration .auth-bottom,.standalone-registration .scroll-progress{display:none!important}.standalone-registration .auth-layout{min-height:100svh;max-width:1270px;align-items:center;gap:90px;padding-top:45px;padding-bottom:45px}.standalone-registration .auth-story{position:relative}.standalone-registration .auth-story .back{margin-bottom:38px;color:#8ea080}.standalone-registration .auth-story h1{font-size:57px;letter-spacing:-2px}.standalone-registration .auth-story>p:not(.auth-card-caption){max-width:360px;font-size:16px}.standalone-registration #auth-3d{height:410px;margin:5px -48px -5px}.standalone-registration .auth-card-caption{margin-top:-13px!important}.standalone-registration .auth-card{margin:0;padding:38px;min-height:0;border-radius:24px;background:rgba(255,255,255,.035)}.standalone-registration #registration-progress{margin-bottom:30px}.standalone-registration .step-bars{margin-bottom:0}.standalone-registration .auth-card h2{font-size:32px}.standalone-registration .auth-card>p{margin-bottom:31px;font-size:15px}.standalone-registration .demo-note{margin-top:25px}.standalone-registration .form-actions{margin-top:20px}@media(max-width:1050px){.standalone-registration .auth-layout{gap:48px}.standalone-registration .auth-story h1{font-size:48px}.standalone-registration #auth-3d{height:370px;margin-left:-30px;margin-right:-30px}.standalone-registration .auth-card{padding:29px}.standalone-registration .auth-card h2{font-size:28px}}@media(max-width:760px){.standalone-registration .auth-layout{grid-template-columns:1fr;max-width:540px;gap:28px;align-items:start;padding-top:25px;padding-bottom:40px}.standalone-registration .auth-story .back{margin-bottom:25px}.standalone-registration .auth-story h1{font-size:43px;margin:17px 0 0}.standalone-registration .auth-story>p:not(.auth-card-caption){display:none}.standalone-registration #auth-3d{height:265px;margin:-5px -12px -5px}.standalone-registration .auth-story .auth-card-caption{display:block;font-size:11px!important}.standalone-registration .auth-card{padding:27px;margin:0}.standalone-registration .auth-card h2{font-size:29px}.standalone-registration #registration-progress{margin-bottom:24px}}@media(max-width:380px){.standalone-registration .auth-card{padding:22px}.standalone-registration .auth-story h1{font-size:38px}.standalone-registration #auth-3d{height:230px}}
 /* The body is clipped behind the banner; the pointing hand sits in front. */
-.last-cta #peek-stage{z-index:3;pointer-events:none}
+.last-cta #peek-stage{z-index:1;pointer-events:none}
 /* A staggered entrance, with the lime line arriving last. */
 @keyframes hero-line-enter{from{opacity:0;transform:translateY(28px);filter:blur(5px);clip-path:inset(0 0 100% 0)}to{opacity:1;transform:translateY(0);filter:blur(0);clip-path:inset(0 0 0 0)}}
 @keyframes hero-copy-enter{from{opacity:0;translate:0 12px}to{opacity:1;translate:0 0}}
@@ -3118,42 +3118,79 @@ textarea {
 #zajem {
   scroll-margin-top: 28px;
 }
-.interest-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: min(340px, 100%);
+.interest-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 28px 48px;
+  align-items: center;
   position: relative;
   z-index: 4;
 }
 .interest-copy {
-  max-width: min(420px, 100%);
+  max-width: 460px;
+}
+.last-cta .interest-split .cta-top {
+  justify-content: flex-start;
+  margin-bottom: 4px;
+}
+.interest-split .cta-top > span {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+}
+.last-cta .interest-split h2,
+.interest-page .interest-split h1 {
+  font-size: clamp(26px, 3.2vw, 38px);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -1.4px;
+  margin: 6px 0 10px;
+  color: #101714;
+}
+.last-cta .interest-split p,
+.interest-page .interest-split .interest-copy p {
+  font-size: 16px;
+  line-height: 1.4;
+  color: #33400b;
+  margin: 0;
+}
+.interest-action {
+  min-width: 0;
+}
+.interest-form {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: stretch;
   position: relative;
   z-index: 4;
 }
-.last-cta .cta-bottom {
-  display: block;
-}
-.interest-copy .interest-form {
-  margin-top: 18px;
-}
 .interest-form input[type="email"] {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+  width: auto;
   border: 1px solid #10171433;
   background: #fff;
   color: #101714;
   border-radius: 999px;
-  padding: 16px 22px;
+  padding: 14px 18px;
   font: inherit;
 }
 .interest-form input[type="email"]:focus {
-  outline: 2px solid #c6f21a;
+  outline: 2px solid #101714;
   outline-offset: 2px;
 }
 .interest-form .button {
-  width: 100%;
+  width: auto;
   min-width: 0;
-  justify-content: space-between;
+  flex-shrink: 0;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border-radius: 999px;
+  font-size: 15px;
+}
+.interest-form .button > span {
+  font-size: 18px;
 }
 .interest-honeypot {
   position: absolute;
@@ -3163,70 +3200,54 @@ textarea {
   overflow: hidden;
 }
 .interest-note {
-  margin: 16px 0 0;
+  margin: 10px 0 0;
   font-size: 13px;
   color: #33400b99;
-}
-@media (max-width: 850px) {
-  .interest-form {
-    margin-top: 18px;
-  }
 }
 .interest-page {
   position: relative;
   isolation: isolate;
-  padding: 28px 0 72px;
-  min-height: calc(100vh - 280px);
+  padding: 28px 0 64px;
+  min-height: 0;
 }
 .interest-page .cta-surface {
   position: relative;
   z-index: 2;
-  padding: 40px 300px 48px 48px;
+  padding: 28px 32px;
   color: var(--ink);
-}
-.interest-page h1 {
-  font-size: clamp(34px, 4.6vw, 58px);
-  line-height: 1.06;
-  font-weight: 700;
-  letter-spacing: -2.4px;
-  margin: 22px 0 24px;
-}
-.interest-page h1 > span {
-  color: #101714;
-}
-.interest-page-copy {
-  max-width: 540px;
-  position: relative;
-  z-index: 4;
-}
-.interest-page-copy p {
-  font-size: 17px;
-  line-height: 1.45;
-  color: #33400b;
-  margin: 0 0 14px;
-}
-.interest-page .interest-form {
-  margin: 10px 0 0;
-  max-width: 380px;
-}
-.interest-page #peek-stage {
-  position: absolute;
-  right: 40px;
-  top: -40px;
-  width: 320px;
-  height: 360px;
-  z-index: 1;
-  pointer-events: none;
 }
 .interest-back {
   display: inline-block;
-  margin-top: 22px;
-  color: #101714;
+  margin-top: 18px;
+  color: var(--fog);
   font-weight: 600;
   font-size: 14px;
 }
 .interest-back:hover {
-  color: #293a1c;
+  color: var(--lime);
+}
+@media (max-width: 850px) {
+  .interest-split {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    align-items: stretch;
+  }
+  .interest-copy {
+    max-width: none;
+  }
+  .last-cta .interest-split h2,
+  .interest-page .interest-split h1 {
+    font-size: clamp(24px, 6.4vw, 32px);
+    letter-spacing: -1px;
+    margin: 4px 0 8px;
+  }
+  .interest-form {
+    flex-direction: column;
+  }
+  .interest-form .button {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 .avatar-picker {
   display: grid;
@@ -3344,24 +3365,16 @@ input[data-avatar-input] {
 #avatar-step .avatar-picker-preview {
   font-size: 38px;
 }
+.last-cta .cta-surface {
+  padding: 26px 32px;
+}
 @media (max-width: 850px) {
   .interest-page {
     padding: 12px 0 48px;
-    min-height: 0;
   }
-  .interest-page .cta-surface {
-    padding: 28px 22px 32px;
+  .interest-page .cta-surface,
+  .last-cta .cta-surface {
+    padding: 22px;
     border-radius: 20px;
-  }
-  .interest-page h1 {
-    font-size: clamp(30px, 8vw, 44px);
-    letter-spacing: -1.6px;
-    margin: 18px 0 20px;
-  }
-  .interest-page-copy p {
-    font-size: 16px;
-  }
-  .interest-page #peek-stage {
-    display: none;
   }
 }
