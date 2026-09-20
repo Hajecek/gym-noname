@@ -16,7 +16,7 @@ Aplikace je připravená na PHP 8.3–8.5 a běžný webhosting Wedos (MariaDB, 
 ## Instalace (XAMPP / lokálně)
 
 ```bash
-cd /Applications/XAMPP/xamppfiles/htdocs/gym-noname
+cd /Applications/XAMPP/xamppfiles/htdocs/privofit
 composer install
 cp .env.example .env
 php bin/install.php --generate-key   # vložte výsledek do APP_KEY, pokud ještě není
@@ -30,7 +30,7 @@ php bin/install.php --email=vas@email.cz --username=majitel --password='dlouhe-h
 
 V XAMPP otevřete přímo:
 
-`http://localhost/gym-noname/`
+`http://localhost/privofit/`
 
 Úvodní stránka běží z kořenového `index.php`. Složky jako `app/`, `config/`, `storage/` a soubor `.env` nejsou z webu dostupné.
 
