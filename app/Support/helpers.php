@@ -93,7 +93,7 @@ function format_datetime(string $utc, string $pattern = 'd. m. Y H:i'): string
 
 function avatar_url(?array $user): string
 {
-    if ($user && !empty($user['avatar_path'])) {
+    if ($user && !empty($user['avatar_path']) && \App\Services\AvatarService::resolveFile((string) $user['avatar_path'])) {
         return app()->url('/uploads/avatars/' . basename((string) $user['avatar_path']));
     }
     $initials = 'PF';

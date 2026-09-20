@@ -70,4 +70,14 @@ final class Response
         echo $content;
         exit;
     }
+
+    public static function file(string $path, string $mime, int $maxAge = 86400): never
+    {
+        http_response_code(200);
+        header('Content-Type: ' . $mime);
+        header('Cache-Control: public, max-age=' . $maxAge);
+        header('Content-Length: ' . (string) filesize($path));
+        readfile($path);
+        exit;
+    }
 }

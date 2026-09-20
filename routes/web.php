@@ -27,6 +27,7 @@ $router->post('/zajem', [PublicController::class, 'signupInterest']);
 $router->get('/dokument/{slug}', [PublicController::class, 'legal']);
 $router->get('/manifest.json', [PublicController::class, 'manifest']);
 $router->get('/avatar/{id}', [PublicController::class, 'avatar']);
+$router->get('/uploads/avatars/{file}', [PublicController::class, 'uploadedAvatar']);
 
 $router->get('/registrace', [AuthController::class, 'showRegister'], [GuestMiddleware::class]);
 $router->post('/registrace', [AuthController::class, 'register'], [GuestMiddleware::class]);

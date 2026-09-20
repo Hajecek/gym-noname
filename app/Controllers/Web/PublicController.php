@@ -7,6 +7,8 @@ namespace App\Controllers\Web;
 use App\Controllers\Controller;
 use App\Core\RateLimiter;
 use App\Core\Request;
+use App\Core\Response;
+use App\Services\AvatarService;
 use App\Services\Content\ContentService;
 use App\Services\MembershipService;
 use App\Support\Clock;
@@ -172,7 +174,41 @@ final class PublicController extends Controller
 
     public function avatar(Request $request, array $params): never
     {
+        $id = (string) ($params['id'] ?? '');
+        if ($id !== '' && $id !== 'guest' && preg_match('/^[0-9a-f-]{36}$/i', $id) === 1) {
+            $user = $this->app->db()->fetch(
+                'SELECT avatar_path FROM users WHERE public_id = :id LIMIT 1',
+                ['id' => $id]
+            );
+            if ($user && !empty($user['avatar_path'])) {
+                $path = AvatarService::resolveFile((string) $user['avatar_path']);
+                if ($path) {
+                    Response::file($path, AvatarService::mimeFor($path));
+                }
+            }
+        }
+
         $initials = strtoupper(substr((string) $request->query('i', 'PF'), 0, 2));
+        $this->sendInitialsSvg($initials);
+    }
+
+    public function uploadedAvatar(Request $request, array $params): never
+    {
+        $file = basename((string) ($params['file'] ?? ''));
+        $path = AvatarService::resolveFile($file);
+        if ($path) {
+            Response::file($path, AvatarService::mimeFor($path));
+        }
+
+        $id = 'guest';
+        if (preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-/i', $file, $match) === 1) {
+            $id = $match[1];
+        }
+        Response::redirect($this->app->url('/avatar/' . rawurlencode($id) . '?i=PF'), 302);
+    }
+
+    private function sendInitialsSvg(string $initials): never
+    {
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">'
             . '<rect width="128" height="128" rx="64" fill="#1A2940"/>'
             . '<text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#42E8B4" font-family="Manrope, Inter, sans-serif" font-size="44" font-weight="700">'

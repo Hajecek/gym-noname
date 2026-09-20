@@ -496,7 +496,7 @@ final class AuthService
             'last_name' => $user['last_name'],
             'email' => $user['email'],
             'phone' => $user['phone'],
-            'avatar_url' => !empty($user['avatar_path']) ? url('/uploads/avatars/' . basename($user['avatar_path'])) : null,
+            'avatar_url' => !empty($user['avatar_path']) ? avatar_url($user) : null,
             'role' => $user['role'],
             'plan' => $user['plan'],
             'status' => $user['status'],

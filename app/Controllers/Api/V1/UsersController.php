@@ -42,8 +42,8 @@ final class UsersController extends Controller
             $this->jsonError('Chybí soubor avatar.', 422);
         }
         try {
-            $path = (new AvatarService($this->app->db()))->storeFromUpload($this->requireUser(), $file);
-            $this->jsonOk(['avatar_url' => url('/uploads/avatars/' . $path)]);
+            $filename = (new AvatarService($this->app->db()))->storeFromUpload($this->requireUser(), $file);
+            $this->jsonOk(['avatar_url' => url('/uploads/avatars/' . $filename)]);
         } catch (\RuntimeException $e) {
             $this->jsonError($e->getMessage(), 422);
         }
