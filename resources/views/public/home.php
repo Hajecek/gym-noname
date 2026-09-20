@@ -32,7 +32,7 @@
                 </div>
                 <div class="character-hint">
                     <span class="click-spark">↗</span>
-                    <span id="scene-hint">Každý klik tě posune.</span>
+                    <span id="scene-hint">Klikni na mě. S každým klikem sílím.</span>
                     <span id="rep-count" aria-hidden="true">0</span>
                 </div>
                 <p id="trainer-status" class="sr-only" role="status" aria-live="polite"></p>
@@ -133,35 +133,42 @@
             </article>
         </div>
     </section>
-    <section class="entry-section wrapper" id="vstup">
-        <div class="entry-copy reveal">
-            <div class="eyebrow">TVŮJ TELEFON. TVŮJ KLÍČ.</div>
-            <h2>Jedno kliknutí.<br><span>A jsi ve svém.</span></h2>
-            <p>Žádná recepce. Žádné hledání kartičky.<br>Tvůj vstup máš přímo ve svém profilu.</p>
-            <div class="entry-steps">
-                <div><span>01</span><p>Otevři svůj profil v PRIVOFIT.</p></div>
-                <div><span>02</span><p>Klepni na <strong>Vstoupit do fitka.</strong></p></div>
-                <div><span>03</span><p>Dveře se otevřou. Tvůj čas začíná.</p></div>
+    <section class="entry-section wrapper entry-cinema" id="vstup">
+        <div class="entry-heading reveal">
+            <div>
+                <div class="eyebrow">TVŮJ TELEFON. TVŮJ KLÍČ.</div>
+                <h2>Venku svět.<br><span>Uvnitř jen ty.</span></h2>
             </div>
-            <div class="entry-try"><span>↗</span> Vyzkoušej si to na telefonu vedle.</div>
-            <p class="entry-demo">Interaktivní ukázka. Skutečný vstup připojíme později.</p>
+            <p>Přijdeš. Otevřeš. Jsi ve svém.<br>Vyzkoušej si vstup vlastníma očima.</p>
         </div>
-        <div class="phone-experience reveal">
-            <div class="phone-aura" aria-hidden="true"></div>
-            <div id="phone-stage" tabindex="0" role="group" aria-label="Interaktivní 3D telefon s ukázkou vstupu do fitka. Tažením otoč telefon, kliknutím na obrazovku otevři vstup.">
-                <p id="phone-loading">Připravujeme tvůj vstup…</p>
+        <div class="phone-experience entry-theater reveal">
+            <div class="entry-scene-label"><span>PRIVOFIT / VSTUP</span><span id="entry-scene-state">PŘED TVÝM PROSTOREM</span></div>
+            <div id="phone-stage" tabindex="0" role="group" aria-label="Pohled očima návštěvníka před fitkem. Klikni na displej telefonu a otevři dveře. Šipkami se rozhlédni, Enter otevře dveře.">
+                <p id="phone-loading">Připravujeme tvůj prostor…</p>
             </div>
+            <div class="entry-scene-bottom">
+                <span>POHLED TVÝMA OČIMA</span>
+                <button type="button" id="entry-replay" aria-label="Zopakovat příchod ke dveřím">↺ Znovu</button>
+            </div>
+        </div>
+        <div class="entry-control-row">
+            <p id="phone-status" class="phone-status" role="status" aria-live="polite">Klepni na zelený displej. Tvůj prostor čeká.</p>
             <div class="phone-actions" aria-label="Ukázka aplikace">
-                <button id="phone-home" type="button">Vstup</button>
-                <button id="phone-reserve" type="button">Rezervace</button>
-                <button id="phone-profile" type="button">Profil</button>
-                <button id="phone-enter" type="button">Otevřít fitko <span>↗</span></button>
+                <button id="phone-home" type="button" aria-pressed="true">Vstup</button>
+                <button id="phone-reserve" type="button" aria-pressed="false">Rezervace</button>
+                <button id="phone-profile" type="button" aria-pressed="false">Profil</button>
+                <button id="phone-enter" type="button">Otevřít dveře ↗</button>
             </div>
-            <div id="phone-booking-controls" class="phone-choice-controls" hidden>
-                <label>Den<select id="phone-day"><option value="0">Dnes</option><option value="1">Zítra</option></select></label>
-                <label>Čas<select id="phone-time"><option value="0">10:00</option><option value="1">14:00</option><option value="2" selected>17:00</option><option value="3">19:00</option></select></label>
-            </div>
-            <p id="phone-status" class="phone-status" role="status" aria-live="polite">Klepni na displej. Nebo telefon jemně otoč.</p>
+        </div>
+        <div id="phone-booking-controls" class="phone-choice-controls" hidden>
+            <label>Den<select id="phone-day"><option value="0">Dnes</option><option value="1">Zítra</option></select></label>
+            <label>Čas<select id="phone-time"><option value="0">10:00</option><option value="1">14:00</option><option value="2" selected>17:00</option><option value="3">19:00</option></select></label>
+        </div>
+        <div class="entry-footnote">
+            <span>01 Přijdeš ke dveřím</span>
+            <span>02 Otevřeš telefonem</span>
+            <span>03 Prostor je tvůj</span>
+            <small>Interaktivní ukázka · bez napojení na skutečný zámek</small>
         </div>
     </section>
     <section class="statement">

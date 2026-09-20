@@ -22,7 +22,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=6">
+    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=7">
     <link rel="manifest" href="<?= e(url('/manifest.json')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="PRIVOFIT">
@@ -65,12 +65,12 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
         <span>MADE FOR YOUR NEXT MOVE.</span>
     </div>
 </footer>
-<script nonce="<?= e($cspNonce) ?>" src="<?= e(url('/assets/marketing/app.js')) ?>?v=5"></script>
+<script nonce="<?= e($cspNonce) ?>" src="<?= e(url('/assets/marketing/app.js')) ?>?v=7"></script>
 <script type="module" nonce="<?= e($cspNonce) ?>">
-const sceneUrl = <?= json_encode(url('/assets/marketing/scene.js') . '?v=6', JSON_UNESCAPED_SLASHES) ?>;
-const decorUrl = <?= json_encode(url('/assets/marketing/decor.js') . '?v=5', JSON_UNESCAPED_SLASHES) ?>;
-const phoneUrl = <?= json_encode(url('/assets/marketing/phone.js') . '?v=5', JSON_UNESCAPED_SLASHES) ?>;
-const welcomeUrl = <?= json_encode(url('/assets/marketing/welcome.js') . '?v=5', JSON_UNESCAPED_SLASHES) ?>;
+const sceneUrl = <?= json_encode(url('/assets/marketing/scene.js') . '?v=7', JSON_UNESCAPED_SLASHES) ?>;
+const decorUrl = <?= json_encode(url('/assets/marketing/decor.js') . '?v=7', JSON_UNESCAPED_SLASHES) ?>;
+const phoneUrl = <?= json_encode(url('/assets/marketing/phone.js') . '?v=7', JSON_UNESCAPED_SLASHES) ?>;
+const welcomeUrl = <?= json_encode(url('/assets/marketing/welcome.js') . '?v=7', JSON_UNESCAPED_SLASHES) ?>;
 const isLoginPage = document.body.dataset.page === "login";
 if (document.getElementById("three-stage")) {
   import(sceneUrl).catch(() => {

@@ -291,6 +291,14 @@ const ring = new THREE.Mesh(new THREE.TorusGeometry(1.32, 0.007, 8, 80), shirt);
 ring.rotation.x = Math.PI / 2;
 ring.position.y = 0.013;
 world.add(ring);
+// A physical score plaque behind the athlete, independent of body rotation.
+const scoreCanvas=document.createElement('canvas');scoreCanvas.width=768;scoreCanvas.height=640;
+const scoreCtx=scoreCanvas.getContext('2d');const scoreTexture=new THREE.CanvasTexture(scoreCanvas);scoreTexture.colorSpace=THREE.SRGBColorSpace;
+const scoreboard=new THREE.Group();scoreboard.name='rep-scoreboard';scoreboard.position.set(1.17,2.82,-.7);scoreboard.rotation.y=-.12;scene.add(scoreboard);
+const scoreBack=new THREE.Mesh(new THREE.BoxGeometry(1.45,1.22,.10),mat(0x26392b,.5));scoreboard.add(scoreBack);
+const scoreFace=new THREE.Mesh(new THREE.PlaneGeometry(1.40,1.17),new THREE.MeshBasicMaterial({map:scoreTexture}));scoreFace.position.z=.056;scoreboard.add(scoreFace);
+function paintScore(){scoreCtx.fillStyle='#142019';scoreCtx.fillRect(0,0,768,640);scoreCtx.strokeStyle='#c6f21a55';scoreCtx.lineWidth=3;scoreCtx.strokeRect(16,16,736,608);scoreCtx.textAlign='center';scoreCtx.fillStyle='#C6F21A';scoreCtx.font='800 300px Figtree, sans-serif';scoreCtx.fillText(String(reps).padStart(2,'0'),384,395);scoreCtx.fillStyle='#c4d1bd';scoreCtx.font='600 38px Figtree, sans-serif';scoreCtx.fillText('TVŮJ PROGRES',384,105);scoreCtx.font='600 32px Figtree, sans-serif';scoreCtx.fillText('KLIKNI A POSILUJ',384,523);scoreTexture.needsUpdate=true;}
+paintScore();document.fonts?.ready.then(()=>{paintScore();render()});
 // Sweat droplets are independent meshes, emitted only as the workout builds.
 const sweatMat = new THREE.MeshStandardMaterial({
   color: 0x87cbe5,
@@ -307,6 +315,7 @@ const count = document.getElementById("rep-count"),
   status = document.getElementById("trainer-status");
 function updateUI() {
   count.textContent = reps;
+  paintScore();
 }
 function requestRep() {
   reps++;
@@ -467,7 +476,9 @@ function tick(now) {
     }
   }
   world.rotation.y = yaw;
-  const effort = phase < 0 ? 0 : Math.sin(Math.PI * Math.min(1, phase)) ** 2;
+  const idlePhase=(time+1.2)%6.8;
+  const invitation=!paused&&idlePhase<1.6 ? Math.sin(Math.PI*idlePhase/1.6)**2*.23 : 0;
+  const effort = phase < 0 ? invitation : Math.sin(Math.PI * Math.min(1, phase)) ** 2;
   pose(effort);
   render();
   if (!paused) frame = requestAnimationFrame(tick);
@@ -489,7 +500,8 @@ function resize() {
   if (!w || !h) return;
   renderer.setSize(w, h);
   camera.aspect = w / h;
-  camera.position.z = Math.max(6.15, 3.1 / camera.aspect);
+  camera.position.set(0,2.15,Math.max(7.75,5.8/camera.aspect));
+  camera.lookAt(0,1.82,0);
   camera.updateProjectionMatrix();
   pose(phase < 0 ? 0 : Math.sin(Math.PI * phase) ** 2);
   render();
