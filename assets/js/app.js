@@ -10,18 +10,53 @@
     }
   });
 
-  const file = document.querySelector('[data-avatar-input]');
-  const preview = document.querySelector('[data-avatar-preview]');
+  const picker = document.querySelector("[data-avatar-picker]");
+  const file = picker?.querySelector("[data-avatar-input]") || document.querySelector("[data-avatar-input]");
+  const preview = picker?.querySelector("[data-avatar-preview]") || document.querySelector("[data-avatar-preview]");
+  const save = picker?.querySelector("[data-avatar-save]");
+  const errorEl = picker?.querySelector("[data-avatar-error]");
+  const showPickerError = (message) => {
+    if (!errorEl) return;
+    errorEl.hidden = !message;
+    errorEl.textContent = message || "";
+  };
   if (file && preview) {
-    file.addEventListener('change', () => {
+    file.addEventListener("change", () => {
       const chosen = file.files?.[0];
-      if (!chosen) return;
-      const url = URL.createObjectURL(chosen);
-      if (preview.tagName === 'IMG') {
-        preview.src = url;
-      } else {
-        preview.style.backgroundImage = `url(${url})`;
+      showPickerError("");
+      if (!chosen) {
+        if (save) save.hidden = true;
+        return;
       }
+      const type = (chosen.type || "").toLowerCase();
+      const allowed = /^image\/(jpeg|jpg|pjpeg|png|webp)$/.test(type)
+        || (type === "" && /\.(jpe?g|png|webp)$/i.test(chosen.name || ""));
+      if (!allowed) {
+        showPickerError("Povolené formáty jsou JPEG, PNG a WebP.");
+        file.value = "";
+        if (save) save.hidden = true;
+        return;
+      }
+      if (chosen.size > 5 * 1024 * 1024) {
+        showPickerError("Obrázek je větší než 5 MB.");
+        file.value = "";
+        if (save) save.hidden = true;
+        return;
+      }
+      const applyUrl = (url) => {
+        if (preview.tagName === "IMG") {
+          preview.src = url;
+        } else {
+          preview.style.backgroundImage = "url('" + url + "')";
+          preview.style.backgroundSize = "cover";
+          preview.style.backgroundPosition = "center";
+        }
+        if (save) save.hidden = false;
+      };
+      applyUrl(URL.createObjectURL(chosen));
+      const reader = new FileReader();
+      reader.onload = () => applyUrl(String(reader.result || ""));
+      reader.readAsDataURL(chosen);
     });
   }
 

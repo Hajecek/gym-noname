@@ -210,7 +210,7 @@ final class Application
         Session::set('_csp_nonce', $nonce);
         $csp = implode('; ', [
             "default-src 'self'",
-            "img-src 'self' data:",
+            "img-src 'self' data: blob:",
             "font-src 'self' https://fonts.gstatic.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "script-src 'self' 'nonce-{$nonce}'",

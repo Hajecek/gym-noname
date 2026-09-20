@@ -42,6 +42,9 @@ final class AuthController extends Controller
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
             $this->redirect('/registrace');
+        } catch (\RuntimeException $e) {
+            $this->flashError($e->getMessage());
+            $this->redirect('/registrace');
         }
         Session::forget('_old');
         $this->flashSuccess('Účet byl vytvořen. Poslali jsme vám ověřovací e-mail.');

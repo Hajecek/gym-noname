@@ -74,8 +74,10 @@ if (isLogin || isRegister) {
   } else {
   const identity = document.getElementById("identity-step");
   const security = document.getElementById("security-step");
+  const avatarStep = document.getElementById("avatar-step");
   const review = document.getElementById("review-step");
-  const fields = [identity, security, review];
+  const fields = [identity, security, avatarStep, review].filter(Boolean);
+  const lastStep = fields.length - 1;
   const password = document.getElementById("password");
   const confirm = document.getElementById("confirm-password");
   const submit = document.getElementById("submit-button");
@@ -120,6 +122,130 @@ if (isLogin || isRegister) {
       : 'Ještě nemáš účet? <a href="' + APP_BASE + 'registrace">Začni tady</a>';
   }
   const input = (name) => form.querySelector('[name="' + name + '"]');
+  const avatarInput = form.querySelector("[data-avatar-input]");
+  const avatarPreview = form.querySelector("[data-avatar-preview]");
+  const avatarPreviewImg = form.querySelector("[data-avatar-preview-img]");
+  const avatarInitials = form.querySelector("[data-avatar-initials]");
+  const avatarClear = form.querySelector("[data-avatar-clear]");
+  const avatarError = form.querySelector("[data-avatar-error]");
+  const avatarFace = form.querySelector(".avatar-picker-face");
+  let avatarObjectUrl = "";
+  const initialsFromName = () =>
+    ((input("first_name")?.value[0] || "") + (input("last_name")?.value[0] || "")).toUpperCase() || "P";
+  const isAllowedAvatar = (file) => {
+    const type = (file.type || "").toLowerCase();
+    if (type === "image/heic" || type === "image/heif") return false;
+    if (/^image\/(jpeg|jpg|pjpeg|png|webp)$/.test(type)) return true;
+    return type === "" && /\.(jpe?g|png|webp)$/i.test(file.name || "");
+  };
+  const showAvatarError = (message) => {
+    if (!avatarError) return;
+    avatarError.hidden = !message;
+    avatarError.textContent = message || "";
+  };
+  const clearAvatarPreview = () => {
+    if (avatarObjectUrl.startsWith("blob:")) URL.revokeObjectURL(avatarObjectUrl);
+    avatarObjectUrl = "";
+    if (avatarPreviewImg) {
+      avatarPreviewImg.removeAttribute("src");
+      avatarPreviewImg.hidden = true;
+    }
+    if (avatarPreview) avatarPreview.style.backgroundImage = "";
+    if (avatarInitials) {
+      avatarInitials.hidden = false;
+      avatarInitials.textContent = initialsFromName();
+    }
+    if (avatarClear) avatarClear.hidden = true;
+    avatarFace?.classList.remove("has-photo");
+  };
+  const setAvatarPreview = (file) => {
+    if (!file || !avatarPreviewImg) {
+      clearAvatarPreview();
+      return;
+    }
+    if (avatarObjectUrl.startsWith("blob:")) URL.revokeObjectURL(avatarObjectUrl);
+    avatarObjectUrl = URL.createObjectURL(file);
+    avatarPreviewImg.src = avatarObjectUrl;
+    avatarPreviewImg.hidden = false;
+    if (avatarPreview) avatarPreview.style.backgroundImage = "url('" + avatarObjectUrl + "')";
+    if (avatarInitials) avatarInitials.hidden = true;
+    if (avatarClear) avatarClear.hidden = false;
+    avatarFace?.classList.add("has-photo");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      if (!dataUrl) return;
+      avatarPreviewImg.src = dataUrl;
+      if (avatarPreview) avatarPreview.style.backgroundImage = "url('" + dataUrl + "')";
+    };
+    reader.readAsDataURL(file);
+  };
+  const applyAvatarFile = (file) => {
+    showAvatarError("");
+    if (!file || !avatarInput) return;
+    if (!isAllowedAvatar(file)) {
+      showAvatarError("Povolené formáty jsou JPEG, PNG a WebP.");
+      avatarInput.value = "";
+      clearAvatarPreview();
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showAvatarError("Obrázek je větší než 5 MB.");
+      avatarInput.value = "";
+      clearAvatarPreview();
+      return;
+    }
+    if (file !== avatarInput.files?.[0]) {
+      const data = new DataTransfer();
+      data.items.add(file);
+      avatarInput.files = data.files;
+    }
+    setAvatarPreview(file);
+  };
+  avatarInput?.addEventListener("change", () => applyAvatarFile(avatarInput.files?.[0] || null));
+  avatarClear?.addEventListener("click", () => {
+    if (avatarInput) avatarInput.value = "";
+    showAvatarError("");
+    setAvatarPreview(null);
+  });
+  ["dragenter", "dragover"].forEach((type) =>
+    avatarFace?.addEventListener(type, (event) => {
+      event.preventDefault();
+      avatarFace.classList.add("is-drop");
+    }),
+  );
+  ["dragleave", "drop"].forEach((type) =>
+    avatarFace?.addEventListener(type, (event) => {
+      event.preventDefault();
+      avatarFace.classList.remove("is-drop");
+    }),
+  );
+  avatarFace?.addEventListener("drop", (event) => {
+    const file = event.dataTransfer?.files?.[0];
+    if (file) applyAvatarFile(file);
+  });
+  const syncReviewAvatar = () => {
+    const reviewAvatar = document.getElementById("review-avatar");
+    if (!reviewAvatar) return;
+    const initials = initialsFromName();
+    const reviewImg = reviewAvatar.querySelector("img");
+    const reviewInitials = reviewAvatar.querySelector("[data-review-initials]");
+    const hasPhoto = Boolean(avatarPreviewImg && !avatarPreviewImg.hidden && avatarPreviewImg.src);
+    reviewAvatar.classList.toggle("has-photo", hasPhoto);
+    if (hasPhoto && reviewImg) {
+      reviewImg.src = avatarPreviewImg.src;
+      reviewImg.hidden = false;
+      if (reviewInitials) reviewInitials.hidden = true;
+    } else {
+      if (reviewImg) reviewImg.hidden = true;
+      if (reviewInitials) {
+        reviewInitials.hidden = false;
+        reviewInitials.textContent = initials;
+      } else {
+        reviewAvatar.textContent = initials;
+      }
+    }
+  };
   const syncCard = () =>
     window.dispatchEvent(
       new CustomEvent("privofit-registration", {
@@ -146,11 +272,13 @@ if (isLogin || isRegister) {
     const titles = [
       "Začni u sebe.",
       "Tvůj účet. Tvůj klíč.",
+      "Ukaž se.",
       "Všechno připravené.",
     ];
     const subtitles = [
       "Nejdřív se trochu poznáme.",
       "Vytvoř si přístup do svého prostoru.",
+      "Přidej profilovou fotku, nebo to nech na později.",
       "Ještě rychlá kontrola a můžeš pokračovat.",
     ];
     document.getElementById("auth-title").textContent = isRegister
@@ -164,10 +292,11 @@ if (isLogin || isRegister) {
         ? "Zadej kód z autentizační aplikace."
         : "Přihlas se do svého prostoru.";
     document.getElementById("step-count").textContent =
-      "KROK 0" + (step + 1) + " / 03";
+      "KROK 0" + (step + 1) + " / 0" + (lastStep + 1);
     document.getElementById("step-name").textContent = [
       "O tobě",
       "Přístup",
+      "Fotka",
       "Kontrola",
     ][step];
     document
@@ -177,12 +306,19 @@ if (isLogin || isRegister) {
     submit.disabled = false;
     submit.innerHTML =
       (isRegister
-        ? step < 2
+        ? step < lastStep
           ? "Pokračovat"
           : "Vytvořit účet"
         : "Přihlásit se") + " <span>↗</span>";
+    const demoNote = form.querySelector(".demo-note");
+    if (demoNote) demoNote.hidden = isRegister && fields[step] !== security;
     if (status && !status.dataset.keep) status.hidden = true;
-    if (isRegister && step === 2) {
+    if (isRegister && fields[step] === avatarStep && avatarInitials) {
+      if (!avatarPreviewImg || avatarPreviewImg.hidden) {
+        avatarInitials.textContent = initialsFromName();
+      }
+    }
+    if (isRegister && step === lastStep) {
       const name =
         input("first_name").value.trim() + " " + input("last_name").value.trim();
       document.getElementById("review-name").textContent = name;
@@ -190,9 +326,7 @@ if (isLogin || isRegister) {
         "@" + input("username").value.trim();
       document.getElementById("review-email").textContent =
         input("email").value;
-      document.getElementById("review-avatar").textContent =
-        (input("first_name").value[0] || "") +
-        (input("last_name").value[0] || "");
+      syncReviewAvatar();
     }
     syncCard();
     if (focus)
@@ -220,7 +354,17 @@ if (isLogin || isRegister) {
   back.addEventListener("click", () => showStep(Math.max(0, step - 1), true));
   password.addEventListener("input", () => confirm.setCustomValidity(""));
   confirm.addEventListener("input", () => confirm.setCustomValidity(""));
-  input("first_name")?.addEventListener("input", syncCard);
+  input("first_name")?.addEventListener("input", () => {
+    if (avatarInitials && (!avatarPreviewImg || avatarPreviewImg.hidden)) {
+      avatarInitials.textContent = initialsFromName();
+    }
+    syncCard();
+  });
+  input("last_name")?.addEventListener("input", () => {
+    if (avatarInitials && (!avatarPreviewImg || avatarPreviewImg.hidden)) {
+      avatarInitials.textContent = initialsFromName();
+    }
+  });
   document.getElementById("show-password")?.addEventListener("click", (e) => {
     const reveal = password.type === "password";
     password.type = reveal ? "text" : "password";
@@ -235,7 +379,7 @@ if (isLogin || isRegister) {
       e.preventDefault();
       return;
     }
-    if (isRegister && step < 2) {
+    if (isRegister && step < lastStep) {
       e.preventDefault();
       showStep(step + 1, true);
       return;

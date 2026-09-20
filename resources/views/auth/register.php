@@ -24,16 +24,17 @@ $oldEmail = old('email');
             </div>
             <div id="registration-progress" hidden>
                 <div class="step-counter">
-                    <span id="step-count">KROK 01 / 03</span>
+                    <span id="step-count">KROK 01 / 04</span>
                     <span id="step-name">O tobě</span>
                 </div>
-                <div class="step-bars" aria-hidden="true"><i class="active"></i><i></i><i></i></div>
+                <div class="step-bars" aria-hidden="true"><i class="active"></i><i></i><i></i><i></i></div>
             </div>
             <h2 id="auth-title" tabindex="-1">Začni u sebe.</h2>
             <p id="auth-subtitle">Nejdřív se trochu poznáme.</p>
             <?php require dirname(__DIR__) . '/partials/social-auth.php'; ?>
-            <form id="auth-form" method="post" action="<?= e(url('/registrace')) ?>" novalidate>
+            <form id="auth-form" method="post" action="<?= e(url('/registrace')) ?>" enctype="multipart/form-data" novalidate>
                 <?= csrf_field() ?>
+                <input type="file" id="register-avatar" name="avatar" accept="image/jpeg,image/png,image/webp" hidden data-avatar-input>
                 <fieldset id="identity-step" hidden>
                     <legend class="sr-only">O tobě</legend>
                     <div class="field-row">
@@ -66,10 +67,30 @@ $oldEmail = old('email');
                         </label>
                     </div>
                 </fieldset>
+                <fieldset id="avatar-step" hidden>
+                    <legend class="sr-only">Profilová fotka</legend>
+                    <div class="avatar-picker" data-avatar-picker>
+                        <label class="avatar-picker-face" for="register-avatar">
+                            <span class="avatar-picker-preview" data-avatar-preview>
+                                <span data-avatar-initials>P</span>
+                                <img data-avatar-preview-img hidden alt="">
+                            </span>
+                            <span class="avatar-picker-badge" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 8h2.5l1.6-2.4h6L17.7 8H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><circle cx="12.5" cy="14" r="3.4"/></svg>
+                            </span>
+                        </label>
+                        <p class="avatar-picker-hint">Přidej fotku, nebo pokračuj bez ní. Doplnit ji můžeš i později v profilu.</p>
+                        <button type="button" class="avatar-picker-clear" data-avatar-clear hidden>Odebrat fotku</button>
+                        <p class="avatar-picker-error" data-avatar-error hidden></p>
+                    </div>
+                </fieldset>
                 <fieldset id="review-step" hidden>
                     <legend class="sr-only">Kontrola údajů</legend>
                     <div class="review-profile">
-                        <span id="review-avatar">P</span>
+                        <span id="review-avatar">
+                            <span data-review-initials>P</span>
+                            <img hidden alt="">
+                        </span>
                         <div>
                             <strong id="review-name"></strong>
                             <small id="review-username"></small>
