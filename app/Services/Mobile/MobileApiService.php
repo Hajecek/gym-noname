@@ -7,6 +7,7 @@ namespace App\Services\Mobile;
 use App\Core\Crypto;
 use App\Core\Database;
 use App\Core\HttpException;
+use App\Core\Logger;
 use App\Core\Request;
 use App\Services\Access\AccessControlService;
 use App\Services\Auth\AuthService;
@@ -226,14 +227,12 @@ final class MobileApiService
 
     public function payAndReserve(array $user, array $slotIds, string $requestId, array $applePay): array
     {
+        $this->ensureCheckoutSchema();
         if ($cached = $this->idempotent($user, $requestId)) {
             return $cached;
         }
-        $existing = $this->db->fetch(
-            'SELECT * FROM payments WHERE user_id = :uid AND client_request_id = :rid',
-            ['uid' => (int) $user['id'], 'rid' => $requestId]
-        );
-        if ($existing && $existing['status'] === 'paid') {
+        $existing = $this->existingPaidCheckout($user, $requestId);
+        if ($existing) {
             $payload = $this->paymentPayloadFromRow($existing, $user);
             $this->storeIdempotent($user, $requestId, 'reservations.pay', $payload);
             return $payload;
@@ -243,7 +242,6 @@ final class MobileApiService
         $count = count($quote['slots']);
         $unit = (float) $quote['pricePerSlot'];
         $total = number_format($unit * $count, 2, '.', '');
-        $chargeCard = $unit > 0;
         $holds = [];
         try {
             $this->reservations->releasePendingForSlots($user, $slotIds);
@@ -253,49 +251,33 @@ final class MobileApiService
                 $ignoreIds[] = (int) $hold['id'];
                 $holds[] = $hold;
             }
-            $reference = null;
-            if ($chargeCard) {
-                $amountMinor = (int) round(((float) $total) * 100);
-                $gateway = StripeGateway::fromConfig();
-                $paymentData = $this->applePayJson($applePay);
-                $charge = $paymentData === null
-                    ? $gateway->chargeTestCard($amountMinor, 'czk', $requestId, 'PRIVOFIT rezervace (local test)')
-                    : $gateway->chargeApplePay($paymentData, $amountMinor, 'czk', $requestId, 'PRIVOFIT rezervace');
-                $reference = $charge['id'];
-            } else {
-                $membership = $this->memberships->activeForUser((int) $user['id']);
-                if ($membership && $membership['entries_remaining'] !== null) {
-                    for ($i = 0; $i < $count; $i++) {
-                        $this->memberships->consumeEntry((int) $membership['id'], (int) $user['id']);
-                    }
-                }
-            }
 
+            $settlement = $this->settleCheckout($user, $unit, $count, $total, $requestId, $applePay);
             $confirmed = [];
             foreach ($holds as $hold) {
                 $confirmed[] = $this->reservations->confirmPending($hold, $user);
             }
-            $firstId = $confirmed[0]['id'] ?? null;
-            $paymentId = (int) $this->db->insert('payments', [
+            $firstId = isset($confirmed[0]['id']) ? (int) $confirmed[0]['id'] : null;
+            $this->insertPayment([
                 'public_id' => Crypto::uuid(),
-                'client_request_id' => $requestId,
+                'client_request_id' => $requestId !== '' ? $requestId : null,
                 'user_id' => (int) $user['id'],
                 'reservation_id' => $firstId,
-                'provider' => $chargeCard ? 'stripe' : 'membership',
-                'provider_reference' => $reference,
+                'provider' => $settlement['provider'],
+                'provider_reference' => $settlement['reference'],
                 'amount' => $total,
                 'currency' => 'CZK',
                 'status' => 'paid',
-                'metadata_json' => json_encode(['reservations' => array_column($confirmed, 'public_id')], JSON_UNESCAPED_UNICODE),
+                'metadata_json' => json_encode([
+                    'reservations' => array_column($confirmed, 'public_id'),
+                    'settlement' => $settlement['provider'],
+                ], JSON_UNESCAPED_UNICODE),
                 'paid_at' => Clock::utc(),
                 'created_at' => Clock::utc(),
                 'updated_at' => Clock::utc(),
             ]);
-            if ($reference) {
-                $this->payments->markPaid($paymentId, $reference, $requestId);
-            }
             $payload = [
-                'id' => $requestId,
+                'id' => $requestId !== '' ? $requestId : ($confirmed[0]['public_id'] ?? Crypto::uuid()),
                 'status' => 'paid',
                 'checkoutURL' => null,
                 'reservations' => array_map(fn (array $row): array => $this->reservationPayload($row, $user), $confirmed),
@@ -306,7 +288,11 @@ final class MobileApiService
             foreach ($holds as $hold) {
                 $this->reservations->failPending($hold);
             }
-            throw $e;
+            if ($e instanceof HttpException) {
+                throw $e;
+            }
+            Logger::error('Checkout rezervace selhal', ['error' => $e->getMessage()]);
+            throw new HttpException(500, 'Rezervaci se nepodařilo dokončit.');
         }
     }
 
@@ -491,19 +477,127 @@ final class MobileApiService
 
     private function applePayJson(array $applePay): ?string
     {
-        $raw = (string) ($applePay['paymentData'] ?? '');
-        $decoded = base64_decode($raw, true);
-        $json = $decoded !== false ? $decoded : $raw;
-        $parsed = json_decode($json, true);
+        $raw = $applePay['paymentData'] ?? '';
+        if (is_array($raw)) {
+            $json = json_encode($raw);
+            $parsed = $raw;
+        } else {
+            $raw = is_string($raw) ? $raw : '';
+            $decoded = base64_decode($raw, true);
+            $json = $decoded !== false ? $decoded : $raw;
+            $parsed = json_decode($json, true);
+        }
         $looksLikeApplePay = is_array($parsed)
             && isset($parsed['data'], $parsed['signature'], $parsed['header']);
         if (!$looksLikeApplePay) {
-            if ($this->allowLocalStripeTest()) {
-                return null;
-            }
-            throw new HttpException(422, 'Chybí Apple Pay token.');
+            return null;
         }
-        return $json;
+        return is_string($json) ? $json : json_encode($parsed);
+    }
+
+    /**
+     * @return array{provider:string,reference:?string}
+     */
+    private function settleCheckout(array $user, float $unit, int $count, string $total, string $requestId, array $applePay): array
+    {
+        if ($unit <= 0) {
+            $membership = $this->memberships->activeForUser((int) $user['id']);
+            if ($membership && $membership['entries_remaining'] !== null) {
+                for ($i = 0; $i < $count; $i++) {
+                    $this->memberships->consumeEntry((int) $membership['id'], (int) $user['id']);
+                }
+            }
+            return ['provider' => 'membership', 'reference' => null];
+        }
+
+        $amountMinor = (int) round(((float) $total) * 100);
+        $key = trim((string) env_value('STRIPE_SECRET_KEY', ''));
+        if ($key === '' || !str_starts_with($key, 'sk_')) {
+            throw new HttpException(503, 'Stripe není nakonfigurovaný.');
+        }
+
+        $paymentData = $this->applePayJson($applePay);
+        $gateway = StripeGateway::fromConfig();
+        $description = 'PRIVOFIT rezervace';
+        $meta = [
+            'user' => (string) ($user['public_id'] ?? $user['id'] ?? ''),
+            'request' => $requestId,
+            'slots' => (string) $count,
+        ];
+
+        if ($paymentData !== null) {
+            $charge = $gateway->chargeApplePay($paymentData, $amountMinor, 'czk', $requestId, $description, $meta);
+            return ['provider' => 'stripe', 'reference' => $charge['id']];
+        }
+        if (str_starts_with($key, 'sk_test_')) {
+            $charge = $gateway->chargeTestCard($amountMinor, 'czk', $requestId, $description . ' (test)', $meta);
+            return ['provider' => 'stripe', 'reference' => $charge['id']];
+        }
+
+        throw new HttpException(422, 'Chybí Apple Pay token.');
+    }
+
+    private function existingPaidCheckout(array $user, string $requestId): ?array
+    {
+        if ($requestId === '') {
+            return null;
+        }
+        try {
+            $existing = $this->db->fetch(
+                'SELECT * FROM payments WHERE user_id = :uid AND client_request_id = :rid',
+                ['uid' => (int) $user['id'], 'rid' => $requestId]
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+        if ($existing && $existing['status'] === 'paid') {
+            return $existing;
+        }
+        return null;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function insertPayment(array $data): int
+    {
+        try {
+            return (int) $this->db->insert('payments', $data);
+        } catch (\Throwable) {
+            unset($data['client_request_id'], $data['metadata_json']);
+            return (int) $this->db->insert('payments', $data);
+        }
+    }
+
+    private function ensureCheckoutSchema(): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+        $ready = true;
+        $this->trySql(
+            "CREATE TABLE IF NOT EXISTS api_idempotency (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                user_id BIGINT UNSIGNED NOT NULL,
+                idempotency_key CHAR(36) NOT NULL,
+                route VARCHAR(120) NOT NULL,
+                status_code SMALLINT UNSIGNED NOT NULL DEFAULT 200,
+                response_json MEDIUMTEXT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_api_idempotency_user_key (user_id, idempotency_key)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $this->trySql('ALTER TABLE payments ADD COLUMN client_request_id CHAR(36) DEFAULT NULL AFTER public_id');
+        $this->trySql('ALTER TABLE payments ADD COLUMN metadata_json MEDIUMTEXT DEFAULT NULL AFTER status');
+    }
+
+    private function trySql(string $sql): void
+    {
+        try {
+            $this->db->query($sql);
+        } catch (\Throwable) {
+            // sloupec / tabulka už existuje
+        }
     }
 
     private function allowLocalStripeTest(): bool
@@ -540,10 +634,14 @@ final class MobileApiService
         if ($key === '') {
             return null;
         }
-        $row = $this->db->fetch(
-            'SELECT response_json FROM api_idempotency WHERE user_id = :uid AND idempotency_key = :k',
-            ['uid' => (int) $user['id'], 'k' => $key]
-        );
+        try {
+            $row = $this->db->fetch(
+                'SELECT response_json FROM api_idempotency WHERE user_id = :uid AND idempotency_key = :k',
+                ['uid' => (int) $user['id'], 'k' => $key]
+            );
+        } catch (\Throwable) {
+            return null;
+        }
         if (!$row) {
             return null;
         }

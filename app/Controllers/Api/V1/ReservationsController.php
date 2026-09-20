@@ -60,6 +60,9 @@ final class ReservationsController extends Controller
             ));
         } catch (HttpException $e) {
             $this->jsonError($e->getMessage(), $e->status);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('API reservations/pay', ['error' => $e->getMessage()]);
+            $this->jsonError('Rezervaci se nepodařilo dokončit.', 500);
         }
     }
 

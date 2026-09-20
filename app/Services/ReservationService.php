@@ -84,11 +84,11 @@ final class ReservationService
 
     public function create(array $user, string $localStart, int $durationMinutes, int $guestCount, ?int $roomId = null, bool $paidCheckout = false, array $ignoreReservationIds = []): array
     {
-        if (empty($user['email_verified_at'])) {
-            throw new HttpException(403, 'Nejprve ověřte e-mailovou adresu.');
-        }
-        if ($user['status'] !== 'active') {
+        if ($user['status'] !== 'active' && $user['status'] !== 'pending') {
             throw new HttpException(403, 'Účet není aktivní.');
+        }
+        if (!$paidCheckout && empty($user['email_verified_at'])) {
+            throw new HttpException(403, 'Nejprve ověřte e-mailovou adresu.');
         }
 
         $room = $this->room($roomId);
@@ -162,24 +162,32 @@ final class ReservationService
             if ($door && $status === 'confirmed') {
                 $early = $this->settings->int('access.early_minutes', 10);
                 $late = $this->settings->int('access.late_minutes', 10);
-                $db->insert('access_permissions', [
-                    'user_id' => (int) $user['id'],
-                    'door_id' => (int) $door['id'],
-                    'reservation_id' => $id,
-                    'valid_from' => $startUtc->modify('-' . $early . ' minutes')->format('Y-m-d H:i:s'),
-                    'valid_until' => $endUtc->modify('+' . $late . ' minutes')->format('Y-m-d H:i:s'),
-                    'created_at' => Clock::utc(),
-                ]);
+                try {
+                    $db->insert('access_permissions', [
+                        'user_id' => (int) $user['id'],
+                        'door_id' => (int) $door['id'],
+                        'reservation_id' => $id,
+                        'valid_from' => $startUtc->modify('-' . $early . ' minutes')->format('Y-m-d H:i:s'),
+                        'valid_until' => $endUtc->modify('+' . $late . ' minutes')->format('Y-m-d H:i:s'),
+                        'created_at' => Clock::utc(),
+                    ]);
+                } catch (\Throwable) {
+                    // rezervace platí i bez záznamu ke dveřím
+                }
             }
 
             $reservation = $db->fetch('SELECT * FROM reservations WHERE id = :id', ['id' => $id]);
             if ($status === 'confirmed') {
-                $this->mail->queue('reservation-confirmed', $user['email'], [
-                    'subject' => 'Potvrzení rezervace PRIVOFIT',
-                    'first_name' => $user['first_name'],
-                    'starts_at' => Clock::format($reservation['starts_at']),
-                    'ends_at' => Clock::format($reservation['ends_at']),
-                ], (int) $user['id']);
+                try {
+                    $this->mail->queue('reservation-confirmed', $user['email'], [
+                        'subject' => 'Potvrzení rezervace PRIVOFIT',
+                        'first_name' => $user['first_name'],
+                        'starts_at' => Clock::format($reservation['starts_at']),
+                        'ends_at' => Clock::format($reservation['ends_at']),
+                    ], (int) $user['id']);
+                } catch (\Throwable) {
+                    // rezervace platí i bez e-mailu
+                }
             }
             return $reservation;
         });
@@ -498,22 +506,30 @@ final class ReservationService
             $endUtc = new \DateTimeImmutable($fresh['ends_at'], new \DateTimeZone('UTC'));
             $exists = $this->db->fetch('SELECT id FROM access_permissions WHERE reservation_id = :id', ['id' => (int) $fresh['id']]);
             if (!$exists) {
-                $this->db->insert('access_permissions', [
-                    'user_id' => (int) $user['id'],
-                    'door_id' => (int) $door['id'],
-                    'reservation_id' => (int) $fresh['id'],
-                    'valid_from' => $startUtc->modify('-' . $early . ' minutes')->format('Y-m-d H:i:s'),
-                    'valid_until' => $endUtc->modify('+' . $late . ' minutes')->format('Y-m-d H:i:s'),
-                    'created_at' => Clock::utc(),
-                ]);
+                try {
+                    $this->db->insert('access_permissions', [
+                        'user_id' => (int) $user['id'],
+                        'door_id' => (int) $door['id'],
+                        'reservation_id' => (int) $fresh['id'],
+                        'valid_from' => $startUtc->modify('-' . $early . ' minutes')->format('Y-m-d H:i:s'),
+                        'valid_until' => $endUtc->modify('+' . $late . ' minutes')->format('Y-m-d H:i:s'),
+                        'created_at' => Clock::utc(),
+                    ]);
+                } catch (\Throwable) {
+                    // rezervace platí i bez záznamu ke dveřím
+                }
             }
         }
-        $this->mail->queue('reservation-confirmed', $user['email'], [
-            'subject' => 'Potvrzení rezervace PRIVOFIT',
-            'first_name' => $user['first_name'],
-            'starts_at' => Clock::format($fresh['starts_at']),
-            'ends_at' => Clock::format($fresh['ends_at']),
-        ], (int) $user['id']);
+        try {
+            $this->mail->queue('reservation-confirmed', $user['email'], [
+                'subject' => 'Potvrzení rezervace PRIVOFIT',
+                'first_name' => $user['first_name'],
+                'starts_at' => Clock::format($fresh['starts_at']),
+                'ends_at' => Clock::format($fresh['ends_at']),
+            ], (int) $user['id']);
+        } catch (\Throwable) {
+            // rezervace platí i bez e-mailu
+        }
         return $fresh;
     }
 

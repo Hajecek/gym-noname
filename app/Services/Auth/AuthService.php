@@ -686,17 +686,14 @@ final class AuthService
         $prepared['terms'] = '1';
         $prepared['privacy'] = '1';
         $user = $this->register($prepared, $request);
-        if ((string) env_value('APP_ENV', 'local') === 'local') {
-            $this->db->update('users', [
-                'email_verified_at' => Clock::utc(),
-                'status' => 'active',
-            ], 'id = :id AND status != :blocked', [
-                'id' => (int) $user['id'],
-                'blocked' => 'blocked',
-            ]);
-            $user = $this->findById((int) $user['id']);
-        }
-        return $user;
+        $this->db->update('users', [
+            'email_verified_at' => Clock::utc(),
+            'status' => 'active',
+        ], 'id = :id AND status != :blocked', [
+            'id' => (int) $user['id'],
+            'blocked' => 'blocked',
+        ]);
+        return $this->findById((int) $user['id']);
     }
 
     public function forgotPasswordFromApp(string $identifier, Request $request): void

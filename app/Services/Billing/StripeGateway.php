@@ -32,7 +32,11 @@ final class StripeGateway
     /**
      * @return array{id:string,status:string}
      */
-    public function chargeApplePay(string $paymentDataJson, int $amountMinor, string $currency, string $idempotencyKey, string $description): array
+    /**
+     * @param array<string, string> $metadata
+     * @return array{id:string,status:string}
+     */
+    public function chargeApplePay(string $paymentDataJson, int $amountMinor, string $currency, string $idempotencyKey, string $description, array $metadata = []): array
     {
         $this->assertAmount($amountMinor);
         $token = $this->createApplePayToken($paymentDataJson, $idempotencyKey . ':token');
@@ -45,7 +49,7 @@ final class StripeGateway
             'description' => $description,
             'payment_method_data[type]' => 'card',
             'payment_method_data[card][token]' => $token,
-        ], $idempotencyKey . ':pi');
+        ] + $this->metadataFields($metadata), $idempotencyKey . ':pi');
     }
 
     /**
@@ -54,7 +58,11 @@ final class StripeGateway
      *
      * @return array{id:string,status:string}
      */
-    public function chargeTestCard(int $amountMinor, string $currency, string $idempotencyKey, string $description): array
+    /**
+     * @param array<string, string> $metadata
+     * @return array{id:string,status:string}
+     */
+    public function chargeTestCard(int $amountMinor, string $currency, string $idempotencyKey, string $description, array $metadata = []): array
     {
         if (!str_starts_with($this->secretKey, 'sk_test_')) {
             throw new HttpException(422, 'Chybí Apple Pay token.');
@@ -69,7 +77,20 @@ final class StripeGateway
             'description' => $description,
             'payment_method' => 'pm_card_visa',
             'payment_method_types' => ['card'],
-        ], $idempotencyKey . ':test-pi');
+        ] + $this->metadataFields($metadata), $idempotencyKey . ':test-pi');
+    }
+
+    /** @param array<string, string> $metadata @return array<string, string> */
+    private function metadataFields(array $metadata): array
+    {
+        $fields = [];
+        foreach ($metadata as $key => $value) {
+            if ($value === '') {
+                continue;
+            }
+            $fields['metadata[' . $key . ']'] = $value;
+        }
+        return $fields;
     }
 
     private function assertAmount(int $amountMinor): void
