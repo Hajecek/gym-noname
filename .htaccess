@@ -2,7 +2,13 @@ Options -Indexes
 ServerSignature Off
 
 <IfModule mod_authz_core.c>
-    <FilesMatch "^(\.env|composer\.(json|lock)|phpunit\.xml(\.dist)?|bootstrap\.php)$">
+    <FilesMatch "^(\.env.*|composer\.(json|lock)|phpunit\.xml(\.dist)?|bootstrap\.php)$">
+        Require all denied
+    </FilesMatch>
+    <FilesMatch "^(README(\.md)?|LICENSE(\.md)?|CHANGELOG(\.md)?|CONTRIBUTING(\.md)?|SECURITY(\.md)?|Makefile|docker-compose\.ya?ml)$">
+        Require all denied
+    </FilesMatch>
+    <FilesMatch "\.(sql|log|bak|old|orig|dist)$">
         Require all denied
     </FilesMatch>
     <FilesMatch "^\.">
@@ -12,12 +18,19 @@ ServerSignature Off
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    DirectorySlash Off
 
     # Staré odkazy /public/... přesměruj na kořen projektu
     RewriteCond %{REQUEST_URI} ^(.*?)/public(/.*)?$
     RewriteRule ^public(/.*)?$ %1%2 [R=301,L]
 
-    RewriteRule ^(app|bin|config|database|docs|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+    RewriteRule ^(\.git|\.svn|\.hg|\.idea|\.vscode)(/|$) - [F,L]
+    RewriteRule ^(bin|config|database|docs|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+    RewriteRule ^app/(Core|Controllers|Database|Middleware|Services|Support)(/|$) - [F,L]
+    RewriteRule ^app/.*\.(php|phtml|phar)$ - [F,L]
+
+    # /app je zákaznická aplikace, ne výpis složky se zdrojáky
+    RewriteRule ^app/?$ index.php [L]
 
     RewriteCond %{HTTPS} !=on
     RewriteCond %{HTTP:X-Forwarded-Proto} !=https

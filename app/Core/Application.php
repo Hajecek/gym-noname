@@ -187,7 +187,8 @@ final class Application
             'title' => 'Chyba',
             'message' => $message,
             'status' => $status,
-        ], 'layouts/public'), $status);
+            'page' => 'inner',
+        ], 'layouts/brand'), $status);
     }
 
     private function sendSecurityHeaders(): void

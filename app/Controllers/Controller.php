@@ -28,7 +28,8 @@ abstract class Controller
 
     protected function publicView(string $template, array $data = []): never
     {
-        $this->view($template, $data, 'layouts/public');
+        $data['page'] = $data['page'] ?? 'inner';
+        $this->view($template, $data, 'layouts/brand');
     }
 
     protected function redirect(string $path): never

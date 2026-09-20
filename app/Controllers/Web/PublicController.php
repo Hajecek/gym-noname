@@ -15,16 +15,10 @@ final class PublicController extends Controller
 {
     public function home(Request $request): never
     {
-        $content = new ContentService($this->app->db());
-        $plans = (new MembershipService($this->app->db()))->plans();
         $this->publicView('public/home', [
-            'title' => 'PRIVOFIT – Tvoje fitko. Tvůj prostor.',
-            'hero' => $content->page('home.hero', 'Tvoje fitko. Tvůj prostor.', 'Trénuj bez čekání na stroje, bez přeplněných prostor a bez kompromisů.'),
-            'faqs' => $content->faqs(),
-            'plans' => $plans,
-            'equipment' => $content->equipment(),
-            'media' => $content->media(),
-            'contact' => $content->contact(),
+            'title' => 'PRIVOFIT — Tvůj prostor. Tvoje pravidla.',
+            'page' => 'home',
+            'description' => 'Objev soukromé fitness PRIVOFIT. Prostor pro tvůj trénink, tvoje tempo a tvoje lepší já.',
         ]);
     }
 

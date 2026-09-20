@@ -23,9 +23,11 @@ final class AuthController extends Controller
     public function showRegister(): never
     {
         $this->view('auth/register', [
-            'title' => 'Vytvoř si svůj účet',
+            'title' => 'Registrace | PRIVOFIT',
+            'page' => 'register',
+            'bodyClass' => 'standalone-registration',
             'errors' => Session::pull('errors', []),
-        ], 'layouts/auth');
+        ], 'layouts/brand');
     }
 
     public function register(Request $request): never
@@ -49,9 +51,11 @@ final class AuthController extends Controller
     public function showLogin(): never
     {
         $this->view('auth/login', [
-            'title' => 'Přihlášení',
+            'title' => 'Přihlášení | PRIVOFIT',
+            'page' => 'login',
+            'bodyClass' => 'standalone-login',
             'mfa' => false,
-        ], 'layouts/auth');
+        ], 'layouts/brand');
     }
 
     public function login(Request $request): never
@@ -76,11 +80,13 @@ final class AuthController extends Controller
             Session::set('mfa_pending_user_id', (int) $e->user['id']);
             Session::set('mfa_pending_remember', (bool) $request->input('remember'));
             $this->view('auth/login', [
-                'title' => 'Ověření přihlášení',
+                'title' => 'Ověření přihlášení | PRIVOFIT',
+                'page' => 'login',
+                'bodyClass' => 'standalone-login',
                 'mfa' => true,
                 'email' => $e->user['email'],
                 'remember' => (bool) $request->input('remember'),
-            ], 'layouts/auth');
+            ], 'layouts/brand');
         } catch (MfaSetupRequiredException) {
             $this->redirect('/app/zabezpeceni/mfa');
         } catch (HttpException $e) {
@@ -100,7 +106,7 @@ final class AuthController extends Controller
 
     public function showForgot(): never
     {
-        $this->view('auth/forgot', ['title' => 'Zapomenuté heslo'], 'layouts/auth');
+        $this->view('auth/forgot', ['title' => 'Zapomenuté heslo | PRIVOFIT', 'page' => 'login'], 'layouts/brand');
     }
 
     public function forgot(Request $request): never
@@ -118,9 +124,10 @@ final class AuthController extends Controller
     public function showReset(Request $request): never
     {
         $this->view('auth/reset', [
-            'title' => 'Nové heslo',
+            'title' => 'Nové heslo | PRIVOFIT',
+            'page' => 'login',
             'token' => (string) $request->query('token', ''),
-        ], 'layouts/auth');
+        ], 'layouts/brand');
     }
 
     public function reset(Request $request): never
