@@ -68,7 +68,7 @@ final class AuthController extends Controller
                 Session::forget('mfa_pending_remember');
             } else {
                 $user = $this->authService()->login(
-                    (string) $request->input('email', ''),
+                    (string) ($request->input('identifier') ?: $request->input('email', '')),
                     (string) $request->input('password', ''),
                     $request,
                     (bool) $request->input('remember'),

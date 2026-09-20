@@ -45,14 +45,14 @@ if (isLogin) {
     const caption = document.querySelector(".auth-card-caption");
     const model = document.getElementById("auth-3d");
     if (eyebrow) eyebrow.textContent = "TVŮJ PROSTOR NA TEBE ČEKÁ";
-    if (heading) heading.innerHTML = "Zase ve svém.<br><span>Vítej zpátky.</span>";
-    if (copy) copy.textContent = "Odlož starosti. Dnes je zase chvíle pro tebe.";
-    if (caption) caption.textContent = "Klikni na svého parťáka. Rád tě pozdraví.";
+    if (heading) heading.innerHTML = "Tvůj klíč.<br><span>Tvůj prostor.</span>";
+    if (copy) copy.textContent = "Vítej zpátky. Odemkni si čas jen pro sebe.";
+    if (caption) caption.textContent = "Tvůj přístup k vlastnímu tempu. Tažením otoč klíč.";
     if (model) {
       model.setAttribute("role", "button");
       model.setAttribute(
         "aria-label",
-        "Tvůj 3D parťák. Klikni nebo stiskni Enter a zamává ti.",
+        "3D členský klíč PRIVOFIT. Tažením nebo šipkami ho otočíš. Kliknutím ho obrátíš.",
       );
     }
   }
@@ -82,6 +82,33 @@ if (isLogin || isRegister) {
   const back = document.getElementById("step-back");
   const status = document.getElementById("form-status");
   let step = 0;
+  if (isLogin && !isMfa) {
+    const identifier = form.querySelector('[name="email"], [name="identifier"]');
+    if (identifier) {
+      identifier.type = "text";
+      identifier.name = "identifier";
+      identifier.autocomplete = "username";
+      identifier.placeholder = "E-mail nebo uživatelské jméno";
+      identifier.spellcheck = false;
+      identifier.setAttribute("autocapitalize", "none");
+    }
+    const identifierLabel = document.getElementById("login-identifier-label");
+    if (identifierLabel) identifierLabel.textContent = "E-mail nebo uživatelské jméno";
+    const dividerSpan = document.querySelector("#auth-divider span");
+    if (dividerSpan) dividerSpan.textContent = "nebo pomocí účtu";
+    password.removeAttribute("minlength");
+  }
+  document.querySelectorAll("[data-provider]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const message = document.getElementById("social-status");
+      if (!message) return;
+      message.hidden = false;
+      message.textContent =
+        "Připojení k účtu " +
+        button.dataset.provider +
+        " zatím není aktivní. Toto je ukázka rozhraní; žádné údaje se neodesílají.";
+    }),
+  );
   document.getElementById("registration-progress").hidden = !isRegister;
   document.getElementById("confirm-field").hidden = !isRegister;
   document.getElementById("password-hint").hidden = !isRegister;
@@ -105,6 +132,12 @@ if (isLogin || isRegister) {
     );
   function showStep(next, focus = false) {
     step = next;
+    const socialAuth = document.getElementById("social-auth");
+    const authDivider = document.getElementById("auth-divider");
+    const socialStatus = document.getElementById("social-status");
+    if (socialAuth) socialAuth.hidden = isRegister && step !== 0;
+    if (authDivider) authDivider.hidden = isRegister && step !== 0;
+    if (socialStatus) socialStatus.hidden = true;
     fields.forEach((field, i) => {
       field.hidden = isRegister ? i !== step : i !== 1;
       field.disabled = field.hidden;
@@ -167,6 +200,10 @@ if (isLogin || isRegister) {
   }
   function validateCurrent() {
     const active = isRegister ? fields[step] : security;
+    if (isLogin) {
+      const identifierInput = input("identifier");
+      if (identifierInput) identifierInput.value = identifierInput.value.trim();
+    }
     if (isRegister && step === 0)
       active
         .querySelectorAll("input")

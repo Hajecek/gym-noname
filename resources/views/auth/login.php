@@ -4,12 +4,12 @@
         <div class="auth-story">
             <a class="back" href="<?= e(url('/')) ?>">← Zpět na úvod</a>
             <div class="eyebrow">TVŮJ PROSTOR NA TEBE ČEKÁ</div>
-            <h1>Zase ve svém.<br><span>Vítej zpátky.</span></h1>
-            <p id="auth-story-copy">Odlož starosti. Dnes je zase chvíle pro tebe.</p>
-            <div id="auth-3d" tabindex="0" role="button" aria-label="Tvůj 3D parťák. Klikni nebo stiskni Enter a zamává ti.">
+            <h1>Tvůj klíč.<br><span>Tvůj prostor.</span></h1>
+            <p id="auth-story-copy">Vítej zpátky. Odemkni si čas jen pro sebe.</p>
+            <div id="auth-3d" tabindex="0" role="button" aria-label="3D členský klíč PRIVOFIT. Tažením nebo šipkami ho otočíš. Kliknutím ho obrátíš.">
                 <p id="auth-3d-loading">Tvůj nový začátek.</p>
             </div>
-            <p class="auth-card-caption">Klikni na svého parťáka. Rád tě pozdraví.</p>
+            <p class="auth-card-caption">Tvůj přístup k vlastnímu tempu. Tažením otoč klíč.</p>
         </div>
         <div class="auth-card">
             <div class="auth-switch" hidden>
@@ -25,6 +25,9 @@
             </div>
             <h2 id="auth-title" tabindex="-1"><?= $mfa ? 'Ověření přihlášení' : 'Pojďme na to.' ?></h2>
             <p id="auth-subtitle"><?= $mfa ? 'Zadej kód z autentizační aplikace.' : 'Přihlas se do svého prostoru.' ?></p>
+            <?php if (!$mfa): ?>
+                <?php require dirname(__DIR__) . '/partials/social-auth.php'; ?>
+            <?php endif; ?>
             <form id="auth-form" method="post" action="<?= e(url('/prihlaseni')) ?>" novalidate>
                 <?= csrf_field() ?>
                 <fieldset id="identity-step" hidden>
@@ -37,13 +40,14 @@
                 </fieldset>
                 <fieldset id="security-step">
                     <legend class="sr-only">Přihlašovací údaje</legend>
-                    <label>E-mail
-                        <input type="email" name="email" autocomplete="email" placeholder="ty@example.cz" required maxlength="190" value="<?= e($email ?? old('email')) ?>">
+                    <label>
+                        <span id="login-identifier-label">E-mail nebo uživatelské jméno</span>
+                        <input type="text" name="identifier" autocomplete="username" placeholder="E-mail nebo uživatelské jméno" required maxlength="190" spellcheck="false" autocapitalize="none" value="<?= e($email ?? old('identifier') ?: old('email')) ?>">
                     </label>
                     <?php if (!$mfa): ?>
                         <label>Heslo
                             <div class="password-field">
-                                <input id="password" type="password" name="password" autocomplete="current-password" placeholder="Tvoje heslo" required minlength="8">
+                                <input id="password" type="password" name="password" autocomplete="current-password" placeholder="Tvoje heslo" required>
                                 <button type="button" id="show-password" aria-label="Zobrazit heslo">Zobrazit</button>
                             </div>
                             <small id="password-hint" hidden>Alespoň 8 znaků.</small>

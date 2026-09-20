@@ -144,17 +144,25 @@ final class AuthService
         return $user;
     }
 
-    public function login(string $email, string $password, Request $request, bool $remember = false, ?string $totp = null): array
+    public function login(string $identifier, string $password, Request $request, bool $remember = false, ?string $totp = null): array
     {
-        $email = $this->normalizeEmail($email);
+        $identifier = trim($identifier);
+        $lookupKey = $identifier;
+        if (str_contains($identifier, '@')) {
+            $lookupKey = $this->normalizeEmail($identifier);
+            $user = $this->db->fetch('SELECT * FROM users WHERE email = :e AND deleted_at IS NULL', ['e' => $lookupKey]);
+        } else {
+            $lookupKey = $this->normalizeUsername($identifier);
+            $user = $this->db->fetch('SELECT * FROM users WHERE username = :u AND deleted_at IS NULL', ['u' => $lookupKey]);
+        }
         $ip = $request->ip();
-        $generic = 'E-mail nebo heslo není správné.';
+        $generic = 'E-mail, uživatelské jméno nebo heslo není správné.';
 
         if ($this->limiter->tooMany('login-ip', $ip, (int) config('security.login.max_attempts_ip', 20), 15)
-            || $this->limiter->tooMany('login-id', $email, (int) config('security.login.max_attempts_account', 5), 15)
+            || $this->limiter->tooMany('login-id', $lookupKey, (int) config('security.login.max_attempts_account', 5), 15)
         ) {
             $this->db->insert('login_attempts', [
-                'identifier' => $email,
+                'identifier' => $lookupKey,
                 'ip_address' => $ip,
                 'successful' => 0,
                 'created_at' => Clock::utc(),
@@ -162,14 +170,13 @@ final class AuthService
             throw new HttpException(429, 'Příliš mnoho pokusů o přihlášení. Zkuste to později.');
         }
 
-        $user = $this->db->fetch('SELECT * FROM users WHERE email = :e AND deleted_at IS NULL', ['e' => $email]);
         $valid = $user && is_string($user['password_hash'] ?? null) && Crypto::verifyPassword($password, $user['password_hash']);
         $this->limiter->hit('login-ip', $ip);
-        $this->limiter->hit('login-id', $email);
+        $this->limiter->hit('login-id', $lookupKey);
 
         if (!$valid || in_array($user['status'], ['blocked', 'deleted'], true)) {
             $this->db->insert('login_attempts', [
-                'identifier' => $email,
+                'identifier' => $lookupKey,
                 'ip_address' => $ip,
                 'successful' => 0,
                 'created_at' => Clock::utc(),
@@ -187,7 +194,7 @@ final class AuthService
         }
 
         $this->db->insert('login_attempts', [
-            'identifier' => $email,
+            'identifier' => $lookupKey,
             'ip_address' => $ip,
             'successful' => 1,
             'created_at' => Clock::utc(),
