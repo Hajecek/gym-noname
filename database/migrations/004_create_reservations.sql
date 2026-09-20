@@ -72,16 +72,6 @@ CREATE TABLE IF NOT EXISTS reservations (
     CONSTRAINT fk_reservations_cancelled_by FOREIGN KEY (cancelled_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS reservation_participants (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    reservation_id BIGINT UNSIGNED NOT NULL,
-    full_name VARCHAR(160) NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_reservation_participants_reservation (reservation_id),
-    CONSTRAINT fk_reservation_participants_reservation FOREIGN KEY (reservation_id) REFERENCES reservations (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS blocked_slots (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     room_id BIGINT UNSIGNED NOT NULL,

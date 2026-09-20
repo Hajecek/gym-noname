@@ -312,25 +312,6 @@ CREATE TABLE IF NOT EXISTS membership_transactions (
     CONSTRAINT fk_membership_transactions_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS gift_vouchers (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    public_id CHAR(36) NOT NULL,
-    code_hash CHAR(64) NOT NULL,
-    code_hint VARCHAR(12) NOT NULL,
-    plan_id BIGINT UNSIGNED DEFAULT NULL,
-    amount DECIMAL(12,2) DEFAULT NULL,
-    currency CHAR(3) NOT NULL DEFAULT 'CZK',
-    redeemed_by BIGINT UNSIGNED DEFAULT NULL,
-    redeemed_at DATETIME DEFAULT NULL,
-    expires_at DATETIME DEFAULT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    UNIQUE KEY uq_gift_vouchers_public_id (public_id),
-    UNIQUE KEY uq_gift_vouchers_hash (code_hash),
-    CONSTRAINT fk_gift_vouchers_plan FOREIGN KEY (plan_id) REFERENCES membership_plans (id) ON DELETE SET NULL,
-    CONSTRAINT fk_gift_vouchers_user FOREIGN KEY (redeemed_by) REFERENCES users (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- -----------------------------------------------------------------------------
 -- Prostory, provozní doba, rezervace
 -- -----------------------------------------------------------------------------
@@ -403,16 +384,6 @@ CREATE TABLE IF NOT EXISTS reservations (
     CONSTRAINT fk_reservations_user FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT fk_reservations_membership FOREIGN KEY (membership_id) REFERENCES memberships (id) ON DELETE SET NULL,
     CONSTRAINT fk_reservations_cancelled_by FOREIGN KEY (cancelled_by) REFERENCES users (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS reservation_participants (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    reservation_id BIGINT UNSIGNED NOT NULL,
-    full_name VARCHAR(160) NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_reservation_participants_reservation (reservation_id),
-    CONSTRAINT fk_reservation_participants_reservation FOREIGN KEY (reservation_id) REFERENCES reservations (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS blocked_slots (
@@ -616,30 +587,6 @@ CREATE TABLE IF NOT EXISTS faq_items (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_faq_items_sort (is_published, sort_order)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS gym_media (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    public_id CHAR(36) NOT NULL,
-    title VARCHAR(190) NOT NULL,
-    caption VARCHAR(255) DEFAULT NULL,
-    file_path VARCHAR(500) NOT NULL,
-    sort_order INT NOT NULL DEFAULT 0,
-    is_published TINYINT(1) NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    UNIQUE KEY uq_gym_media_public_id (public_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS equipment_items (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    name VARCHAR(160) NOT NULL,
-    description TEXT DEFAULT NULL,
-    is_confirmed TINYINT(1) NOT NULL DEFAULT 0,
-    sort_order INT NOT NULL DEFAULT 0,
-    is_published TINYINT(1) NOT NULL DEFAULT 0,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS interest_signups (

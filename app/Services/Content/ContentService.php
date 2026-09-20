@@ -54,16 +54,6 @@ final class ContentService
         return $this->db->fetchAll('SELECT * FROM faq_items ORDER BY sort_order ASC, id ASC');
     }
 
-    public function equipment(): array
-    {
-        return $this->db->fetchAll('SELECT * FROM equipment_items WHERE is_published = 1 ORDER BY sort_order ASC, id ASC');
-    }
-
-    public function media(): array
-    {
-        return $this->db->fetchAll('SELECT * FROM gym_media WHERE is_published = 1 ORDER BY sort_order ASC, id ASC');
-    }
-
     public function contact(): array
     {
         return [

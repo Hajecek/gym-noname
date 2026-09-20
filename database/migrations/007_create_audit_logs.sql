@@ -78,30 +78,6 @@ CREATE TABLE IF NOT EXISTS faq_items (
     KEY idx_faq_items_sort (is_published, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS gym_media (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    public_id CHAR(36) NOT NULL,
-    title VARCHAR(190) NOT NULL,
-    caption VARCHAR(255) DEFAULT NULL,
-    file_path VARCHAR(500) NOT NULL,
-    sort_order INT NOT NULL DEFAULT 0,
-    is_published TINYINT(1) NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    UNIQUE KEY uq_gym_media_public_id (public_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS equipment_items (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    name VARCHAR(160) NOT NULL,
-    description TEXT DEFAULT NULL,
-    is_confirmed TINYINT(1) NOT NULL DEFAULT 0,
-    sort_order INT NOT NULL DEFAULT 0,
-    is_published TINYINT(1) NOT NULL DEFAULT 0,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS contact_messages (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     name VARCHAR(160) NOT NULL,

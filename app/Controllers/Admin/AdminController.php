@@ -227,7 +227,6 @@ final class AdminController extends Controller
             'privacy' => $content->page('ochrana-udaju'),
             'faqs' => $content->allFaqs(),
             'contact' => $content->contact(),
-            'equipment' => $this->app->db()->fetchAll('SELECT * FROM equipment_items ORDER BY sort_order'),
         ], 'layouts/admin');
     }
 

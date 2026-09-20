@@ -58,22 +58,3 @@ CREATE TABLE IF NOT EXISTS membership_transactions (
     CONSTRAINT fk_membership_transactions_membership FOREIGN KEY (membership_id) REFERENCES memberships (id) ON DELETE CASCADE,
     CONSTRAINT fk_membership_transactions_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS gift_vouchers (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    public_id CHAR(36) NOT NULL,
-    code_hash CHAR(64) NOT NULL,
-    code_hint VARCHAR(12) NOT NULL,
-    plan_id BIGINT UNSIGNED DEFAULT NULL,
-    amount DECIMAL(12,2) DEFAULT NULL,
-    currency CHAR(3) NOT NULL DEFAULT 'CZK',
-    redeemed_by BIGINT UNSIGNED DEFAULT NULL,
-    redeemed_at DATETIME DEFAULT NULL,
-    expires_at DATETIME DEFAULT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    UNIQUE KEY uq_gift_vouchers_public_id (public_id),
-    UNIQUE KEY uq_gift_vouchers_hash (code_hash),
-    CONSTRAINT fk_gift_vouchers_plan FOREIGN KEY (plan_id) REFERENCES membership_plans (id) ON DELETE SET NULL,
-    CONSTRAINT fk_gift_vouchers_user FOREIGN KEY (redeemed_by) REFERENCES users (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
