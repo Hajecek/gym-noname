@@ -23,8 +23,11 @@ function env_value(string $key, mixed $default = null): mixed
     return \App\Core\Env::get($key, $default);
 }
 
-function e(?string $value): string
+function e(mixed $value): string
 {
+    if (is_array($value) || is_object($value)) {
+        return '';
+    }
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 

@@ -599,22 +599,51 @@ final class AuthService
         if ((int) $user['mfa_enabled'] === 1) {
             throw new HttpException(400, 'Dvoufaktorové ověření už je aktivní.');
         }
-        $totp = TOTP::generate();
-        $totp->setLabel($user['email']);
+
+        $label = self::totpLabel($user);
+        $row = $this->db->fetch(
+            'SELECT * FROM totp_secrets WHERE user_id = :id AND confirmed_at IS NULL ORDER BY id DESC LIMIT 1',
+            ['id' => (int) $user['id']]
+        );
+
+        $totp = null;
+        if ($row) {
+            try {
+                $totp = TOTP::createFromSecret(Crypto::decrypt($row['secret_encrypted']));
+            } catch (\Throwable) {
+                $this->db->query('DELETE FROM totp_secrets WHERE user_id = :id AND confirmed_at IS NULL', ['id' => (int) $user['id']]);
+            }
+        }
+        if ($totp === null) {
+            $totp = TOTP::generate(null, 20);
+            $this->db->query('DELETE FROM totp_secrets WHERE user_id = :id', ['id' => (int) $user['id']]);
+            $this->db->insert('totp_secrets', [
+                'user_id' => (int) $user['id'],
+                'secret_encrypted' => Crypto::encrypt($totp->getSecret()),
+                'created_at' => Clock::utc(),
+            ]);
+        }
+
+        $totp->setLabel($label);
         $totp->setIssuer('PRIVOFIT');
-        $this->db->query('DELETE FROM totp_secrets WHERE user_id = :id', ['id' => (int) $user['id']]);
-        $this->db->insert('totp_secrets', [
-            'user_id' => (int) $user['id'],
-            'secret_encrypted' => Crypto::encrypt($totp->getSecret()),
-            'created_at' => Clock::utc(),
-        ]);
         $otpauth = $totp->getProvisioningUri();
         $secret = $totp->getSecret();
+        Session::set('mfa_setup_otpauth', $otpauth);
+
         return [
             'secret' => $secret,
             'secret_grouped' => strtoupper(trim(chunk_split($secret, 4, ' '))),
             'otpauth' => $otpauth,
         ];
+    }
+
+    private static function totpLabel(array $user): string
+    {
+        $label = trim(str_replace([':', '%3A', '%3a'], '', (string) ($user['email'] ?? '')));
+        if ($label === '') {
+            $label = trim(str_replace([':', '%3A', '%3a'], '', (string) ($user['username'] ?? 'user')));
+        }
+        return $label !== '' ? $label : 'user';
     }
 
     public function totpProvisioningUri(array $user): string
@@ -627,7 +656,7 @@ final class AuthService
             throw new HttpException(404, 'Nejprve zahajte nastavení MFA.');
         }
         $totp = TOTP::createFromSecret(Crypto::decrypt($row['secret_encrypted']));
-        $totp->setLabel((string) $user['email']);
+        $totp->setLabel(self::totpLabel($user));
         $totp->setIssuer('PRIVOFIT');
         return $totp->getProvisioningUri();
     }

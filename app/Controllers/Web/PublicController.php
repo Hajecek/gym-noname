@@ -147,7 +147,8 @@ final class PublicController extends Controller
         $page = (new ContentService($this->app->db()))->page($slug, 'Dokument');
         $this->publicView('public/legal', [
             'title' => $page['title'],
-            'page' => $page,
+            'page' => 'inner',
+            'document' => $page,
         ]);
     }
 
@@ -174,18 +175,26 @@ final class PublicController extends Controller
 
     public function avatar(Request $request, array $params): never
     {
-        $id = (string) ($params['id'] ?? '');
-        if ($id !== '' && $id !== 'guest' && preg_match('/^[0-9a-f-]{36}$/i', $id) === 1) {
-            $user = $this->app->db()->fetch(
-                'SELECT avatar_path FROM users WHERE public_id = :id LIMIT 1',
-                ['id' => $id]
-            );
-            if ($user && !empty($user['avatar_path'])) {
-                $path = AvatarService::resolveFile((string) $user['avatar_path']);
-                if ($path) {
-                    Response::file($path, AvatarService::mimeFor($path));
+        try {
+            $id = (string) ($params['id'] ?? '');
+            if ($id !== '' && $id !== 'guest' && preg_match('/^[0-9a-f-]{36}$/i', $id) === 1) {
+                $user = $this->app->db()->fetch(
+                    'SELECT avatar_path, first_name, last_name FROM users WHERE public_id = :id LIMIT 1',
+                    ['id' => $id]
+                );
+                if ($user && !empty($user['avatar_path'])) {
+                    $path = AvatarService::resolveFile((string) $user['avatar_path']);
+                    if ($path) {
+                        Response::file($path, AvatarService::mimeFor($path));
+                    }
+                }
+                if ($user) {
+                    $initials = mb_strtoupper(mb_substr((string) ($user['first_name'] ?? ''), 0, 1) . mb_substr((string) ($user['last_name'] ?? ''), 0, 1)) ?: 'PF';
+                    $this->sendInitialsSvg($initials);
                 }
             }
+        } catch (\Throwable) {
+            // Náhled fotky nesmí shodit stránku.
         }
 
         $initials = strtoupper(substr((string) $request->query('i', 'PF'), 0, 2));
@@ -194,17 +203,27 @@ final class PublicController extends Controller
 
     public function uploadedAvatar(Request $request, array $params): never
     {
-        $file = basename((string) ($params['file'] ?? ''));
-        $path = AvatarService::resolveFile($file);
-        if ($path) {
-            Response::file($path, AvatarService::mimeFor($path));
-        }
+        try {
+            $file = basename((string) ($params['file'] ?? ''));
+            $path = AvatarService::resolveFile($file);
+            if ($path) {
+                Response::file($path, AvatarService::mimeFor($path));
+            }
 
-        $id = 'guest';
-        if (preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-/i', $file, $match) === 1) {
-            $id = $match[1];
+            $initials = 'PF';
+            if (preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-/i', $file, $match) === 1) {
+                $user = $this->app->db()->fetch(
+                    'SELECT first_name, last_name FROM users WHERE public_id = :id LIMIT 1',
+                    ['id' => $match[1]]
+                );
+                if ($user) {
+                    $initials = mb_strtoupper(mb_substr((string) ($user['first_name'] ?? ''), 0, 1) . mb_substr((string) ($user['last_name'] ?? ''), 0, 1)) ?: 'PF';
+                }
+            }
+            $this->sendInitialsSvg($initials);
+        } catch (\Throwable) {
+            $this->sendInitialsSvg('PF');
         }
-        Response::redirect($this->app->url('/avatar/' . rawurlencode($id) . '?i=PF'), 302);
     }
 
     private function sendInitialsSvg(string $initials): never

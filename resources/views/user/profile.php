@@ -1,6 +1,6 @@
 <?php
 $errors = $errors ?? [];
-$hasAvatar = !empty($user['avatar_path']);
+$hasAvatar = \App\Services\AvatarService::resolveFile((string) ($user['avatar_path'] ?? '')) !== null;
 $fullName = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
 $planName = $membership['plan_name'] ?? 'Bez tarifu';
 $mfaEnabled = !empty($mfaEnabled);

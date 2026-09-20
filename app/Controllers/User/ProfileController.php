@@ -6,9 +6,11 @@ namespace App\Controllers\User;
 
 use App\Controllers\Controller;
 use App\Core\HttpException;
+use App\Core\Logger;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
+use App\Support\QrSvg;
 use App\Services\Auth\AuthService;
 use App\Services\Auth\ValidationException;
 use App\Services\AvatarService;
@@ -182,13 +184,28 @@ final class ProfileController extends Controller
         $user = $this->requireUser();
         $auth = AuthService::make($this->app->db());
         $enabled = (int) $user['mfa_enabled'] === 1;
+        $setup = $enabled ? null : $auth->beginTotpSetup($user);
+        $errors = Session::pull('errors', []);
+        $recoveryLeft = $enabled ? $auth->remainingRecoveryCodes((int) $user['id']) : 0;
+        if (is_array($setup)) {
+            try {
+                $setup['qr_src'] = QrSvg::dataUri((string) $setup['otpauth']);
+            } catch (\Throwable $e) {
+                Logger::error($e->getMessage(), ['file' => $e->getFile(), 'line' => $e->getLine()]);
+                error_log('PRIVOFIT QR: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+                $setup['qr_src'] = url('/user/zabezpeceni/mfa/qr');
+            }
+        }
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
         $this->view('user/mfa', [
             'title' => 'Dvoufaktorové ověření',
             'enabled' => $enabled,
             'mfaRequired' => AuthService::mfaRequiredFor($user),
-            'recoveryLeft' => $enabled ? $auth->remainingRecoveryCodes((int) $user['id']) : 0,
-            'setup' => $enabled ? null : $auth->beginTotpSetup($user),
-            'errors' => Session::pull('errors', []),
+            'recoveryLeft' => $recoveryLeft,
+            'setup' => $setup,
+            'errors' => $errors,
         ]);
     }
 
@@ -237,9 +254,26 @@ final class ProfileController extends Controller
     {
         $user = $this->requireUser();
         if ((int) $user['mfa_enabled'] === 1) {
-            throw new HttpException(404, 'QR kód není k dispozici.');
+            Response::send(self::qrUnavailableSvg(), 'image/svg+xml; charset=UTF-8', 404);
         }
-        $uri = AuthService::make($this->app->db())->totpProvisioningUri($user);
-        Response::send(\App\Support\QrSvg::render($uri), 'image/svg+xml; charset=UTF-8');
+        try {
+            $uri = Session::get('mfa_setup_otpauth');
+            if (!is_string($uri) || !str_starts_with($uri, 'otpauth://')) {
+                $uri = AuthService::make($this->app->db())->totpProvisioningUri($user);
+            }
+            Response::send(QrSvg::render($uri), 'image/svg+xml; charset=UTF-8');
+        } catch (\Throwable $e) {
+            Logger::error($e->getMessage(), ['file' => $e->getFile(), 'line' => $e->getLine()]);
+            error_log('PRIVOFIT QR: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            Response::send(self::qrUnavailableSvg(), 'image/svg+xml; charset=UTF-8');
+        }
+    }
+
+    private static function qrUnavailableSvg(): string
+    {
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220">'
+            . '<rect width="220" height="220" fill="#fff"/>'
+            . '<text x="110" y="110" text-anchor="middle" fill="#6b7280" font-size="14">QR není k dispozici</text>'
+            . '</svg>';
     }
 }

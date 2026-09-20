@@ -73,6 +73,9 @@ final class Response
 
     public static function file(string $path, string $mime, int $maxAge = 86400): never
     {
+        if (!is_file($path) || !is_readable($path)) {
+            throw new HttpException(404, 'Soubor nebyl nalezen.');
+        }
         http_response_code(200);
         header('Content-Type: ' . $mime);
         header('Cache-Control: public, max-age=' . $maxAge);
