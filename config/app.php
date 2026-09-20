@@ -6,7 +6,7 @@ return [
     'name' => env_value('APP_NAME', 'PRIVOFIT'),
     'env' => env_value('APP_ENV', 'local'),
     'debug' => (bool) env_value('APP_DEBUG', false),
-    'url' => rtrim((string) env_value('APP_URL', 'http://localhost/gym-noname'), '/'),
+    'url' => rtrim((string) env_value('APP_URL', '/gym-noname'), '/'),
     'timezone' => env_value('APP_TIMEZONE', 'UTC'),
     'display_timezone' => env_value('APP_DISPLAY_TIMEZONE', 'Europe/Prague'),
     'locale' => env_value('APP_LOCALE', 'cs-CZ'),

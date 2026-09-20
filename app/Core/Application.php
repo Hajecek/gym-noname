@@ -158,6 +158,9 @@ final class Application
     {
         $path = '/' . ltrim($path, '/');
         $configured = rtrim((string) $this->config('app.url', ''), '/');
+        if ($configured !== '' && preg_match('#^https?://#i', $configured) === 1) {
+            $configured = rtrim((string) (parse_url($configured, PHP_URL_PATH) ?: ''), '/');
+        }
         if ($configured !== '') {
             return $configured . ($path === '/' ? '/' : $path);
         }
