@@ -55,10 +55,13 @@
     <section class="benefits wrapper" id="prostor">
         <div class="section-heading reveal">
             <div>
-                <div class="eyebrow">01 — PROSTOR PRO ZMĚNU</div>
-                <h2>Vypni okolní svět.<br><span>Zapni sebe.</span></h2>
+                <div class="eyebrow">01 — PROČ PRIVOFIT</div>
+                <h2>Hodně lidí<br>do fitka nejde.<br><span>A má to důvod.</span></h2>
             </div>
-            <p>Fitko nemusí být plné lidí,<br>aby bylo plné možností.</p>
+        </div>
+        <div class="why-problem reveal">
+            <p class="why-lead">Není to vždy o lenosti. Je to o cizích pohledech, o šatně plné lidí, o pocitu, že tam nepatříš. Někteří se bojí začít — protože nechtějí být na očích, když ještě neví, co s činkou. Jiní cvičit umí. Jen chtějí být sami a soustředit se jen na sebe.</p>
+            <p class="why-resolve">PRIVOFIT je na tohle stavěný. Celé studio na tu hodinu jen pro tebe. Bez publika, bez front, bez tlaku vypadat, že to umíš. Můžeš začít pomalu. Můžeš jet naplno. Nikdo se nedívá.</p>
         </div>
         <div class="benefit-grid">
             <article class="benefit-card reveal tilt-card">
@@ -66,18 +69,18 @@
                     <span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></span>
                     <span>01</span>
                 </div>
-                <h3>Ve svém.<br>A sám sebou.</h3>
-                <p>Žádné porovnávání. Žádné publikum. Jen klidný prostor, kde se můžeš soustředit na sebe.</p>
-                <div class="card-foot">SOUKROMÍ <span>↗</span></div>
+                <h3>Bojíš se jít<br>do fitka?</h3>
+                <p>Cizí pohledy, plná zrcadla, pocit, že všichni vědí, co dělají — jen ty ne. Tady nejsi na očích. Nikdo tě nesrovnává. Můžeš začít z nuly a zůstat ve svém.</p>
+                <div class="card-foot">BEZ PUBLIKA <span>↗</span></div>
             </article>
             <article class="benefit-card reveal tilt-card">
                 <div class="card-top">
                     <span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 5v14M3 8v8m14-11v14m4-11v8M7 12h10"/></svg></span>
                     <span>02</span>
                 </div>
-                <h3>Tvoje série.<br>Bez pořadníku.</h3>
-                <p>Činky i stroje máš po ruce. Tvůj trénink má rytmus, který ti nikdo nerozhodí.</p>
-                <div class="card-foot">SVOBODA <span>↗</span></div>
+                <h3>Chceš být sám.<br>A v klidu.</h3>
+                <p>Ne proto, že bys lidi nesnášel. Protože soustředění potřebuje ticho. Playlist, dech, další série — bez malé talky, bez čekání na stroj, bez toho, aby u toho někdo stál.</p>
+                <div class="card-foot">JEN TY <span>↗</span></div>
             </article>
             <article class="benefit-card reveal tilt-card">
                 <div class="card-top">
@@ -85,7 +88,7 @@
                     <span>03</span>
                 </div>
                 <h3>Tempo si<br>určuješ ty.</h3>
-                <p>První trénink nebo další osobní rekord? Nemusíš s nikým držet krok. Stačí začít.</p>
+                <p>První trénink nebo další osobní rekord? Nemusíš s nikým držet krok. Na tu hodinu je prostor tvůj — zavřeš dveře a jdeš si po svém.</p>
                 <div class="card-foot">VLASTNÍ TEMPO <span>↗</span></div>
             </article>
         </div>

@@ -506,8 +506,38 @@ summary:focus-visible,
   color: #9bac91;
 }
 .benefits {
-  padding-top: 110px;
-  padding-bottom: 80px;
+  padding-top: 140px;
+  padding-bottom: 110px;
+}
+.benefits .section-heading {
+  display: block;
+  max-width: 920px;
+  margin-bottom: 36px;
+}
+.benefits h2 {
+  font-size: clamp(44px, 5.4vw, 72px);
+  line-height: 1.04;
+  letter-spacing: -2.6px;
+  margin-top: 18px;
+}
+.why-problem {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr);
+  gap: 36px 64px;
+  align-items: start;
+  margin-bottom: 52px;
+  max-width: 1180px;
+}
+.why-lead,
+.why-resolve {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.55;
+  color: var(--secondary);
+}
+.why-resolve {
+  color: var(--fog);
+  font-weight: 500;
 }
 .section-heading {
   display: flex;
@@ -539,14 +569,17 @@ h2 {
 .benefit-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 20px;
 }
 .benefit-card {
   position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 28px;
+  border-radius: 24px;
+  padding: 36px;
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
   will-change: transform;
   transition: border-color 0.25s;
   transform-style: preserve-3d;
@@ -564,9 +597,9 @@ h2 {
   color: #728268;
 }
 .feature-icon {
-  width: 45px;
-  height: 45px;
-  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   border: 1px solid #c6f21a26;
   display: grid;
   place-items: center;
@@ -574,32 +607,33 @@ h2 {
   background: #c6f21a06;
 }
 .feature-icon svg {
-  height: 25px;
-  width: 25px;
+  height: 28px;
+  width: 28px;
 }
 .benefit-card h3 {
   font-family: var(--display);
-  font-size: 26px;
+  font-size: 32px;
   font-weight: 600;
-  letter-spacing: -0.8px;
-  line-height: 1.2;
-  margin: 37px 0 17px;
+  letter-spacing: -1.1px;
+  line-height: 1.12;
+  margin: 40px 0 18px;
 }
 .benefit-card p {
-  font-size: 16px;
+  font-size: 17px;
   color: var(--secondary);
-  line-height: 1.7;
-  max-width: 290px;
+  line-height: 1.65;
+  max-width: none;
+  flex: 1;
 }
 .card-foot {
   border-top: 1px solid var(--line);
-  padding-top: 20px;
-  margin-top: 28px;
+  padding-top: 22px;
+  margin-top: 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   color: #8f9d81;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 1.6px;
 }
 .card-foot span {
@@ -1209,11 +1243,28 @@ label small {
   .object-tag {
     right: 12px;
   }
+  .benefits {
+    padding-top: 120px;
+    padding-bottom: 90px;
+  }
+  .benefits h2 {
+    font-size: clamp(38px, 6vw, 56px);
+  }
+  .why-problem {
+    gap: 28px 40px;
+    margin-bottom: 40px;
+  }
+  .why-lead,
+  .why-resolve {
+    font-size: 18px;
+  }
   .benefit-card {
-    padding: 24px;
+    padding: 28px;
+    min-height: 320px;
   }
   .benefit-card h3 {
-    font-size: 24px;
+    font-size: 26px;
+    margin: 32px 0 14px;
   }
   .last-cta {
     margin-left: 35px;
@@ -1325,17 +1376,24 @@ label small {
     width: 250px;
     height: 250px;
   }
+  .why-problem {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    margin-bottom: 32px;
+  }
   .benefit-grid {
-    gap: 12px;
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
   .benefit-card {
-    padding: 20px;
+    padding: 26px;
+    min-height: 0;
   }
   .benefit-card h3 {
-    font-size: 22px;
+    font-size: 28px;
   }
   .benefit-card p {
-    font-size: 15px;
+    font-size: 16px;
   }
   h2 {
     font-size: 40px;
@@ -1527,8 +1585,17 @@ label small {
     font-size: 12px;
   }
   .benefits {
-    padding-top: 65px;
-    padding-bottom: 40px;
+    padding-top: 72px;
+    padding-bottom: 56px;
+  }
+  .benefits h2 {
+    font-size: clamp(34px, 8.4vw, 42px);
+    letter-spacing: -1.4px;
+  }
+  .why-lead,
+  .why-resolve {
+    font-size: 17px;
+    line-height: 1.5;
   }
   .eyebrow {
     font-size: 9px;
@@ -1554,11 +1621,11 @@ label small {
     gap: 16px;
   }
   .benefit-card {
-    padding: 25px;
+    padding: 28px 24px;
   }
   .benefit-card h3 {
-    font-size: 27px;
-    margin: 25px 0 15px;
+    font-size: 28px;
+    margin: 26px 0 14px;
   }
   .benefit-card p {
     font-size: 16px;
