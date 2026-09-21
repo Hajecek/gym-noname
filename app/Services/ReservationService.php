@@ -45,6 +45,7 @@ final class ReservationService
             'max_minutes' => $maxMinutes,
             'duration_step_minutes' => $durationStep,
             'buffer_minutes' => $buffer,
+            'block_minutes' => $durationStep + $buffer,
             'max_persons' => $maxPersons,
             'hourly_price' => number_format($hourlyPrice, 2, '.', ''),
         ];
@@ -66,13 +67,15 @@ final class ReservationService
             $durations[] = $m;
         }
 
+        $blockMinutes = $durationStep + $buffer;
         $slots = [];
-        foreach ($this->startCandidates($open, $close, $occupied, $durationStep) as $cursor) {
+        foreach ($this->startCandidates($open, $close, $occupied, $blockMinutes) as $cursor) {
             $fits = [];
             $availableFor = [];
             foreach ($durations as $minutes) {
                 $end = $cursor->modify('+' . $minutes . ' minutes');
-                if ($end > $close) {
+                $until = $end->modify('+' . $buffer . ' minutes');
+                if ($until > $close) {
                     continue;
                 }
                 $fits[] = $minutes;
@@ -81,14 +84,14 @@ final class ReservationService
                     $availableFor[] = $minutes;
                 }
             }
-            $endHour = $cursor->modify('+' . $minMinutes . ' minutes');
-            if ($endHour > $close) {
+            $blockEnd = $cursor->modify('+' . $blockMinutes . ' minutes');
+            if ($blockEnd > $close) {
                 continue;
             }
             $utcStart = Clock::toUtc($cursor);
             $past = $utcStart <= Clock::nowUtc();
             $free = in_array($minMinutes, $availableFor, true);
-            $taken = $this->overlapsBody($occupied, $utcStart, Clock::toUtc($endHour));
+            $taken = $this->overlapsBody($occupied, $utcStart, Clock::toUtc($blockEnd));
             if (!$free && !$past && !$taken) {
                 continue;
             }
@@ -100,7 +103,7 @@ final class ReservationService
             }
             $slots[] = [
                 'start' => $cursor->format('H:i'),
-                'end' => $endHour->format('H:i'),
+                'end' => $blockEnd->format('H:i'),
                 'start_at' => $utcStart->format('Y-m-d H:i:s'),
                 'past' => $past,
                 'available' => $free,
@@ -109,28 +112,6 @@ final class ReservationService
                 'available_for' => $availableFor,
             ];
         }
-        foreach ($occupied as $item) {
-            $gap = (int) ($item['buffer_minutes'] ?? 0);
-            if ($gap <= 0) {
-                continue;
-            }
-            $endLocal = Clock::toLocal((string) $item['ends_at']);
-            $bufferEnd = $endLocal->modify('+' . $gap . ' minutes');
-            if ($bufferEnd <= $open || $endLocal >= $close) {
-                continue;
-            }
-            $slots[] = [
-                'start' => $endLocal->format('H:i'),
-                'end' => $bufferEnd->format('H:i'),
-                'start_at' => (new \DateTimeImmutable((string) $item['ends_at'], new \DateTimeZone('UTC')))->format('Y-m-d H:i:s'),
-                'past' => Clock::toUtc($endLocal) <= Clock::nowUtc(),
-                'available' => false,
-                'kind' => 'buffer',
-                'fits' => [],
-                'available_for' => [],
-            ];
-        }
-        usort($slots, static fn (array $a, array $b): int => strcmp((string) $a['start'], (string) $b['start']));
 
         return $meta + [
             'closed' => false,
@@ -151,23 +132,78 @@ final class ReservationService
         }
         $start = $start->setTime(0, 0);
         $last = (int) $start->format('t');
+        $end = $start->setDate($year, $month, $last)->setTime(23, 59, 59);
+        $room = $this->room($roomId);
+        $buffer = $this->bufferMinutes();
+        $hourMinutes = $this->durationStep();
+        $blockMinutes = $hourMinutes + $buffer;
+        $weekHours = [];
+        foreach ($this->db->fetchAll('SELECT * FROM opening_hours WHERE room_id = :rid', ['rid' => (int) $room['id']]) as $row) {
+            $weekHours[(int) $row['weekday']] = $row;
+        }
+        $exceptions = [];
+        foreach ($this->db->fetchAll(
+            'SELECT * FROM opening_hour_exceptions WHERE room_id = :rid AND exception_date BETWEEN :a AND :b',
+            ['rid' => (int) $room['id'], 'a' => $start->format('Y-m-d'), 'b' => $end->format('Y-m-d')]
+        ) as $row) {
+            $exceptions[(string) $row['exception_date']] = $row;
+        }
+        $occupied = $this->occupiedIntervals(
+            (int) $room['id'],
+            Clock::toUtc($start->modify('-6 hours'))->format('Y-m-d H:i:s'),
+            Clock::toUtc($end->modify('+6 hours'))->format('Y-m-d H:i:s')
+        );
+        $nowUtc = Clock::nowUtc();
         $days = [];
         for ($day = 1; $day <= $last; $day++) {
-            $date = $start->setDate($year, $month, $day)->format('Y-m-d');
-            $availability = $this->availability($date, $roomId);
+            $localDay = $start->setDate($year, $month, $day);
+            $date = $localDay->format('Y-m-d');
+            $hours = $this->hoursFromMaps($weekHours, $exceptions[$date] ?? null, (int) $localDay->format('N'));
+            if ($hours['closed']) {
+                $days[] = ['date' => $date, 'closed' => true, 'free' => 0];
+                continue;
+            }
+            $open = Clock::parseLocal($date . ' ' . $hours['opens_at']);
+            $close = Clock::parseLocal($date . ' ' . $hours['closes_at']);
             $free = 0;
-            foreach ($availability['slots'] as $slot) {
-                if (!empty($slot['available'])) {
+            foreach ($this->startCandidates($open, $close, $occupied, $blockMinutes) as $cursor) {
+                $slotEnd = $cursor->modify('+' . $hourMinutes . ' minutes');
+                $blockEnd = $cursor->modify('+' . $blockMinutes . ' minutes');
+                if ($blockEnd > $close) {
+                    continue;
+                }
+                $utcStart = Clock::toUtc($cursor);
+                if ($utcStart > $nowUtc && !$this->overlaps($occupied, $utcStart, Clock::toUtc($slotEnd), $buffer)) {
                     $free++;
                 }
             }
-            $days[] = [
-                'date' => $date,
-                'closed' => !empty($availability['closed']),
-                'free' => $free,
-            ];
+            $days[] = ['date' => $date, 'closed' => false, 'free' => $free];
         }
         return $days;
+    }
+
+    /** @param array<int, array<string, mixed>> $weekHours */
+    private function hoursFromMaps(array $weekHours, ?array $exception, int $weekday): array
+    {
+        $hours = $weekHours[$weekday] ?? null;
+        $hourlyPrice = $hours['hourly_price'] ?? null;
+        if ($exception) {
+            return [
+                'closed' => (int) $exception['is_closed'] === 1,
+                'opens_at' => $exception['opens_at'] ?? '06:00:00',
+                'closes_at' => $exception['closes_at'] ?? '22:00:00',
+                'hourly_price' => $hourlyPrice,
+            ];
+        }
+        if (!$hours || (int) $hours['is_closed'] === 1) {
+            return ['closed' => true, 'opens_at' => '00:00:00', 'closes_at' => '00:00:00', 'hourly_price' => $hourlyPrice];
+        }
+        return [
+            'closed' => false,
+            'opens_at' => $hours['opens_at'],
+            'closes_at' => $hours['closes_at'],
+            'hourly_price' => $hourlyPrice,
+        ];
     }
 
     public function create(array $user, string $localStart, int $durationMinutes, int $guestCount, ?int $roomId = null, bool $paidCheckout = false, array $ignoreReservationIds = []): array
@@ -206,7 +242,8 @@ final class ReservationService
         }
         $open = Clock::parseLocal($startLocal->format('Y-m-d') . ' ' . $hours['opens_at']);
         $close = Clock::parseLocal($startLocal->format('Y-m-d') . ' ' . $hours['closes_at']);
-        if ($startLocal < $open || $endLocal > $close) {
+        $occupiedUntil = $endLocal->modify('+' . $buffer . ' minutes');
+        if ($startLocal < $open || $occupiedUntil > $close) {
             throw new HttpException(422, 'Termín je mimo provozní dobu.');
         }
 
@@ -240,8 +277,8 @@ final class ReservationService
                     $this->occupiedIntervals((int) $room['id'], $startUtc->modify('-6 hours')->format('Y-m-d H:i:s'), $endUtc->modify('+6 hours')->format('Y-m-d H:i:s')),
                     static fn (array $row): bool => !in_array((int) ($row['id'] ?? 0), $ignoreReservationIds, true)
                 ));
-                if (!$this->isValidStart($open, $startLocal, $occupied, $durationStep)) {
-                    throw new HttpException(422, 'Začátek musí být v celou hodinu, nebo hned po 15 minutách na převlečení.');
+                if (!$this->isValidStart($open, $startLocal, $occupied, $durationStep + $buffer)) {
+                    throw new HttpException(422, 'Začátek musí být v bloku 1 h 15 min, nebo hned po předchozím termínu.');
                 }
                 if ($this->overlaps($occupied, $startUtc, $endUtc, $buffer)) {
                     throw new HttpException(409, 'Tento termín je již obsazený.');
@@ -660,7 +697,7 @@ final class ReservationService
                 continue;
             }
             foreach ($availability['slots'] as $slot) {
-                if (empty($slot['available'])) {
+                if (empty($slot['available']) || ($slot['kind'] ?? '') === 'buffer') {
                     continue;
                 }
                 $start = new \DateTimeImmutable((string) $slot['start_at'], new \DateTimeZone('UTC'));
@@ -904,7 +941,7 @@ final class ReservationService
     }
 
     /**
-     * Začátky po hodinách od otevíračky + čas hned po 15 min úklidu po existující rezervaci.
+     * Začátky po blocích (hodina tréninku + úklid) od otevíračky a hned po skončení obsazenosti.
      *
      * @param list<array<string, mixed>> $occupied
      * @return list<\DateTimeImmutable>

@@ -19,7 +19,7 @@
 *,
 *::before,
 *::after { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; color-scheme: dark; }
 html, body { margin: 0; min-height: 100%; }
 body {
   font-family: var(--ui);
@@ -32,7 +32,13 @@ img { max-width: 100%; display: block; }
 a { color: inherit; text-decoration: none; }
 a:hover { color: var(--lime); }
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
+button {
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  border: 0;
+}
 h1, h2, h3, p { margin: 0; }
 h1, h2, h3 { font-family: var(--display); letter-spacing: -0.04em; line-height: 1.1; }
 h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; }
@@ -404,35 +410,25 @@ body.side-collapsed .side-menu:focus-within {
 .slot[hidden] { display: none; }
 
 .booker { display: grid; gap: 16px; }
-.booker-date {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  min-height: 84px;
-  padding: 16px 18px;
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  background: var(--surface);
-  text-align: left;
-}
-.booker-date:hover { border-color: var(--lime); }
-.booker-date-icon {
-  width: 48px;
-  height: 48px;
-  flex-shrink: 0;
+.booker-date-btn {
   display: grid;
-  place-items: center;
-  border-radius: 16px;
-  background: #c6f21a14;
-  color: var(--lime);
+  justify-items: start;
+  width: 100%;
+  padding: 16px 18px;
+  text-align: left;
+  cursor: pointer;
+  transition: 140ms ease;
 }
-.booker-date-icon svg {
-  width: 22px;
-  height: 22px;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.booker-date-btn:hover {
+  border-color: #c6f21a66;
+  background: #c6f21a0d;
+}
+.booker-date-btn strong {
+  display: block;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
 }
 .booker-date-kicker {
   display: block;
@@ -443,18 +439,11 @@ body.side-collapsed .side-menu:focus-within {
   text-transform: uppercase;
   margin-bottom: 4px;
 }
-.booker-date strong {
-  display: block;
-  font-family: var(--display);
-  font-size: 1.2rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-}
 .booker-date-action {
-  margin-left: auto;
+  margin-top: 10px;
   color: var(--lime);
+  font-size: .82rem;
   font-weight: 700;
-  font-size: .9rem;
 }
 .booker-hours { padding: 22px 18px; }
 .booker-hours-head {
@@ -575,89 +564,117 @@ body.side-collapsed .side-menu:focus-within {
   margin: 8px 0 0;
   color: var(--secondary);
 }
-.booker-dialog {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  width: min(420px, calc(100vw - 24px));
-}
-.booker-dialog::backdrop {
-  background: rgba(5, 10, 8, .72);
-  backdrop-filter: blur(10px);
-}
-.cal-sheet {
-  background: #121a17;
-  border: 1px solid var(--line);
-  border-radius: 24px;
+.cal-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
   padding: 18px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, .45);
 }
+.cal-modal[hidden] { display: none; }
+.cal-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 10, 9, .72);
+}
+.cal-modal-panel {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  padding: 16px 16px 14px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: #121a16;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .5);
+}
+.cal-modal-close {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .04);
+  color: var(--fog);
+  font-weight: 700;
+}
+.cal-modal-close:hover { border-color: var(--lime); color: var(--lime); }
+body.cal-open { overflow: hidden; }
 .cal-head {
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: 36px 1fr 36px;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 .cal-head h2 {
   margin: 0;
   text-align: center;
-  font-size: 1.15rem;
+  font-size: .95rem;
   text-transform: capitalize;
 }
 .cal-nav {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   border: 1px solid var(--line);
   background: rgba(0, 0, 0, .2);
-  font-size: 1.4rem;
+  color: var(--fog);
+  font-size: 1.15rem;
   line-height: 1;
 }
 .cal-nav:hover { border-color: var(--lime); color: var(--lime); }
 .cal-weekdays,
 .cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
 }
 .cal-weekdays {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   color: var(--secondary);
-  font-size: .72rem;
+  font-size: .62rem;
   font-weight: 700;
-  letter-spacing: .06em;
+  letter-spacing: .04em;
   text-transform: uppercase;
   text-align: center;
 }
 .cal-day {
-  aspect-ratio: 1;
-  border: 0;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .03);
+  -webkit-appearance: none;
+  appearance: none;
+  height: 32px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .06);
   color: var(--fog);
+  font-size: .8rem;
   font-weight: 700;
   position: relative;
 }
-.cal-day.is-pad { visibility: hidden; }
-.cal-day.is-today { box-shadow: inset 0 0 0 1px #c6f21a66; }
+.cal-day.is-pad {
+  visibility: hidden;
+  pointer-events: none;
+}
+.cal-day.is-today { border-color: #c6f21a88; }
 .cal-day.is-selected { background: var(--lime); color: var(--ink); }
 .cal-day.is-free::after {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 6px;
-  width: 5px;
-  height: 5px;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: var(--lime);
   transform: translateX(-50%);
 }
 .cal-day.is-selected.is-free::after { background: var(--ink); }
 .cal-day.is-closed { color: var(--secondary); }
-.cal-day.is-disabled { opacity: .28; cursor: not-allowed; }
+.cal-day.is-disabled { opacity: .32; cursor: not-allowed; }
 .cal-day:hover:not(:disabled):not(.is-selected) { background: #c6f21a18; }
-.cal-legend { margin: 12px 0 14px; font-size: .82rem; }
+.cal-legend { margin: 8px 0 0; font-size: .72rem; }
 .booker-bar {
   position: fixed;
   left: 0;

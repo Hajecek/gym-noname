@@ -22,9 +22,11 @@
   const barMeta = bar?.querySelector("[data-bar-meta]");
   const confirmBtn = bar?.querySelector("[data-confirm]");
   const guestCountEl = bar?.querySelector("[data-guest-count]");
-  const dialog = document.querySelector("[data-calendar-dialog]");
-  const calGrid = dialog?.querySelector("[data-cal-grid]");
-  const calTitle = dialog?.querySelector("[data-cal-title]");
+  const calendar = root.querySelector("[data-calendar]");
+  const calModal = root.querySelector("[data-cal-modal]");
+  const openCalBtn = root.querySelector("[data-open-cal]");
+  const calGrid = calendar?.querySelector("[data-cal-grid]");
+  const calTitle = calendar?.querySelector("[data-cal-title]");
 
   const state = {
     date: payload.date,
@@ -79,15 +81,16 @@
   const membershipCovers = !!payload.membership_covers;
   const availableFor = (slot) => (slot.available_for || []).map((item) => Number(item));
   const bookableRows = () => (state.availability.slots || []).filter((slot) => slot.kind !== "buffer");
-  const rangeEnd = () => {
+  const occupyMinutes = (hours) => (hours || state.hours) * step() + buffer();
+  const occupyEnd = () => {
     const first = state.selected[0];
     if (!first) return "";
-    return addMinutesToTime(first.start, state.hours * step());
+    return addMinutesToTime(first.start, occupyMinutes());
   };
   const inRange = (row) => {
     const first = state.selected[0];
     if (!first || row.kind === "buffer") return false;
-    return row.start >= first.start && row.end <= rangeEnd();
+    return row.start >= first.start && row.start < occupyEnd();
   };
 
   const setSelection = (rows, hours) => {
@@ -113,14 +116,12 @@
       setSelection([first], 1);
       return;
     }
-    const end = rangeEnd();
+    const end = occupyEnd();
     if (row.start === end && state.hours < maxHours() && availableFor(first).includes((state.hours + 1) * step())) {
       setSelection([first], state.hours + 1);
       return;
     }
-    if (inRange(row)) {
-      const nextHours = Math.max(1, Math.round((timeToMinutes(row.end) - timeToMinutes(first.start)) / step()));
-      setSelection([first], nextHours);
+    if (inRange(row) && row.start !== first.start) {
       return;
     }
     setSelection([row], 1);
@@ -155,7 +156,7 @@
     const first = state.selected[0];
     if (
       first &&
-      row.start === rangeEnd() &&
+      row.start === occupyEnd() &&
       state.hours < maxHours() &&
       availableFor(first).includes((state.hours + 1) * step())
     ) {
@@ -185,19 +186,20 @@
     }
     if (hoursEl) {
       hoursEl.hidden = closed || loading || rows.length === 0;
+      const first = state.selected[0];
       hoursEl.innerHTML = rows.map((row) => {
         const kind = hourState(row);
-        if (kind === "buffer") {
-          return '<div class="hour-buffer">15 min úklid · ' + row.start + "–" + row.end + "</div>";
-        }
+        if (kind === "buffer") return "";
+        if (first && row.start > first.start && row.start < occupyEnd()) return "";
         const selected = kind === "selected";
         const disabled = kind === "busy" || kind === "past";
+        const end = selected && row.start === first.start ? occupyEnd() : row.end;
         return (
           '<button type="button" class="hour-row is-' + kind + '"' +
           ' data-hour-start="' + row.start + '"' +
           (disabled ? " disabled" : "") +
           ' aria-pressed="' + (selected ? "true" : "false") + '">' +
-          '<span class="hour-time">' + row.start + "<small>" + row.end + "</small></span>" +
+          '<span class="hour-time">' + row.start + "<small>" + end + "</small></span>" +
           '<span class="hour-meta">' + hourMeta(kind) + (kind === "free" || kind === "selected" || kind === "add" ? " · " + money(hourly()) : "") + "</span>" +
           "</button>"
         );
@@ -213,8 +215,8 @@
         hintEl.textContent = "Načítám volné hodiny…";
       } else {
         hintEl.textContent = free
-          ? "Vyber začátek. Délku měníš tlačítky 1 / 2 / 3 h — další hodina se sama neoznačí. Mezi tebou a dalším člověkem je " + buffer() + " min na úklid."
-          : "Na tenhle den už volná hodina nezbývá.";
+          ? "Každý blok je 1 h 15 min (hodina tréninku + úklid). 2 nebo 3 hodiny jdou v kuse, 15 min je až na konci."
+          : "Na tenhle den už volný blok nezbývá.";
       }
     }
   };
@@ -226,7 +228,7 @@
     bar.classList.toggle("is-on", on);
     if (!on) return;
     const first = state.selected[0];
-    const end = rangeEnd();
+    const end = occupyEnd();
     const count = state.hours;
     const price = hourly() * count;
     if (barTime) barTime.textContent = first.start + "–" + end;
@@ -267,6 +269,7 @@
     state.selected = [];
     state.hours = 1;
     state.error = "";
+    renderCalendar();
     setLoading(true);
     renderHours();
     try {
@@ -284,6 +287,29 @@
       updateForm();
       renderHours();
       renderBar();
+      renderCalendar();
+    }
+  };
+
+  const isCalOpen = () => !!(calModal && !calModal.hidden);
+
+  const openCalendar = async () => {
+    if (!calModal) return;
+    calModal.hidden = false;
+    document.body.classList.add("cal-open");
+    if (openCalBtn) openCalBtn.setAttribute("aria-expanded", "true");
+    await loadCalendar();
+    const selected = calGrid?.querySelector(".cal-day.is-selected:not(:disabled)") || calendar?.querySelector(".cal-modal-close");
+    selected?.focus();
+  };
+
+  const closeCalendar = () => {
+    if (!calModal || calModal.hidden) return;
+    calModal.hidden = true;
+    document.body.classList.remove("cal-open");
+    if (openCalBtn) {
+      openCalBtn.setAttribute("aria-expanded", "false");
+      openCalBtn.focus();
     }
   };
 
@@ -294,7 +320,8 @@
       renderCalendar();
       return;
     }
-    if (calGrid) calGrid.innerHTML = '<p class="muted">Načítám měsíc…</p>';
+    state.calDays = [];
+    renderCalendar();
     try {
       const data = await fetchJson(root.getAttribute("data-calendar-url") + "?year=" + state.calYear + "&month=" + state.calMonth);
       state.calDays = data.days || [];
@@ -336,20 +363,6 @@
     calGrid.innerHTML = html;
   };
 
-  const openCalendar = () => {
-    const current = parseDate(state.date);
-    state.calYear = current.getFullYear();
-    state.calMonth = current.getMonth() + 1;
-    if (typeof dialog?.showModal === "function") dialog.showModal();
-    else dialog?.setAttribute("open", "open");
-    loadCalendar();
-  };
-
-  const closeCalendar = () => {
-    if (typeof dialog?.close === "function") dialog.close();
-    else dialog?.removeAttribute("open");
-  };
-
   hoursEl?.addEventListener("click", (event) => {
     const btn = event.target.closest("[data-hour-start]");
     if (!btn || btn.disabled) return;
@@ -358,9 +371,17 @@
     if (row) clickHour(row);
   });
 
-  root.querySelector("[data-open-calendar]")?.addEventListener("click", openCalendar);
-  dialog?.querySelector("[data-cal-close]")?.addEventListener("click", closeCalendar);
-  dialog?.querySelector("[data-cal-prev]")?.addEventListener("click", () => {
+  openCalBtn?.addEventListener("click", () => {
+    if (isCalOpen()) closeCalendar();
+    else openCalendar();
+  });
+  calModal?.querySelectorAll("[data-cal-close]")?.forEach((btn) => {
+    btn.addEventListener("click", closeCalendar);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && isCalOpen()) closeCalendar();
+  });
+  calendar?.querySelector("[data-cal-prev]")?.addEventListener("click", () => {
     state.calMonth -= 1;
     if (state.calMonth < 1) {
       state.calMonth = 12;
@@ -368,7 +389,7 @@
     }
     loadCalendar();
   });
-  dialog?.querySelector("[data-cal-next]")?.addEventListener("click", () => {
+  calendar?.querySelector("[data-cal-next]")?.addEventListener("click", () => {
     state.calMonth += 1;
     if (state.calMonth > 12) {
       state.calMonth = 1;
@@ -379,8 +400,9 @@
   calGrid?.addEventListener("click", (event) => {
     const btn = event.target.closest("[data-cal-day]");
     if (!btn || btn.disabled) return;
+    const date = btn.getAttribute("data-cal-day");
     closeCalendar();
-    loadDay(btn.getAttribute("data-cal-day"));
+    loadDay(date);
   });
 
   bar?.querySelector("[data-clear]")?.addEventListener("click", () => setSelection([], 1));

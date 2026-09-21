@@ -28,7 +28,7 @@ $statusMap = [
     <div>
         <p class="eyebrow">TVŮJ ČAS</p>
         <h1>Rezervace</h1>
-        <p class="muted">Vyber den a začátek. Délku (1–3 hodiny) nastavíš až po výběru — další hodina se sama nezablokuje.</p>
+        <p class="muted">Otevři kalendář, vyber den a klikni na blok. Každý blok je 1 h 15 min. Délku 2 nebo 3 hodiny přidáš tlačítky dole.</p>
     </div>
 </div>
 
@@ -48,22 +48,34 @@ $statusMap = [
         </form>
     </noscript>
 
-    <button type="button" class="booker-date" data-open-calendar aria-haspopup="dialog">
-        <span class="booker-date-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
-        </span>
-        <span>
-            <span class="booker-date-kicker">Den tréninku</span>
-            <strong data-date-label><?= e($dateLabel) ?></strong>
-        </span>
-        <span class="booker-date-action">Změnit</span>
+    <button type="button" class="booker-date-btn card" data-open-cal aria-haspopup="dialog" aria-expanded="false">
+        <span class="booker-date-kicker">Vybraný den</span>
+        <strong data-date-label><?= e($dateLabel) ?></strong>
+        <span class="booker-date-action">Otevřít kalendář</span>
     </button>
+
+    <div class="cal-modal" data-cal-modal hidden>
+        <div class="cal-modal-backdrop" data-cal-close></div>
+        <section class="cal-modal-panel" data-calendar role="dialog" aria-modal="true" aria-labelledby="calendar-title">
+            <header class="cal-head">
+                <button type="button" class="cal-nav" data-cal-prev aria-label="Předchozí měsíc">‹</button>
+                <h2 id="calendar-title" data-cal-title>Kalendář</h2>
+                <button type="button" class="cal-nav" data-cal-next aria-label="Další měsíc">›</button>
+            </header>
+            <div class="cal-weekdays" aria-hidden="true">
+                <span>Po</span><span>Út</span><span>St</span><span>Čt</span><span>Pá</span><span>So</span><span>Ne</span>
+            </div>
+            <div class="cal-grid" data-cal-grid></div>
+            <p class="cal-legend muted">Zelená tečka = volný termín</p>
+            <button type="button" class="cal-modal-close" data-cal-close>Zavřít</button>
+        </section>
+    </div>
 
     <section class="booker-hours card">
         <div class="booker-hours-head">
             <div>
                 <h2>Hodiny</h2>
-                <p class="muted" data-hours-hint>Klikni na začátek. Délku 2 nebo 3 hodiny přidáš tlačítky dole, ne automaticky. Mezi tebou a dalším člověkem je <?= (int) $buffer ?> min na úklid.</p>
+                <p class="muted" data-hours-hint>Každý blok je hodina tréninku plus <?= (int) $buffer ?> min úklid. 2 nebo 3 hodiny jdou v kuse, úklid je až na konci.</p>
             </div>
             <p class="booker-price"><?= e(money_format_czk($hourly)) ?><span> / hod</span></p>
         </div>
@@ -81,22 +93,6 @@ $statusMap = [
     </form>
 </div>
 
-<dialog class="booker-dialog" data-calendar-dialog aria-labelledby="calendar-title">
-    <div class="cal-sheet">
-        <header class="cal-head">
-            <button type="button" class="cal-nav" data-cal-prev aria-label="Předchozí měsíc">‹</button>
-            <h2 id="calendar-title" data-cal-title>Kalendář</h2>
-            <button type="button" class="cal-nav" data-cal-next aria-label="Další měsíc">›</button>
-        </header>
-        <div class="cal-weekdays" aria-hidden="true">
-            <span>Po</span><span>Út</span><span>St</span><span>Čt</span><span>Pá</span><span>So</span><span>Ne</span>
-        </div>
-        <div class="cal-grid" data-cal-grid></div>
-        <p class="cal-legend muted">Zelená tečka znamená volný termín. Šedé dny jsou zavřené nebo minulé.</p>
-        <button type="button" class="btn btn-secondary btn-block" data-cal-close>Zavřít</button>
-    </div>
-</dialog>
-
 <div class="booker-bar" data-bar hidden>
     <div class="booker-bar-inner">
         <button type="button" class="booker-bar-clear" data-clear aria-label="Zrušit výběr">✕</button>
@@ -106,9 +102,9 @@ $statusMap = [
         </div>
         <div class="booker-durations" data-durations>
             <span>Délka</span>
-            <button type="button" data-hours="1">1 h</button>
-            <button type="button" data-hours="2">2 h</button>
-            <button type="button" data-hours="3">3 h</button>
+            <button type="button" data-hours="1">1 h 15</button>
+            <button type="button" data-hours="2">2 h 15</button>
+            <button type="button" data-hours="3">3 h 15</button>
         </div>
         <div class="booker-guests" data-guests-wrap>
             <span>Osoby</span>
@@ -131,12 +127,13 @@ $statusMap = [
                 [$statusLabel, $statusClass] = $statusMap[$status] ?? [$status, 'badge-warn'];
                 $canCancel = in_array($status, ['confirmed', 'pending_payment'], true);
                 $startLocal = \App\Support\Clock::toLocal((string) $item['starts_at']);
+                $endShown = \App\Support\Clock::toLocal((string) $item['ends_at'])->modify('+' . (int) ($item['buffer_minutes'] ?? 15) . ' minutes');
                 $whenLabel = $dayNames[(int) $startLocal->format('N')] . ' ' . $startLocal->format('j. n. Y');
             ?>
                 <article class="mine-card card">
                     <div>
                         <p class="mine-when"><?= e($whenLabel) ?></p>
-                        <h3><?= e(format_datetime($item['starts_at'], 'H:i')) ?>–<?= e(format_datetime($item['ends_at'], 'H:i')) ?></h3>
+                        <h3><?= e(format_datetime($item['starts_at'], 'H:i')) ?>–<?= e($endShown->format('H:i')) ?></h3>
                         <p class="muted"><?= e($item['room_name'] ?? 'Studio') ?> · <?= e(money_format_czk($item['price'] ?? 0)) ?></p>
                     </div>
                     <div class="mine-actions">
