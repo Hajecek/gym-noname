@@ -96,17 +96,43 @@ final class AppPushService
         if ($key === '') {
             return;
         }
+        foreach ($this->tokensFor($userId) as $token) {
+            $this->postFcm($key, $token, $title, $body, $type);
+        }
+    }
+
+    /** @return list<string> */
+    private function tokensFor(int $userId): array
+    {
+        $tokens = [];
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT token FROM fcm_tokens WHERE user_id = :uid AND is_active = 1 AND token <> ''",
+                ['uid' => $userId]
+            );
+            foreach ($rows as $row) {
+                $token = (string) ($row['token'] ?? '');
+                if (strlen($token) >= 32) {
+                    $tokens[$token] = $token;
+                }
+            }
+        } catch (\Throwable) {
+            $tokens = [];
+        }
+        if ($tokens !== []) {
+            return array_values($tokens);
+        }
         $devices = $this->db->fetchAll(
             "SELECT push_token FROM api_devices WHERE user_id = :uid AND push_token IS NOT NULL AND push_token != ''",
             ['uid' => $userId]
         );
         foreach ($devices as $device) {
             $token = (string) ($device['push_token'] ?? '');
-            if ($token === '' || strlen($token) < 32) {
-                continue;
+            if (strlen($token) >= 32) {
+                $tokens[$token] = $token;
             }
-            $this->postFcm($key, $token, $title, $body, $type);
         }
+        return array_values($tokens);
     }
 
     private function sendFcmTopic(string $topic, string $type, string $revision): void

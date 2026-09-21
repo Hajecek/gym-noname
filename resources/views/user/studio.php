@@ -35,6 +35,8 @@ $todayName = $dayNames[(int) ($weekday ?? 1)] ?? 'dnes';
                 data-id="<?= e((string) $item['public_id']) ?>"
                 data-name="<?= e((string) $item['name']) ?>"
                 data-location="<?= e((string) ($item['location'] ?? '')) ?>"
+                data-latitude="<?= e((string) ($item['latitude'] ?? '')) ?>"
+                data-longitude="<?= e((string) ($item['longitude'] ?? '')) ?>"
                 data-active="<?= $active ? '1' : '0' ?>"
             >
                 <span class="studio-tile-top">
@@ -62,6 +64,8 @@ $todayName = $dayNames[(int) ($weekday ?? 1)] ?? 'dnes';
         </div>
         <div class="field"><label>Název</label><input name="name" required maxlength="120"></div>
         <div class="field"><label>Kde to je</label><input name="location" required maxlength="190" placeholder="Ulice, město"></div>
+        <div class="field"><label>Zeměpisná šířka</label><input name="latitude" inputmode="decimal" placeholder="50.0755"></div>
+        <div class="field"><label>Zeměpisná délka</label><input name="longitude" inputmode="decimal" placeholder="14.4378"></div>
         <label class="check"><input type="checkbox" name="is_active" value="1"> Viditelné v rezervacích</label>
         <div class="studio-modal-actions">
             <button class="btn btn-secondary" type="button" data-close-edit>Zrušit</button>
@@ -81,6 +85,8 @@ $todayName = $dayNames[(int) ($weekday ?? 1)] ?? 'dnes';
         <p class="muted">Po přidání nastavíš cenu a otevírací dobu. Výchozí je každý den 6:00–22:00.</p>
         <div class="field"><label>Jak se jmenuje</label><input name="name" required maxlength="120" placeholder="Studio Vinohrady"></div>
         <div class="field"><label>Kde je</label><input name="location" required maxlength="190" placeholder="Vinohradská 12, Praha"></div>
+        <div class="field"><label>Zeměpisná šířka</label><input name="latitude" inputmode="decimal" placeholder="50.0755"></div>
+        <div class="field"><label>Zeměpisná délka</label><input name="longitude" inputmode="decimal" placeholder="14.4378"></div>
         <div class="studio-modal-actions">
             <button class="btn btn-secondary" type="button" data-close-studio>Zrušit</button>
             <button class="btn btn-primary">Přidat studio</button>
@@ -115,12 +121,16 @@ $todayName = $dayNames[(int) ($weekday ?? 1)] ?? 'dnes';
     const room = editModal.querySelector("input[name=room]");
     const name = editModal.querySelector("input[name=name]");
     const location = editModal.querySelector("input[name=location]");
+    const latitude = editModal.querySelector("input[name=latitude]");
+    const longitude = editModal.querySelector("input[name=longitude]");
     const active = editModal.querySelector("input[name=is_active]");
     document.querySelectorAll("[data-edit-studio]").forEach((card) => {
       card.addEventListener("click", () => {
         room.value = card.dataset.id || "";
         name.value = card.dataset.name || "";
         location.value = card.dataset.location || "";
+        if (latitude) latitude.value = card.dataset.latitude || "";
+        if (longitude) longitude.value = card.dataset.longitude || "";
         active.checked = card.dataset.active === "1";
         openModal(editModal, name);
       });

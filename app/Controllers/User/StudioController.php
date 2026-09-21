@@ -105,7 +105,7 @@ final class StudioController extends Controller
             $this->redirect('/user/studio');
         }
         $slug = $this->uniqueSlug($this->slug($name));
-        $id = (int) $this->app->db()->insert('rooms', [
+        $row = [
             'public_id' => Crypto::uuid(),
             'slug' => $slug,
             'name' => mb_substr($name, 0, 120),
@@ -113,7 +113,11 @@ final class StudioController extends Controller
             'description' => trim((string) $request->input('description', '')) ?: null,
             'max_persons' => 3,
             'is_active' => 1,
-        ]);
+        ];
+        if ($coordinates = $this->coordinates($request)) {
+            $row += $coordinates;
+        }
+        $id = (int) $this->app->db()->insert('rooms', $row);
         foreach (range(1, 7) as $day) {
             $this->app->db()->insert('opening_hours', [
                 'room_id' => $id,
@@ -140,11 +144,15 @@ final class StudioController extends Controller
             $this->flashError('Název i místo prostoru musí zůstat vyplněné.');
             $this->redirect('/user/studio?room=' . rawurlencode((string) $room['public_id']));
         }
-        $this->app->db()->update('rooms', [
+        $row = [
             'name' => mb_substr($name, 0, 120),
             'location' => mb_substr($location, 0, 190),
             'is_active' => $request->input('is_active') ? 1 : 0,
-        ], 'id = :id', ['id' => (int) $room['id']]);
+        ];
+        if ($coordinates = $this->coordinates($request)) {
+            $row += $coordinates;
+        }
+        $this->app->db()->update('rooms', $row, 'id = :id', ['id' => (int) $room['id']]);
         $this->flashSuccess('Prostor je uložený.');
         bump_live();
         $this->redirect('/user/studio?room=' . rawurlencode((string) $room['public_id']));
@@ -237,6 +245,31 @@ final class StudioController extends Controller
             );
         }
         return [$rooms, $room, $hours];
+    }
+
+    /** @return array{latitude:?float,longitude:?float}|null */
+    private function coordinates(Request $request): ?array
+    {
+        if ($this->app->db()->fetchAll("SHOW COLUMNS FROM rooms LIKE 'latitude'") === []) {
+            return null;
+        }
+        return [
+            'latitude' => $this->coordinate($request, 'latitude', -90, 90),
+            'longitude' => $this->coordinate($request, 'longitude', -180, 180),
+        ];
+    }
+
+    private function coordinate(Request $request, string $key, float $min, float $max): ?float
+    {
+        $raw = trim(str_replace(',', '.', (string) $request->input($key, '')));
+        if ($raw === '' || !is_numeric($raw)) {
+            return null;
+        }
+        $value = (float) $raw;
+        if ($value < $min || $value > $max || ($value === 0.0)) {
+            return null;
+        }
+        return $value;
     }
 
     /** @return list<array<string, mixed>> */

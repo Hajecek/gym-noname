@@ -438,16 +438,57 @@ final class MobileApiService
     {
         $payload = Crypto::verifyPayload((string) $request->bearerToken());
         $deviceId = isset($payload['did']) ? (int) $payload['did'] : 0;
-        if ($deviceId < 1) {
+        $token = substr(trim($token), 0, 512);
+        if ($deviceId < 1 || $token === '') {
             return;
         }
+        $userId = (int) $user['id'];
+        $now = Clock::utc();
+        $hash = hash('sha256', $token);
+        $environment = strtolower(trim((string) ($request->input('environment') ?? 'production')));
+        if (!in_array($environment, ['development', 'production'], true)) {
+            $environment = 'production';
+        }
+
+        $this->db->query(
+            'UPDATE fcm_tokens
+             SET is_active = 0, invalidated_at = :now, invalid_reason = :reason
+             WHERE device_id = :did AND is_active = 1 AND token_hash <> :hash',
+            [
+                'now' => $now,
+                'reason' => 'replaced',
+                'did' => $deviceId,
+                'hash' => $hash,
+            ]
+        );
+        $this->db->query(
+            'INSERT INTO fcm_tokens (user_id, device_id, token, token_hash, environment, is_active, last_used_at)
+             VALUES (:uid, :did, :token, :hash, :env, 1, :seen)
+             ON DUPLICATE KEY UPDATE
+                token = VALUES(token),
+                user_id = VALUES(user_id),
+                device_id = VALUES(device_id),
+                environment = VALUES(environment),
+                is_active = 1,
+                invalidated_at = NULL,
+                invalid_reason = NULL,
+                last_used_at = VALUES(last_used_at)',
+            [
+                'uid' => $userId,
+                'did' => $deviceId,
+                'token' => $token,
+                'hash' => $hash,
+                'env' => $environment,
+                'seen' => $now,
+            ]
+        );
         $this->db->update('api_devices', [
             'push_token' => $token,
             'push_preferences_json' => json_encode($preferences, JSON_UNESCAPED_UNICODE),
-            'last_seen_at' => Clock::utc(),
+            'last_seen_at' => $now,
         ], 'id = :id AND user_id = :uid', [
             'id' => $deviceId,
-            'uid' => (int) $user['id'],
+            'uid' => $userId,
         ]);
     }
 
@@ -457,12 +498,27 @@ final class MobileApiService
         if (!$payload || empty($payload['did'])) {
             return;
         }
+        $deviceId = (int) $payload['did'];
+        $now = Clock::utc();
         $this->db->update(
             'api_refresh_tokens',
-            ['revoked_at' => Clock::utc()],
+            ['revoked_at' => $now],
             'device_id = :did AND revoked_at IS NULL',
-            ['did' => (int) $payload['did']]
+            ['did' => $deviceId]
         );
+        $this->db->query(
+            'UPDATE fcm_tokens
+             SET is_active = 0, invalidated_at = :now, invalid_reason = :reason
+             WHERE device_id = :did AND is_active = 1',
+            [
+                'now' => $now,
+                'reason' => 'device_revoked',
+                'did' => $deviceId,
+            ]
+        );
+        $this->db->update('api_devices', [
+            'push_token' => null,
+        ], 'id = :id', ['id' => $deviceId]);
     }
 
     private function reservationPayload(array $row, array $user): array
