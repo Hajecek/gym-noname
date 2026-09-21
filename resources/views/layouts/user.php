@@ -41,7 +41,7 @@ if (!function_exists('user_active')) {
             <span>Profil</span>
         </a>
         <?php if (in_array($role, ['admin', 'owner'], true)): ?>
-            <p class="side-label">Správa</p>
+            <div class="side-split" role="separator"><span>Správa</span></div>
             <a class="side-link <?= user_active('/user/studio') ?>" href="<?= e(url('/user/studio')) ?>" title="Studia">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 10 12 4l8 6v9H4z"/><path d="M9 19v-6h6v6"/></svg>
                 <span>Studia</span>
