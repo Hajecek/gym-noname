@@ -20,7 +20,7 @@ $payload = [
     <div>
         <p class="eyebrow">TVŮJ ČAS</p>
         <h1>Rezervace</h1>
-        <p class="muted">Otevři kalendář, vyber den a klikni na blok. Každý blok je 1 h 15 min. Délku 2 nebo 3 hodiny přidáš tlačítky dole.</p>
+        <p class="muted">Otevři kalendář, vyber den a klikni na blok. Další hodinu za sebou přidáš kliknutím na následující termín, úklid je až na konci.</p>
     </div>
     <a class="button" href="<?= e(url('/user/moje-rezervace')) ?>">Moje rezervace</a>
 </div>

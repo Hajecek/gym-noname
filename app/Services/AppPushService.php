@@ -56,6 +56,17 @@ final class AppPushService
         );
     }
 
+    public function liveChanged(int $revision): void
+    {
+        $now = microtime(true);
+        static $last = 0.0;
+        if ($last > 0 && ($now - $last) < 2) {
+            return;
+        }
+        $last = $now;
+        $this->sendFcmTopic('pf_live', 'live.sync', (string) $revision);
+    }
+
     public function notify(int $userId, string $template, string $title, string $body, string $type): void
     {
         if ($userId < 1) {
@@ -98,25 +109,38 @@ final class AppPushService
         }
     }
 
-    private function postFcm(string $key, string $token, string $title, string $body, string $type): void
+    private function sendFcmTopic(string $topic, string $type, string $revision): void
+    {
+        $key = trim((string) env_value('FCM_SERVER_KEY', ''));
+        if ($key === '') {
+            return;
+        }
+        $this->postFcm($key, '/topics/' . $topic, '', '', $type, $revision, true);
+    }
+
+    private function postFcm(string $key, string $token, string $title, string $body, string $type, string $revision = '', bool $silent = false): void
     {
         $ch = curl_init('https://fcm.googleapis.com/fcm/send');
         if ($ch === false) {
             return;
         }
-        $payload = json_encode([
+        $message = [
             'to' => $token,
             'priority' => 'high',
             'content_available' => true,
-            'notification' => [
+            'data' => [
+                'type' => $type,
+                'revision' => $revision,
+            ],
+        ];
+        if (!$silent && $title !== '') {
+            $message['notification'] = [
                 'title' => $title,
                 'body' => $body,
                 'sound' => 'default',
-            ],
-            'data' => [
-                'type' => $type,
-            ],
-        ], JSON_UNESCAPED_UNICODE);
+            ];
+        }
+        $payload = json_encode($message, JSON_UNESCAPED_UNICODE);
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,

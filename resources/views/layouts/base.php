@@ -28,7 +28,7 @@ $bodyClass = $bodyClass ?? '';
 <?= $content ?? '' ?>
 <script nonce="<?= e($cspNonce) ?>" src="<?= e(asset('js/app.js')) ?>?v=13"></script>
 <?php foreach (($pageScripts ?? []) as $src): ?>
-<script nonce="<?= e($cspNonce) ?>" src="<?= e(asset($src)) ?>?v=12"></script>
+<script nonce="<?= e($cspNonce) ?>" src="<?= e(asset($src)) ?>?v=14"></script>
 <?php endforeach; ?>
 <script nonce="<?= e($cspNonce) ?>">
 if ('serviceWorker' in navigator) {

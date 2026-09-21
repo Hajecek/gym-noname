@@ -91,10 +91,24 @@
     if (!first) return "";
     return addMinutesToTime(first.start, occupyMinutes());
   };
+  const minutes = (time) => timeToMinutes(time);
   const inRange = (row) => {
     const first = state.selected[0];
     if (!first || row.kind === "buffer") return false;
-    return row.start >= first.start && row.start < occupyEnd();
+    const start = minutes(row.start);
+    return start >= minutes(first.start) && start < minutes(occupyEnd());
+  };
+  const extensionRow = () => {
+    const first = state.selected[0];
+    if (!first || state.hours >= maxHours()) return null;
+    const nextHours = state.hours + 1;
+    if (!availableFor(first).includes(nextHours * step())) return null;
+    const from = minutes(occupyEnd());
+    const until = minutes(addMinutesToTime(first.start, occupyMinutes(nextHours)));
+    return bookableRows().find((row) => {
+      const start = minutes(row.start);
+      return start >= from && start < until;
+    }) || null;
   };
 
   const setSelection = (rows, hours) => {
@@ -106,28 +120,26 @@
   };
 
   const clickHour = (row) => {
-    if (!row.available || row.kind === "buffer") return;
+    if (row.kind === "buffer") return;
     const first = state.selected[0];
     if (!first) {
+      if (!row.available) return;
       setSelection([row], 1);
       return;
     }
-    if (row.start === first.start && state.hours === 1) {
-      setSelection([], 1);
-      return;
-    }
     if (row.start === first.start) {
-      setSelection([first], 1);
+      setSelection(state.hours === 1 ? [] : [first], 1);
       return;
     }
-    const end = occupyEnd();
-    if (row.start === end && state.hours < maxHours() && availableFor(first).includes((state.hours + 1) * step())) {
+    const extra = extensionRow();
+    if (extra && row.start === extra.start) {
       setSelection([first], state.hours + 1);
       return;
     }
-    if (inRange(row) && row.start !== first.start) {
+    if (inRange(row)) {
       return;
     }
+    if (!row.available) return;
     setSelection([row], 1);
   };
 
@@ -154,18 +166,11 @@
 
   const hourState = (row) => {
     if (row.kind === "buffer") return "buffer";
+    if (inRange(row)) return "selected";
+    const extra = extensionRow();
+    if (extra && row.start === extra.start) return "add";
     if (row.past || row.kind === "past") return "past";
     if (!row.available || row.kind === "busy") return "busy";
-    if (inRange(row)) return "selected";
-    const first = state.selected[0];
-    if (
-      first &&
-      row.start === occupyEnd() &&
-      state.hours < maxHours() &&
-      availableFor(first).includes((state.hours + 1) * step())
-    ) {
-      return "add";
-    }
     return "free";
   };
 
@@ -190,14 +195,16 @@
     }
     if (hoursEl) {
       hoursEl.hidden = closed || loading || rows.length === 0;
-      const first = state.selected[0];
+      const selectedRows = rows.filter((row) => hourState(row) === "selected");
+      const lastSelected = selectedRows.length ? selectedRows[selectedRows.length - 1].start : "";
       hoursEl.innerHTML = rows.map((row) => {
         const kind = hourState(row);
         if (kind === "buffer") return "";
-        if (first && row.start > first.start && row.start < occupyEnd()) return "";
         const selected = kind === "selected";
         const disabled = kind === "busy" || kind === "past";
-        const end = selected && row.start === first.start ? occupyEnd() : row.end;
+        let end = row.end;
+        if (selected && row.start === lastSelected) end = occupyEnd();
+        else if (selected && minutes(row.end) > minutes(occupyEnd())) end = occupyEnd();
         return (
           '<button type="button" class="hour-row is-' + kind + '"' +
           ' data-hour-start="' + row.start + '"' +
@@ -210,10 +217,6 @@
       }).join("");
     }
     if (dateLabelEl) dateLabelEl.textContent = dateLabel(state.date);
-    const focusStart = state.selected[0]?.start;
-    if (focusStart) {
-      hoursEl?.querySelector('[data-hour-start="' + focusStart + '"]')?.scrollIntoView({ block: "center", behavior: "smooth" });
-    }
     if (hintEl && !closed) {
       if (loading) {
         hintEl.textContent = "Načítám volné hodiny…";
