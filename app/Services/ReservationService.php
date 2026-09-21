@@ -752,17 +752,11 @@ final class ReservationService
     /** @return list<array{id:string,name:string,address:string,latitude:float,longitude:float}> */
     public function gymsForApp(): array
     {
-        try {
-            $rows = $this->db->fetchAll(
-                'SELECT public_id, name, location, latitude, longitude
-                 FROM rooms WHERE is_active = 1 ORDER BY name ASC, id ASC'
-            );
-        } catch (\Throwable) {
-            $rows = $this->db->fetchAll(
-                'SELECT public_id, name, location
-                 FROM rooms WHERE is_active = 1 ORDER BY name ASC, id ASC'
-            );
-        }
+        $hasCoordinates = $this->db->fetchAll("SHOW COLUMNS FROM rooms LIKE 'latitude'") !== [];
+        $columns = $hasCoordinates ? 'public_id, name, location, latitude, longitude' : 'public_id, name, location';
+        $rows = $this->db->fetchAll(
+            "SELECT {$columns} FROM rooms WHERE is_active = 1 ORDER BY name ASC, id ASC"
+        );
         $items = [];
         foreach ($rows as $room) {
             $latitude = isset($room['latitude']) && is_numeric($room['latitude']) ? (float) $room['latitude'] : 0.0;
