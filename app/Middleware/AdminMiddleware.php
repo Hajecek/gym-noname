@@ -11,6 +11,6 @@ final class AdminMiddleware
 {
     public function handle(Request $request, Application $app): void
     {
-        (new RoleMiddleware('admin', 'owner'))->handle($request, $app);
+        (new RoleMiddleware('admin'))->handle($request, $app);
     }
 }

@@ -238,7 +238,7 @@ final class AccessControlService
 
     private function notifyAdminsIfNeeded(array $door, ?DoorCommandResult $result = null, ?DoorStatus $status = null): void
     {
-        $owners = $this->db->fetchAll("SELECT email, first_name FROM users WHERE role IN ('admin', 'owner') AND status = 'active'");
+        $admins = $this->db->fetchAll("SELECT email, first_name FROM users WHERE role = 'admin' AND status = 'active'");
         $body = 'Upozornění vstupního systému PRIVOFIT.';
         if ($status && !$status->online) {
             $body = 'Zámek ' . $door['name'] . ' je offline.';
@@ -247,10 +247,10 @@ final class AccessControlService
         } elseif ($result && !$result->accepted) {
             $body = 'Opakovaný neúspěšný pokus o otevření dveří ' . $door['name'] . '.';
         }
-        foreach ($owners as $owner) {
-            $this->mail->queue('security-alert', $owner['email'], [
+        foreach ($admins as $admin) {
+            $this->mail->queue('security-alert', $admin['email'], [
                 'subject' => 'PRIVOFIT – stav vstupního systému',
-                'first_name' => $owner['first_name'],
+                'first_name' => $admin['first_name'],
                 'body' => $body,
             ]);
         }

@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_path VARCHAR(500) DEFAULT NULL,
     oauth_provider ENUM('google', 'apple') DEFAULT NULL,
     oauth_uid VARCHAR(190) DEFAULT NULL,
-    role ENUM('user', 'staff', 'admin', 'owner') NOT NULL DEFAULT 'user',
+    role ENUM('user', 'staff', 'admin') NOT NULL DEFAULT 'user',
     plan ENUM('free', 'premium', 'family') NOT NULL DEFAULT 'free',
     status ENUM('pending', 'active', 'blocked', 'deleted') NOT NULL DEFAULT 'pending',
     locale VARCHAR(10) NOT NULL DEFAULT 'cs-CZ',

@@ -29,7 +29,6 @@ final class Seeder
             ['slug' => 'user', 'name' => 'Zákazník', 'description' => 'Běžný zákazník'],
             ['slug' => 'staff', 'name' => 'Personál', 'description' => 'Provozní pracovník'],
             ['slug' => 'admin', 'name' => 'Administrátor', 'description' => 'Správce fitka'],
-            ['slug' => 'owner', 'name' => 'Vlastník', 'description' => 'Hlavní správce systému'],
         ];
         foreach ($roles as $role) {
             if (!$this->db->fetch('SELECT id FROM roles WHERE slug = :s', ['s' => $role['slug']])) {
@@ -54,8 +53,7 @@ final class Seeder
         }
         $map = [
             'staff' => ['reservations.view', 'users.view'],
-            'admin' => ['reservations.view', 'reservations.manage', 'users.view', 'users.manage', 'content.manage', 'payments.manage', 'access.manage'],
-            'owner' => ['reservations.view', 'reservations.manage', 'users.view', 'users.manage', 'users.roles', 'content.manage', 'settings.manage', 'access.manage', 'payments.manage'],
+            'admin' => ['reservations.view', 'reservations.manage', 'users.view', 'users.manage', 'users.roles', 'content.manage', 'settings.manage', 'access.manage', 'payments.manage'],
         ];
         foreach ($map as $roleSlug => $slugs) {
             $role = $this->db->fetch('SELECT id FROM roles WHERE slug = :s', ['s' => $roleSlug]);

@@ -103,18 +103,18 @@ final class AdminController extends Controller
     public function userRole(Request $request, array $params): never
     {
         $actor = $this->requireUser();
-        if ($actor['role'] !== 'owner') {
-            throw new HttpException(403, 'Role smí měnit pouze vlastník.');
+        if ($actor['role'] !== 'admin') {
+            throw new HttpException(403, 'Role smí měnit pouze administrátor.');
         }
         $user = $this->app->db()->fetch('SELECT * FROM users WHERE public_id = :id', ['id' => $params['id']]);
         $role = (string) $request->input('role');
-        if (!in_array($role, ['user', 'staff', 'admin', 'owner'], true) || !$user) {
+        if (!in_array($role, ['user', 'staff', 'admin'], true) || !$user) {
             throw new HttpException(422, 'Neplatná role.');
         }
-        if ($user['role'] === 'owner' && $role !== 'owner') {
-            $owners = (int) $this->app->db()->fetchColumn("SELECT COUNT(*) FROM users WHERE role = 'owner' AND status = 'active' AND deleted_at IS NULL");
-            if ($owners <= 1) {
-                throw new HttpException(422, 'Nelze odebrat roli poslednímu aktivnímu vlastníkovi.');
+        if ($user['role'] === 'admin' && $role !== 'admin') {
+            $admins = (int) $this->app->db()->fetchColumn("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active' AND deleted_at IS NULL");
+            if ($admins <= 1) {
+                throw new HttpException(422, 'Nelze odebrat roli poslednímu aktivnímu administrátorovi.');
             }
         }
         $this->app->db()->update('users', ['role' => $role], 'id = :id', ['id' => (int) $user['id']]);
@@ -336,7 +336,7 @@ final class AdminController extends Controller
 
     public function settings(): never
     {
-        if (!$this->app->auth()->hasRole('owner')) {
+        if (!$this->app->auth()->hasRole('admin')) {
             throw new HttpException(403);
         }
         $this->view('admin/settings', [
@@ -347,7 +347,7 @@ final class AdminController extends Controller
 
     public function saveSettings(Request $request): never
     {
-        if (!$this->app->auth()->hasRole('owner')) {
+        if (!$this->app->auth()->hasRole('admin')) {
             throw new HttpException(403);
         }
         foreach (['reservation.slot_minutes', 'reservation.min_minutes', 'reservation.max_minutes', 'reservation.buffer_minutes', 'reservation.cancellation_hours', 'access.early_minutes', 'access.late_minutes', 'pricing.hourly'] as $key) {

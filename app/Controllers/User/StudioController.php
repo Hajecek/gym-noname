@@ -22,6 +22,8 @@ final class StudioController extends Controller
             'section' => 'studia',
             'rooms' => $rooms,
             'room' => $selected,
+            'hourly_price' => $this->app->settings()->get('pricing.hourly', 150),
+            'weekday' => (int) Clock::nowLocal()->format('N'),
         ]);
     }
 
@@ -234,7 +236,13 @@ final class StudioController extends Controller
     /** @return list<array<string, mixed>> */
     private function rooms(): array
     {
-        return $this->app->db()->fetchAll('SELECT * FROM rooms ORDER BY is_active DESC, name ASC, id ASC');
+        return $this->app->db()->fetchAll(
+            'SELECT r.*, h.opens_at AS today_open, h.closes_at AS today_close, h.is_closed AS today_closed, h.hourly_price AS today_price
+             FROM rooms r
+             LEFT JOIN opening_hours h ON h.room_id = r.id AND h.weekday = :day
+             ORDER BY r.is_active DESC, r.name ASC, r.id ASC',
+            ['day' => (int) Clock::nowLocal()->format('N')]
+        );
     }
 
     /** @param array<string, mixed> $room */

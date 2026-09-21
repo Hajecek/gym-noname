@@ -1,9 +1,14 @@
-<?php $room = $room ?? null; ?>
+<?php
+$room = $room ?? null;
+$defaultPrice = (int) (float) ($hourly_price ?? 150);
+$dayNames = [1 => 'pondělí', 2 => 'úterý', 3 => 'středa', 4 => 'čtvrtek', 5 => 'pátek', 6 => 'sobota', 7 => 'neděle'];
+$todayName = $dayNames[(int) ($weekday ?? 1)] ?? 'dnes';
+?>
 <div class="page-head">
     <div>
         <p class="eyebrow">SPRÁVA</p>
         <h1>Studia</h1>
-        <p class="muted">Vyber studio a uprav název, místo a viditelnost v rezervacích.</p>
+        <p class="muted">Dnes je <?= e($todayName) ?>. Klikni na studio a upravíš název, místo a jestli jde rezervovat.</p>
     </div>
     <button class="btn btn-primary" type="button" data-open-studio>Přidat studio</button>
 </div>
@@ -16,29 +21,54 @@
     </div>
 <?php else: ?>
     <div class="studio-grid">
-        <?php foreach ($rooms as $item): ?>
-            <a class="studio-tile<?= $room && $item['public_id'] === $room['public_id'] ? ' is-on' : '' ?>" href="<?= e(url('/user/studio?room=' . rawurlencode((string) $item['public_id']))) ?>">
-                <strong><?= e($item['name']) ?></strong>
-                <span><?= e($item['location'] ?: 'Místo není vyplněné') ?></span>
-                <em><?= (int) $item['is_active'] ? 'V rezervacích' : 'Skryté' ?></em>
-            </a>
+        <?php foreach ($rooms as $item):
+            $active = (int) $item['is_active'] === 1;
+            $closedToday = (int) ($item['today_closed'] ?? 1) === 1 || empty($item['today_open']);
+            $price = ($item['today_price'] ?? '') !== '' && $item['today_price'] !== null
+                ? (int) (float) $item['today_price']
+                : $defaultPrice;
+        ?>
+            <button
+                class="studio-tile<?= $active ? '' : ' is-hidden' ?>"
+                type="button"
+                data-edit-studio
+                data-id="<?= e((string) $item['public_id']) ?>"
+                data-name="<?= e((string) $item['name']) ?>"
+                data-location="<?= e((string) ($item['location'] ?? '')) ?>"
+                data-active="<?= $active ? '1' : '0' ?>"
+            >
+                <span class="studio-tile-top">
+                    <strong><?= e($item['name']) ?></strong>
+                    <em><?= $active ? 'V rezervacích' : 'Skryté' ?></em>
+                </span>
+                <span class="studio-tile-place"><?= e($item['location'] ?: 'Místo není vyplněné') ?></span>
+                <span class="studio-tile-meta">
+                    <b><?= $closedToday ? 'Dnes zavřeno' : e(substr((string) $item['today_open'], 0, 5) . ' – ' . substr((string) $item['today_close'], 0, 5)) ?></b>
+                    <b><?= $price ?> Kč/hod</b>
+                </span>
+            </button>
         <?php endforeach; ?>
     </div>
 <?php endif; ?>
 
-<?php if ($room): ?>
-    <form class="card studio-card" method="post" action="<?= e(url('/user/studio/ulozit')) ?>">
+<div class="cal-modal" data-edit-modal hidden>
+    <button class="cal-modal-backdrop" type="button" data-close-edit aria-label="Zavřít"></button>
+    <form class="cal-modal-panel studio-modal" method="post" action="<?= e(url('/user/studio/ulozit')) ?>">
         <?= csrf_field() ?>
-        <input type="hidden" name="room" value="<?= e($room['public_id']) ?>">
-        <h2>Upravit studio</h2>
-        <div class="row-2">
-            <div class="field"><label>Název</label><input name="name" required maxlength="120" value="<?= e($room['name']) ?>"></div>
-            <div class="field"><label>Kde to je</label><input name="location" required maxlength="190" value="<?= e((string) ($room['location'] ?? '')) ?>" placeholder="Ulice, město"></div>
+        <input type="hidden" name="room" value="">
+        <div class="studio-modal-head">
+            <h2>Upravit studio</h2>
+            <button class="studio-modal-x" type="button" data-close-edit aria-label="Zavřít">✕</button>
         </div>
-        <label class="check"><input type="checkbox" name="is_active" value="1" <?= (int) $room['is_active'] ? 'checked' : '' ?>> Viditelné v rezervacích</label>
-        <button class="btn btn-secondary">Uložit změny</button>
+        <div class="field"><label>Název</label><input name="name" required maxlength="120"></div>
+        <div class="field"><label>Kde to je</label><input name="location" required maxlength="190" placeholder="Ulice, město"></div>
+        <label class="check"><input type="checkbox" name="is_active" value="1"> Viditelné v rezervacích</label>
+        <div class="studio-modal-actions">
+            <button class="btn btn-secondary" type="button" data-close-edit>Zrušit</button>
+            <button class="btn btn-primary">Uložit změny</button>
+        </div>
     </form>
-<?php endif; ?>
+</div>
 
 <div class="cal-modal" data-studio-modal hidden>
     <button class="cal-modal-backdrop" type="button" data-close-studio aria-label="Zavřít"></button>
@@ -59,22 +89,50 @@
 </div>
 <script nonce="<?= e($cspNonce ?? '') ?>">
 (() => {
-  const modal = document.querySelector("[data-studio-modal]");
-  if (!modal) return;
-  const name = modal.querySelector("input[name=name]");
-  const open = () => {
+  const addModal = document.querySelector("[data-studio-modal]");
+  const editModal = document.querySelector("[data-edit-modal]");
+  const openModal = (modal, focus) => {
     modal.hidden = false;
     document.body.classList.add("cal-open");
-    name?.focus();
+    focus?.focus();
   };
-  const close = () => {
+  const closeModal = (modal) => {
     modal.hidden = true;
-    document.body.classList.remove("cal-open");
+    if ((addModal?.hidden ?? true) && (editModal?.hidden ?? true)) {
+      document.body.classList.remove("cal-open");
+    }
   };
-  document.querySelectorAll("[data-open-studio]").forEach((button) => button.addEventListener("click", open));
-  modal.querySelectorAll("[data-close-studio]").forEach((button) => button.addEventListener("click", close));
+  if (addModal) {
+    const name = addModal.querySelector("input[name=name]");
+    document.querySelectorAll("[data-open-studio]").forEach((button) => {
+      button.addEventListener("click", () => openModal(addModal, name));
+    });
+    addModal.querySelectorAll("[data-close-studio]").forEach((button) => {
+      button.addEventListener("click", () => closeModal(addModal));
+    });
+  }
+  if (editModal) {
+    const room = editModal.querySelector("input[name=room]");
+    const name = editModal.querySelector("input[name=name]");
+    const location = editModal.querySelector("input[name=location]");
+    const active = editModal.querySelector("input[name=is_active]");
+    document.querySelectorAll("[data-edit-studio]").forEach((card) => {
+      card.addEventListener("click", () => {
+        room.value = card.dataset.id || "";
+        name.value = card.dataset.name || "";
+        location.value = card.dataset.location || "";
+        active.checked = card.dataset.active === "1";
+        openModal(editModal, name);
+      });
+    });
+    editModal.querySelectorAll("[data-close-edit]").forEach((button) => {
+      button.addEventListener("click", () => closeModal(editModal));
+    });
+  }
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal.hidden) close();
+    if (event.key !== "Escape") return;
+    if (editModal && !editModal.hidden) closeModal(editModal);
+    else if (addModal && !addModal.hidden) closeModal(addModal);
   });
 })();
 </script>

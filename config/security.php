@@ -33,5 +33,5 @@ return [
         'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=()',
     ],
     'hibp_enabled' => (bool) env_value('HIBP_ENABLED', true),
-    'mfa_required_roles' => ['admin', 'owner'],
+    'mfa_required_roles' => ['admin'],
 ];

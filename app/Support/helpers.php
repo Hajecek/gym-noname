@@ -109,7 +109,6 @@ function avatar_url(?array $user): string
 function role_label(string $role): string
 {
     return match ($role) {
-        'owner' => 'Vlastník',
         'admin' => 'Administrátor',
         'staff' => 'Personál',
         default => 'Zákazník',

@@ -88,14 +88,14 @@ if ($existing) {
 }
 
 $now = Clock::utc();
-$ownerId = (int) $db->insert('users', [
+$adminId = (int) $db->insert('users', [
     'public_id' => Crypto::uuid(),
     'email' => $email,
     'username' => $username,
     'password_hash' => Crypto::hashPassword($password),
     'first_name' => $first,
     'last_name' => $last,
-    'role' => 'owner',
+    'role' => 'admin',
     'plan' => 'free',
     'status' => 'active',
     'email_verified_at' => $now,
@@ -104,15 +104,15 @@ $ownerId = (int) $db->insert('users', [
     'created_at' => $now,
     'updated_at' => $now,
 ]);
-$role = $db->fetch("SELECT id FROM roles WHERE slug = 'owner'");
+$role = $db->fetch("SELECT id FROM roles WHERE slug = 'admin'");
 if ($role) {
     $db->insert('user_roles', [
-        'user_id' => $ownerId,
+        'user_id' => $adminId,
         'role_id' => (int) $role['id'],
         'assigned_at' => $now,
     ]);
 }
-$db->insert('notification_preferences', ['user_id' => $ownerId]);
+$db->insert('notification_preferences', ['user_id' => $adminId]);
 
 if (!is_dir($root . '/storage/app')) {
     mkdir($root . '/storage/app', 0750, true);

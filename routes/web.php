@@ -13,7 +13,6 @@ use App\Controllers\Web\StripeWebhookController;
 use App\Middleware\AdminMiddleware;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\GuestMiddleware;
-use App\Middleware\OwnerMiddleware;
 
 $router = app()->router();
 
@@ -86,7 +85,7 @@ $router->get('/admin', [AdminController::class, 'dashboard'], [AuthMiddleware::c
 $router->get('/admin/zakaznici', [AdminController::class, 'users'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/zakaznici/{id}', [AdminController::class, 'userShow'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->post('/admin/zakaznici/{id}', [AdminController::class, 'userUpdate'], [AuthMiddleware::class, AdminMiddleware::class]);
-$router->post('/admin/zakaznici/{id}/role', [AdminController::class, 'userRole'], [AuthMiddleware::class, OwnerMiddleware::class]);
+$router->post('/admin/zakaznici/{id}/role', [AdminController::class, 'userRole'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->post('/admin/zakaznici/{id}/clenstvi', [AdminController::class, 'assignMembership'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/rezervace', [AdminController::class, 'reservations'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->post('/admin/rezervace', [AdminController::class, 'createReservation'], [AuthMiddleware::class, AdminMiddleware::class]);
@@ -99,7 +98,7 @@ $router->get('/admin/vstup', [AdminController::class, 'access'], [AuthMiddleware
 $router->post('/admin/vstup/test', [AdminController::class, 'testOpen'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/zajem', [AdminController::class, 'interest'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/zajem/export', [AdminController::class, 'exportInterest'], [AuthMiddleware::class, AdminMiddleware::class]);
-$router->get('/admin/nastaveni', [AdminController::class, 'settings'], [AuthMiddleware::class, OwnerMiddleware::class]);
-$router->post('/admin/nastaveni', [AdminController::class, 'saveSettings'], [AuthMiddleware::class, OwnerMiddleware::class]);
+$router->get('/admin/nastaveni', [AdminController::class, 'settings'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->post('/admin/nastaveni', [AdminController::class, 'saveSettings'], [AuthMiddleware::class, AdminMiddleware::class]);
 
 $router->post('/platba/stripe', [StripeWebhookController::class, 'handle']);
