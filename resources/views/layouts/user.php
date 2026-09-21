@@ -24,14 +24,15 @@ if (!function_exists('user_active')) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 11 12 4l8 7v9H4z"/></svg>
             <span>Domů</span>
         </a>
-        <a class="side-link <?= user_active('/user/rezervace', true) ?>" href="<?= e(url('/user/rezervace')) ?>" title="Rezervace">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
-            <span>Rezervace</span>
-        </a>
-        <a class="side-link <?= user_active('/user/moje-rezervace', true) ?>" href="<?= e(url('/user/moje-rezervace')) ?>" title="Moje rezervace">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>
-            <span>Moje rezervace</span>
-        </a>
+        <div class="side-group<?= user_active('/user/rezervace', true) !== '' || user_active('/user/moje-rezervace', true) !== '' ? ' is-open' : '' ?>">
+            <a class="side-link <?= user_active('/user/rezervace', true) ?>" href="<?= e(url('/user/rezervace')) ?>" title="Rezervace">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
+                <span>Rezervace</span>
+            </a>
+            <div class="side-sub">
+                <a class="side-sublink <?= user_active('/user/moje-rezervace', true) ?>" href="<?= e(url('/user/moje-rezervace')) ?>" title="Moje rezervace">Moje</a>
+            </div>
+        </div>
         <a class="side-link <?= user_active('/user/vstup', true) ?>" href="<?= e(url('/user/vstup')) ?>" title="Vstup">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
             <span>Vstup</span>

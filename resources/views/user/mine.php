@@ -1,5 +1,6 @@
 <?php
 $dayNames = [1 => 'pondělí', 2 => 'úterý', 3 => 'středa', 4 => 'čtvrtek', 5 => 'pátek', 6 => 'sobota', 7 => 'neděle'];
+$monthsShort = [1 => 'led', 2 => 'úno', 3 => 'bře', 4 => 'dub', 5 => 'kvě', 6 => 'čvn', 7 => 'čvc', 8 => 'srp', 9 => 'zář', 10 => 'říj', 11 => 'lis', 12 => 'pro'];
 $filters = [
     'prehled' => 'Přehled',
     'naplanovane' => 'Naplánované',
@@ -58,7 +59,11 @@ $tones = [
                     $guestLabel = $guests > 1 ? ' · ' . $guests . ($guests < 5 ? ' osoby' : ' osob') : '';
                 ?>
                     <article class="res-card card <?= e($tone) ?>">
-                        <div>
+                        <div class="res-day">
+                            <strong><?= e($startLocal->format('j')) ?></strong>
+                            <span><?= e($monthsShort[(int) $startLocal->format('n')]) ?></span>
+                        </div>
+                        <div class="res-copy">
                             <p class="res-when"><?= e($whenLabel) ?></p>
                             <h3><?= e(format_datetime($item['starts_at'], 'H:i')) ?>–<?= e($endShown->format('H:i')) ?></h3>
                             <p class="muted"><?= e($item['room_name'] ?? 'Studio') ?> · <?= e(money_format_czk($item['price'] ?? 0)) ?><?= e($guestLabel) ?></p>
