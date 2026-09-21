@@ -23,15 +23,20 @@ final class ReservationController extends Controller
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             $date = Clock::nowLocal()->format('Y-m-d');
         }
+        $rooms = $service->activeRooms();
+        $room = $service->roomByPublicId((string) $request->query('room', '')) ?? ($rooms[0] ?? null);
+        $roomId = $room ? (int) $room['id'] : null;
         $membership = (new MembershipService($this->app->db()))->activeForUser((int) $user['id']);
         $covers = $membership && ($membership['entries_remaining'] === null || (int) $membership['entries_remaining'] > 0);
         $this->view('user/reservations', [
             'title' => 'Rezervace',
-            'availability' => $service->availability($date),
+            'availability' => $service->availability($date, $roomId),
             'mine' => $service->forUser((int) $user['id']),
             'date' => $date,
             'today' => Clock::nowLocal()->format('Y-m-d'),
             'membership_covers' => $covers,
+            'rooms' => $rooms,
+            'room' => $room,
             'pageScripts' => ['js/reservations.js'],
         ]);
     }
@@ -39,40 +44,48 @@ final class ReservationController extends Controller
     public function availability(Request $request): never
     {
         $this->requireUser();
+        $service = ReservationService::make($this->app->db());
         $date = (string) $request->query('date', Clock::nowLocal()->format('Y-m-d'));
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             $this->jsonError('Neplatné datum.', 422);
         }
-        $this->jsonOk(ReservationService::make($this->app->db())->availability($date));
+        $room = $service->roomByPublicId((string) $request->query('room', ''));
+        $this->jsonOk($service->availability($date, $room ? (int) $room['id'] : null));
     }
 
     public function calendar(Request $request): never
     {
         $this->requireUser();
+        $service = ReservationService::make($this->app->db());
         $year = (int) $request->query('year', Clock::nowLocal()->format('Y'));
         $month = (int) $request->query('month', Clock::nowLocal()->format('n'));
+        $room = $service->roomByPublicId((string) $request->query('room', ''));
         $this->jsonOk([
             'year' => $year,
             'month' => $month,
-            'days' => ReservationService::make($this->app->db())->monthOverview($year, $month),
+            'days' => $service->monthOverview($year, $month, $room ? (int) $room['id'] : null),
         ]);
     }
 
     public function store(Request $request): never
     {
         $user = $this->requireUser();
+        $service = ReservationService::make($this->app->db());
         $start = (string) $request->input('start');
         $date = preg_match('/^(\d{4}-\d{2}-\d{2})/', $start, $match) ? $match[1] : '';
-        $back = '/user/rezervace' . ($date !== '' ? '?date=' . rawurlencode($date) : '');
+        $room = $service->roomByPublicId((string) $request->input('room', ''));
+        $roomQuery = $room ? '&room=' . rawurlencode((string) $room['public_id']) : '';
+        $back = '/user/rezervace' . ($date !== '' ? '?date=' . rawurlencode($date) . $roomQuery : '');
         try {
-            $reservation = ReservationService::make($this->app->db())->create(
+            $reservation = $service->create(
                 $user,
                 $start,
                 (int) $request->input('duration', 60),
-                (int) $request->input('guests', 1)
+                (int) $request->input('guests', 1),
+                $room ? (int) $room['id'] : null
             );
             if (($reservation['status'] ?? '') === 'confirmed' || (float) ($reservation['price'] ?? 0) <= 0) {
-                $this->flashSuccess('Rezervace byla potvrzena.');
+                $this->flashSuccess('Rezervace je potvrzená.');
                 if ($request->wantsJson()) {
                     $this->jsonOk(['redirect' => $this->app->url($back)]);
                 }
@@ -101,7 +114,7 @@ final class ReservationController extends Controller
             if ((int) ($payment['user_id'] ?? 0) !== (int) $user['id']) {
                 throw new HttpException(403, 'Tato platba nepatří k tvému účtu.');
             }
-            $this->flashSuccess('Platba prošla. Rezervace je potvrzená.');
+            $this->flashSuccess('Platba prošla a rezervace je potvrzená.');
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
         }

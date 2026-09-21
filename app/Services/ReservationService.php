@@ -506,6 +506,27 @@ final class ReservationService
         return $room;
     }
 
+    /** @return list<array<string, mixed>> */
+    public function activeRooms(): array
+    {
+        return $this->db->fetchAll(
+            'SELECT id, public_id, name, location, description, max_persons
+             FROM rooms WHERE is_active = 1 ORDER BY name ASC, id ASC'
+        );
+    }
+
+    public function roomByPublicId(string $publicId): ?array
+    {
+        if ($publicId === '') {
+            return null;
+        }
+        $room = $this->db->fetch(
+            'SELECT * FROM rooms WHERE public_id = :pid AND is_active = 1',
+            ['pid' => $publicId]
+        );
+        return $room ?: null;
+    }
+
     public function occupancyNow(): array
     {
         $room = $this->room();

@@ -225,6 +225,65 @@ final class ApplicationFlowTest extends TestCase
         $this->assertNull((new MembershipService($this->db))->activeForUser((int) $user['id']));
     }
 
+    public function testIdleSessionIsRevokedEvenWithoutABrowserRequest(): void
+    {
+        $user = $this->createVerifiedUser('idle');
+        $last = Clock::nowUtc()->modify('-25 hours')->format('Y-m-d H:i:s');
+        $sessionId = (int) $this->db->insert('user_sessions', [
+            'user_id' => (int) $user['id'],
+            'token_hash' => Crypto::hash(bin2hex(random_bytes(8))),
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'phpunit',
+            'is_remembered' => 0,
+            'last_activity_at' => $last,
+            'expires_at' => Clock::nowUtc()->modify('+2 days')->format('Y-m-d H:i:s'),
+            'created_at' => Clock::utc(),
+        ]);
+        \App\Core\Session::set('user_id', (int) $user['id']);
+        \App\Core\Session::set('auth_session_id', $sessionId);
+        \App\Core\Session::forget('logged_out_reason');
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $_SERVER['REQUEST_URI'] = '/user/profil';
+        $_SERVER['SCRIPT_NAME'] = '/index.php';
+        $auth = new \App\Core\Auth($this->db);
+        $auth->hydrate(new \App\Core\Request());
+        $this->assertFalse($auth->check());
+        $this->assertSame('idle', \App\Core\Session::pull('logged_out_reason'));
+        $row = $this->db->fetch('SELECT revoked_at, last_activity_at FROM user_sessions WHERE id = :id', ['id' => $sessionId]);
+        $this->assertNotNull($row['revoked_at']);
+        $this->assertSame($last, $row['last_activity_at']);
+    }
+
+    public function testPresenceCheckDoesNotRefreshIdleClock(): void
+    {
+        $user = $this->createVerifiedUser('idle2');
+        $last = Clock::nowUtc()->modify('-10 minutes')->format('Y-m-d H:i:s');
+        $sessionId = (int) $this->db->insert('user_sessions', [
+            'user_id' => (int) $user['id'],
+            'token_hash' => Crypto::hash(bin2hex(random_bytes(8))),
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'phpunit',
+            'is_remembered' => 0,
+            'last_activity_at' => $last,
+            'expires_at' => Clock::nowUtc()->modify('+2 days')->format('Y-m-d H:i:s'),
+            'created_at' => Clock::utc(),
+        ]);
+        \App\Core\Session::set('user_id', (int) $user['id']);
+        \App\Core\Session::set('auth_session_id', $sessionId);
+        \App\Core\Session::forget('logged_out_reason');
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $_SERVER['REQUEST_URI'] = '/user/pritomnost';
+        $_SERVER['SCRIPT_NAME'] = '/index.php';
+        $auth = new \App\Core\Auth($this->db);
+        $auth->hydrate(new \App\Core\Request());
+        $this->assertTrue($auth->check());
+        $row = $this->db->fetch('SELECT last_activity_at, revoked_at FROM user_sessions WHERE id = :id', ['id' => $sessionId]);
+        $this->assertNull($row['revoked_at']);
+        $this->assertSame($last, $row['last_activity_at']);
+        \App\Core\Session::forget('user_id');
+        \App\Core\Session::forget('auth_session_id');
+    }
+
     private function clearReservationWindow(\DateTimeImmutable $localStart, int $hoursBefore = 3, int $hoursAfter = 6): void
     {
         $from = Clock::toUtc($localStart->modify('-' . $hoursBefore . ' hours'))->format('Y-m-d H:i:s');

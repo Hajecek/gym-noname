@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use App\Controllers\Admin\AdminController;
-use App\Controllers\Staff\StaffController;
 use App\Controllers\User\DashboardController;
 use App\Controllers\User\ProfileController;
 use App\Controllers\User\ReservationController;
+use App\Controllers\User\StudioController;
 use App\Controllers\Web\AuthController;
 use App\Controllers\Web\PublicController;
 use App\Controllers\Web\StripeWebhookController;
@@ -14,7 +14,6 @@ use App\Middleware\AdminMiddleware;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\GuestMiddleware;
 use App\Middleware\OwnerMiddleware;
-use App\Middleware\StaffMiddleware;
 
 $router = app()->router();
 
@@ -35,6 +34,7 @@ $router->post('/registrace', [AuthController::class, 'register'], [GuestMiddlewa
 $router->get('/prihlaseni', [AuthController::class, 'showLogin'], [GuestMiddleware::class]);
 $router->post('/prihlaseni', [AuthController::class, 'login'], [GuestMiddleware::class]);
 $router->post('/odhlaseni', [AuthController::class, 'logout'], [AuthMiddleware::class]);
+$router->get('/odhlaseno', [AuthController::class, 'signedOut']);
 $router->get('/zapomenute-heslo', [AuthController::class, 'showForgot'], [GuestMiddleware::class]);
 $router->post('/zapomenute-heslo', [AuthController::class, 'forgot'], [GuestMiddleware::class]);
 $router->get('/obnoveni-hesla', [AuthController::class, 'showReset'], [GuestMiddleware::class]);
@@ -43,6 +43,7 @@ $router->get('/overeni-emailu', [AuthController::class, 'verifyEmail']);
 $router->get('/potvrzeni-emailu', [AuthController::class, 'confirmEmailChange']);
 
 $router->get('/user', [DashboardController::class, 'index'], [AuthMiddleware::class]);
+$router->get('/user/pritomnost', [DashboardController::class, 'presence'], [AuthMiddleware::class]);
 $router->get('/user/overeni', [DashboardController::class, 'verifyNotice'], [AuthMiddleware::class]);
 $router->post('/user/overeni', [DashboardController::class, 'resendVerification'], [AuthMiddleware::class]);
 $router->get('/user/vstup', [DashboardController::class, 'access'], [AuthMiddleware::class]);
@@ -54,6 +55,15 @@ $router->post('/user/rezervace', [ReservationController::class, 'store'], [AuthM
 $router->get('/user/rezervace/platba', [ReservationController::class, 'paid'], [AuthMiddleware::class]);
 $router->get('/user/rezervace/platba/zruseno', [ReservationController::class, 'checkoutCancel'], [AuthMiddleware::class]);
 $router->post('/user/rezervace/{id}/zrusit', [ReservationController::class, 'cancel'], [AuthMiddleware::class]);
+$router->get('/user/studio', [StudioController::class, 'index'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->post('/user/studio', [StudioController::class, 'store'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->post('/user/studio/ulozit', [StudioController::class, 'update'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->get('/user/studio/ceny', [StudioController::class, 'prices'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->post('/user/studio/ceny', [StudioController::class, 'savePrices'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->get('/user/studio/doba', [StudioController::class, 'hoursPage'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->post('/user/studio/doba', [StudioController::class, 'hours'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->post('/user/studio/vyjimka', [StudioController::class, 'exception'], [AuthMiddleware::class, AdminMiddleware::class]);
+$router->post('/user/studio/vyjimka/smazat', [StudioController::class, 'deleteException'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/user/clenstvi', [ProfileController::class, 'membership'], [AuthMiddleware::class]);
 $router->get('/user/profil', [ProfileController::class, 'index'], [AuthMiddleware::class]);
 $router->post('/user/profil', [ProfileController::class, 'update'], [AuthMiddleware::class]);
@@ -72,9 +82,6 @@ $router->post('/user/zabezpeceni/mfa/vypnout', [ProfileController::class, 'disab
 $router->get('/user/zabezpeceni/mfa/qr', [ProfileController::class, 'mfaQr'], [AuthMiddleware::class]);
 $router->get('/user/zabezpeceni/mfa/kody', [ProfileController::class, 'recoveryCodes'], [AuthMiddleware::class]);
 
-$router->get('/provoz', [StaffController::class, 'index'], [AuthMiddleware::class, StaffMiddleware::class]);
-$router->post('/provoz/problem', [StaffController::class, 'issue'], [AuthMiddleware::class, StaffMiddleware::class]);
-
 $router->get('/admin', [AdminController::class, 'dashboard'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/zakaznici', [AdminController::class, 'users'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/zakaznici/{id}', [AdminController::class, 'userShow'], [AuthMiddleware::class, AdminMiddleware::class]);
@@ -86,9 +93,6 @@ $router->post('/admin/rezervace', [AdminController::class, 'createReservation'],
 $router->post('/admin/rezervace/blokace', [AdminController::class, 'blockSlot'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->post('/admin/rezervace/provozni-doba', [AdminController::class, 'openingHours'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->post('/admin/rezervace/vyjimka', [AdminController::class, 'exception'], [AuthMiddleware::class, AdminMiddleware::class]);
-$router->get('/admin/obsah', [AdminController::class, 'content'], [AuthMiddleware::class, AdminMiddleware::class]);
-$router->post('/admin/obsah', [AdminController::class, 'saveContent'], [AuthMiddleware::class, AdminMiddleware::class]);
-$router->post('/admin/obsah/faq', [AdminController::class, 'saveFaq'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/clenstvi', [AdminController::class, 'plans'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->post('/admin/clenstvi', [AdminController::class, 'savePlan'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/vstup', [AdminController::class, 'access'], [AuthMiddleware::class, AdminMiddleware::class]);

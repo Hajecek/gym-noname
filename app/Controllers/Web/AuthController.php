@@ -100,6 +100,17 @@ final class AuthController extends Controller
         $this->redirect(is_string($intended) ? $intended : '/user');
     }
 
+    public function signedOut(): never
+    {
+        $minutes = max(5, (int) config('security.session.idle_minutes', 1440));
+        $this->view('auth/signed-out', [
+            'title' => 'Odhlášení | PRIVOFIT',
+            'page' => 'signed-out',
+            'bodyClass' => 'standalone-signed-out',
+            'idle_minutes' => $minutes,
+        ], 'layouts/brand');
+    }
+
     public function logout(Request $request): never
     {
         $this->authService()->logout($request);

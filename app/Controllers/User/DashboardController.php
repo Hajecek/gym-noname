@@ -35,6 +35,12 @@ final class DashboardController extends Controller
         ]);
     }
 
+    public function presence(): never
+    {
+        $this->requireUser();
+        $this->jsonOk(['ok' => true]);
+    }
+
     public function verifyNotice(): never
     {
         $this->view('user/verify-notice', ['title' => 'Ověření e-mailu']);

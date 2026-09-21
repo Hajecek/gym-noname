@@ -25,6 +25,7 @@
             </div>
             <h2 id="auth-title" tabindex="-1"><?= $mfa ? 'Ověření přihlášení' : 'Pojďme na to.' ?></h2>
             <p id="auth-subtitle"><?= $mfa ? 'Zadej kód z autentizační aplikace.' : 'Přihlas se do svého prostoru.' ?></p>
+            <?php require dirname(__DIR__) . '/partials/form-alert.php'; ?>
             <?php if (!$mfa): ?>
                 <?php require dirname(__DIR__) . '/partials/social-auth.php'; ?>
             <?php endif; ?>

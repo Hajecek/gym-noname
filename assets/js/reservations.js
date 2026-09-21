@@ -77,6 +77,10 @@
     return DAYS[date.getDay()] + " " + date.getDate() + ". " + MONTHS_GEN[date.getMonth()];
   };
   const maxBookable = () => addDays(state.today, 56);
+  const roomParam = () => {
+    const id = root.getAttribute("data-room") || "";
+    return id ? "&room=" + encodeURIComponent(id) : "";
+  };
 
   const membershipCovers = !!payload.membership_covers;
   const availableFor = (slot) => (slot.available_for || []).map((item) => Number(item));
@@ -257,6 +261,10 @@
       headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
       credentials: "same-origin",
     });
+    if (response.status === 401) {
+      window.location.assign(document.body.dataset.signedOut || "/odhlaseno");
+      throw new Error("Odhlášeno");
+    }
     const body = await response.json();
     if (!response.ok || !body.success) {
       throw new Error(body.message || "Nepodařilo se načíst data.");
@@ -273,11 +281,11 @@
     setLoading(true);
     renderHours();
     try {
-      const data = await fetchJson(root.getAttribute("data-availability-url") + "?date=" + encodeURIComponent(date));
+      const data = await fetchJson(root.getAttribute("data-availability-url") + "?date=" + encodeURIComponent(date) + roomParam());
       state.availability = data;
       if (pushUrl !== false) {
         const page = root.getAttribute("data-page-url") || "";
-        history.replaceState({}, "", page + "?date=" + encodeURIComponent(date));
+        history.replaceState({}, "", page + "?date=" + encodeURIComponent(date) + roomParam());
       }
     } catch (error) {
       state.availability = { closed: false, slots: [] };
@@ -323,7 +331,7 @@
     state.calDays = [];
     renderCalendar();
     try {
-      const data = await fetchJson(root.getAttribute("data-calendar-url") + "?year=" + state.calYear + "&month=" + state.calMonth);
+      const data = await fetchJson(root.getAttribute("data-calendar-url") + "?year=" + state.calYear + "&month=" + state.calMonth + roomParam());
       state.calDays = data.days || [];
       state.calCache.set(key, state.calDays);
     } catch {
@@ -433,6 +441,10 @@
         headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
         credentials: "same-origin",
       });
+      if (response.status === 401) {
+        window.location.assign(document.body.dataset.signedOut || "/odhlaseno");
+        return;
+      }
       const body = await response.json();
       const checkout = body.data?.checkout_url;
       const redirect = body.data?.redirect;

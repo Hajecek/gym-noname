@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     public_id CHAR(36) NOT NULL,
     slug VARCHAR(80) NOT NULL,
     name VARCHAR(120) NOT NULL,
+    location VARCHAR(190) DEFAULT NULL,
     description TEXT DEFAULT NULL,
     max_persons TINYINT UNSIGNED NOT NULL DEFAULT 3,
     is_active TINYINT(1) NOT NULL DEFAULT 1,

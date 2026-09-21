@@ -9,6 +9,7 @@
         <div class="auth-card">
             <h2>Nové heslo</h2>
             <p>Alespoň 12 znaků.</p>
+            <?php require dirname(__DIR__) . '/partials/form-alert.php'; ?>
             <form method="post" action="<?= e(url('/obnoveni-hesla')) ?>">
                 <?= csrf_field() ?>
                 <input type="hidden" name="token" value="<?= e($token) ?>">

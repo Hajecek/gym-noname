@@ -35,10 +35,6 @@ if (!function_exists('admin_active')) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/></svg>
             <span>Členství</span>
         </a>
-        <a class="side-link <?= admin_active('/admin/obsah') ?>" href="<?= e(url('/admin/obsah')) ?>" title="Obsah">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
-            <span>Obsah</span>
-        </a>
         <a class="side-link <?= admin_active('/admin/vstup') ?>" href="<?= e(url('/admin/vstup')) ?>" title="Vstup">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
             <span>Vstup</span>
@@ -61,8 +57,7 @@ if (!function_exists('admin_active')) {
     <?php require dirname(__DIR__) . '/partials/side-profile.php'; ?>
 </aside>
 <div class="app-main" id="main">
-    <?php if ($msg = flash('success')): ?><div class="flash flash-success" role="status"><?= e($msg) ?></div><?php endif; ?>
-    <?php if ($msg = flash('error')): ?><div class="flash flash-error" role="alert"><?= e($msg) ?></div><?php endif; ?>
+    <?php require dirname(__DIR__) . '/partials/app-notices.php'; ?>
     <?= $content ?? '' ?>
 </div>
 <?php

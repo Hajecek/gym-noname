@@ -40,24 +40,26 @@ if (!function_exists('user_active')) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5 20c1.5-4 12.5-4 14 0"/></svg>
             <span>Profil</span>
         </a>
-        <?php if (in_array($role, ['staff', 'admin', 'owner'], true)): ?>
-            <a class="side-link <?= user_active('/provoz', true) ?>" href="<?= e(url('/provoz')) ?>" title="Provoz">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h13"/></svg>
-                <span>Provoz</span>
-            </a>
-        <?php endif; ?>
         <?php if (in_array($role, ['admin', 'owner'], true)): ?>
-            <a class="side-link <?= user_active('/admin', true) ?>" href="<?= e(url('/admin')) ?>" title="Admin">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M12 3 20 7v5c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7z"/></svg>
-                <span>Admin</span>
+            <p class="side-label">Správa</p>
+            <a class="side-link <?= user_active('/user/studio') ?>" href="<?= e(url('/user/studio')) ?>" title="Studia">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 10 12 4l8 6v9H4z"/><path d="M9 19v-6h6v6"/></svg>
+                <span>Studia</span>
+            </a>
+            <a class="side-link <?= user_active('/user/studio/ceny', true) ?>" href="<?= e(url('/user/studio/ceny')) ?>" title="Ceny">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M12 3v18M16 7.5c0-1.8-1.8-3-4-3s-4 1.2-4 3 1.8 2.7 4 3 4 1.2 4 3-1.8 3-4 3-4-1.2-4-3"/></svg>
+                <span>Ceny</span>
+            </a>
+            <a class="side-link <?= user_active('/user/studio/doba', true) ?>" href="<?= e(url('/user/studio/doba')) ?>" title="Otevírací doba">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/></svg>
+                <span>Otevírací doba</span>
             </a>
         <?php endif; ?>
     </nav>
     <?php require dirname(__DIR__) . '/partials/side-profile.php'; ?>
 </aside>
 <div class="app-main" id="main">
-    <?php if ($msg = flash('success')): ?><div class="flash flash-success" role="status"><?= e($msg) ?></div><?php endif; ?>
-    <?php if ($msg = flash('error')): ?><div class="flash flash-error" role="alert"><?= e($msg) ?></div><?php endif; ?>
+    <?php require dirname(__DIR__) . '/partials/app-notices.php'; ?>
     <?= $content ?? '' ?>
 </div>
 <?php

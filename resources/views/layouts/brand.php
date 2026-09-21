@@ -25,7 +25,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=23">
+    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=24">
     <link rel="manifest" href="<?= e(url('/manifest.json')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="PRIVOFIT">
@@ -53,8 +53,10 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     </div>
     <button class="menu-toggle" aria-label="Otevřít menu" aria-expanded="false">☰</button>
 </header>
+<?php if (!in_array(($page ?? ''), ['login', 'register'], true)): ?>
 <?php if ($msg = flash('success')): ?><div class="flash flash-success wrapper" role="status"><?= e($msg) ?></div><?php endif; ?>
 <?php if ($msg = flash('error')): ?><div class="flash flash-error wrapper" role="alert"><?= e($msg) ?></div><?php endif; ?>
+<?php endif; ?>
 <div id="main">
 <?= $content ?? '' ?>
 </div>

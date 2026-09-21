@@ -322,6 +322,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     public_id CHAR(36) NOT NULL,
     slug VARCHAR(80) NOT NULL,
     name VARCHAR(120) NOT NULL,
+    location VARCHAR(190) DEFAULT NULL,
     description TEXT DEFAULT NULL,
     max_persons TINYINT UNSIGNED NOT NULL DEFAULT 3,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -623,21 +624,6 @@ CREATE TABLE IF NOT EXISTS contact_messages (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_contact_messages_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS operational_issues (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    reported_by BIGINT UNSIGNED DEFAULT NULL,
-    reservation_id BIGINT UNSIGNED DEFAULT NULL,
-    title VARCHAR(190) NOT NULL,
-    description TEXT NOT NULL,
-    status ENUM('open', 'in_progress', 'resolved', 'closed') NOT NULL DEFAULT 'open',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_operational_issues_status (status),
-    CONSTRAINT fk_operational_issues_user FOREIGN KEY (reported_by) REFERENCES users (id) ON DELETE SET NULL,
-    CONSTRAINT fk_operational_issues_reservation FOREIGN KEY (reservation_id) REFERENCES reservations (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS rate_limit_events (

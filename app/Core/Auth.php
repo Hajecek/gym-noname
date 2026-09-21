@@ -33,23 +33,50 @@ final class Auth
         }
 
         $row = $this->db->fetch(
-            'SELECT s.id AS session_row_id, u.*
+            'SELECT s.id AS session_row_id, s.last_activity_at, s.expires_at, s.revoked_at, u.*
              FROM user_sessions s
              INNER JOIN users u ON u.id = s.user_id
-             WHERE s.id = :sid AND s.user_id = :uid AND s.revoked_at IS NULL AND s.expires_at > :now AND u.deleted_at IS NULL',
-            ['sid' => (int) $sessionId, 'uid' => (int) $userId, 'now' => Clock::utc()]
+             WHERE s.id = :sid AND s.user_id = :uid AND u.deleted_at IS NULL',
+            ['sid' => (int) $sessionId, 'uid' => (int) $userId]
         );
-        if (!$row) {
+        if (!$row || $row['revoked_at'] !== null || (string) $row['expires_at'] <= Clock::utc() || $this->idleExpired($row)) {
+            if ($row && $row['revoked_at'] === null) {
+                $this->db->update('user_sessions', ['revoked_at' => Clock::utc()], 'id = :id', ['id' => (int) $row['session_row_id']]);
+            }
+            $this->dropWebSession(true);
             return;
         }
 
-        $this->db->query(
-            'UPDATE user_sessions SET last_activity_at = :now WHERE id = :id',
-            ['now' => Clock::utc(), 'id' => (int) $row['session_row_id']]
-        );
+        if (!$this->isPresenceCheck($request)) {
+            $this->db->query(
+                'UPDATE user_sessions SET last_activity_at = :now WHERE id = :id',
+                ['now' => Clock::utc(), 'id' => (int) $row['session_row_id']]
+            );
+        }
         $this->sessionRowId = (int) $row['session_row_id'];
-        unset($row['session_row_id']);
+        unset($row['session_row_id'], $row['last_activity_at'], $row['expires_at'], $row['revoked_at']);
         $this->user = $row;
+    }
+
+    private function idleExpired(array $row): bool
+    {
+        $minutes = max(5, (int) config('security.session.idle_minutes', 1440));
+        $last = new \DateTimeImmutable((string) $row['last_activity_at'], new \DateTimeZone('UTC'));
+        return $last->modify('+' . $minutes . ' minutes') <= Clock::nowUtc();
+    }
+
+    private function isPresenceCheck(Request $request): bool
+    {
+        return $request->path() === '/user/pritomnost';
+    }
+
+    private function dropWebSession(bool $security): void
+    {
+        Session::forget('user_id');
+        Session::forget('auth_session_id');
+        if ($security) {
+            Session::set('logged_out_reason', 'idle');
+        }
     }
 
     private function hydrateBearer(string $token): void

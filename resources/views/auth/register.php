@@ -31,6 +31,7 @@ $oldEmail = old('email');
             </div>
             <h2 id="auth-title" tabindex="-1">Začni u sebe.</h2>
             <p id="auth-subtitle">Nejdřív se trochu poznáme.</p>
+            <?php require dirname(__DIR__) . '/partials/form-alert.php'; ?>
             <?php require dirname(__DIR__) . '/partials/social-auth.php'; ?>
             <form id="auth-form" method="post" action="<?= e(url('/registrace')) ?>" enctype="multipart/form-data" novalidate>
                 <?= csrf_field() ?>

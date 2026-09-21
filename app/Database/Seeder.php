@@ -84,6 +84,7 @@ final class Seeder
                 'public_id' => Crypto::uuid(),
                 'slug' => 'studio',
                 'name' => 'PRIVOFIT Studio',
+                'location' => null,
                 'description' => 'Soukromé fitness studio',
                 'max_persons' => 3,
                 'is_active' => 1,

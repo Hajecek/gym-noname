@@ -5,7 +5,8 @@ declare(strict_types=1);
 return [
     'session' => [
         'name' => env_value('SESSION_NAME', 'privofit_session'),
-        'lifetime' => (int) env_value('SESSION_LIFETIME', 120),
+        'lifetime' => (int) env_value('SESSION_LIFETIME', 20160),
+        'idle_minutes' => (int) env_value('SESSION_IDLE_MINUTES', 1440),
         'secure' => (bool) env_value('SESSION_SECURE', false),
         'http_only' => (bool) env_value('SESSION_HTTP_ONLY', true),
         'same_site' => env_value('SESSION_SAME_SITE', 'Lax'),

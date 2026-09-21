@@ -14,7 +14,7 @@ $bodyClass = $bodyClass ?? '';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(asset('user/style.css')) ?>?v=26">
+    <link rel="stylesheet" href="<?= e(asset('user/style.css')) ?>?v=31">
     <link rel="manifest" href="<?= e(url('/manifest.json')) ?>">
     <link rel="icon" href="<?= e(url('/favicon.ico')) ?>?v=3" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="<?= e(asset('brand/favicon-32.png')) ?>?v=3">
@@ -23,12 +23,12 @@ $bodyClass = $bodyClass ?? '';
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="PRIVOFIT">
 </head>
-<body class="<?= e($bodyClass) ?>">
+<body class="<?= e($bodyClass) ?>"<?php if (!empty($user)): ?> data-presence="<?= e(url('/user/pritomnost')) ?>" data-signed-out="<?= e(url('/odhlaseno')) ?>"<?php endif; ?>>
 <a class="skip-link" href="#main">Přeskočit na obsah</a>
 <?= $content ?? '' ?>
-<script nonce="<?= e($cspNonce) ?>" src="<?= e(asset('js/app.js')) ?>?v=11"></script>
+<script nonce="<?= e($cspNonce) ?>" src="<?= e(asset('js/app.js')) ?>?v=12"></script>
 <?php foreach (($pageScripts ?? []) as $src): ?>
-<script nonce="<?= e($cspNonce) ?>" src="<?= e(asset($src)) ?>?v=9"></script>
+<script nonce="<?= e($cspNonce) ?>" src="<?= e(asset($src)) ?>?v=11"></script>
 <?php endforeach; ?>
 <script nonce="<?= e($cspNonce) ?>">
 if ('serviceWorker' in navigator) {

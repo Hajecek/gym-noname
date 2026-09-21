@@ -39,6 +39,7 @@ $statusMap = [
     data-availability-url="<?= e(url('/user/rezervace/dostupnost')) ?>"
     data-calendar-url="<?= e(url('/user/rezervace/kalendar')) ?>"
     data-page-url="<?= e(url('/user/rezervace')) ?>"
+    data-room="<?= e((string) ($room['public_id'] ?? '')) ?>"
     data-payload="<?= e(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP)) ?>"
 >
     <noscript>
@@ -47,6 +48,17 @@ $statusMap = [
             <button class="btn btn-secondary">Zobrazit den</button>
         </form>
     </noscript>
+
+    <?php if (count($rooms ?? []) > 1): ?>
+        <div class="studio-rooms">
+            <?php foreach ($rooms as $item): ?>
+                <a class="studio-room<?= ($room['public_id'] ?? '') === $item['public_id'] ? ' is-on' : '' ?>" href="<?= e(url('/user/rezervace?date=' . rawurlencode($date) . '&room=' . rawurlencode((string) $item['public_id']))) ?>">
+                    <strong><?= e($item['name']) ?></strong>
+                    <span><?= e($item['location'] ?: 'Prostor') ?></span>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 
     <button type="button" class="booker-date-btn card" data-open-cal aria-haspopup="dialog" aria-expanded="false">
         <span class="booker-date-kicker">Vybraný den</span>
@@ -90,6 +102,7 @@ $statusMap = [
         <input type="hidden" name="start" value="">
         <input type="hidden" name="duration" value="<?= (int) $min ?>">
         <input type="hidden" name="guests" value="1">
+        <input type="hidden" name="room" value="<?= e((string) ($room['public_id'] ?? '')) ?>">
     </form>
 </div>
 

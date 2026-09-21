@@ -117,4 +117,47 @@
       }
     });
   });
+
+  const hide = (node) => {
+    node.classList.add("is-out");
+    window.setTimeout(() => node.remove(), 280);
+  };
+  document.querySelectorAll("[data-toast]").forEach((toast) => {
+    toast.querySelector("[data-toast-close]")?.addEventListener("click", () => hide(toast));
+    window.setTimeout(() => hide(toast), 7000);
+  });
+  document.querySelectorAll("[data-done-modal]").forEach((modal) => {
+    window.setTimeout(() => hide(modal), 2600);
+  });
+
+  const presenceUrl = document.body.dataset.presence;
+  const signedOutUrl = document.body.dataset.signedOut;
+  if (presenceUrl && signedOutUrl) {
+    let checking = false;
+    const ping = async () => {
+      if (checking || document.visibilityState === "hidden") return;
+      checking = true;
+      try {
+        const response = await fetch(presenceUrl, {
+          headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (response.status === 401) window.location.assign(signedOutUrl);
+      } catch {
+        // Po probuzení notebooku síť chvíli nemusí být nahoře.
+      } finally {
+        checking = false;
+      }
+    };
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") ping();
+    });
+    window.addEventListener("focus", ping);
+    window.addEventListener("online", ping);
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted) ping();
+    });
+    window.setInterval(ping, 45000);
+  }
 })();
