@@ -13,6 +13,14 @@ function app(): Application
     return Application::getInstance();
 }
 
+function bump_live(): void
+{
+    try {
+        app()->settings()->bumpLive();
+    } catch (\Throwable) {
+    }
+}
+
 function config(string $key, mixed $default = null): mixed
 {
     return app()->config($key, $default);

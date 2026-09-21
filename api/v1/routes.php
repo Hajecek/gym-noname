@@ -6,6 +6,7 @@ require __DIR__ . '/health.php';
 require __DIR__ . '/auth.php';
 require __DIR__ . '/users.php';
 require __DIR__ . '/gym.php';
+require __DIR__ . '/live.php';
 require __DIR__ . '/visits.php';
 require __DIR__ . '/inbox.php';
 require __DIR__ . '/devices.php';

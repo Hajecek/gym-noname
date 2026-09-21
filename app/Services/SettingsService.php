@@ -69,6 +69,22 @@ final class SettingsService
         return (int) $this->get($key, $default);
     }
 
+    public function bumpLive(): int
+    {
+        $next = $this->int('live.revision', 0) + 1;
+        $this->set('live.revision', (string) $next);
+        try {
+            AppPushService::make($this->db)->liveChanged($next);
+        } catch (\Throwable) {
+        }
+        return $next;
+    }
+
+    public function liveRevision(): string
+    {
+        return (string) $this->int('live.revision', 0);
+    }
+
     public function nowNote(): string
     {
         return Clock::utc();

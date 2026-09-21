@@ -10,4 +10,9 @@ final class GymController extends Controller
     {
         $this->send($this->api()->gymInfo());
     }
+
+    public function live(): never
+    {
+        $this->send($this->api()->live());
+    }
 }

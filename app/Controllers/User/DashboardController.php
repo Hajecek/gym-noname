@@ -10,6 +10,7 @@ use App\Core\Request;
 use App\Services\Access\AccessControlService;
 use App\Services\MembershipService;
 use App\Services\ReservationService;
+use App\Services\SettingsService;
 
 final class DashboardController extends Controller
 {
@@ -61,10 +62,22 @@ final class DashboardController extends Controller
     {
         $user = $this->requireUser();
         $access = AccessControlService::make($this->app->db());
+        $state = $access->canAttempt($user);
+        $visit = $state['reservation'] ?? null;
+        if (is_array($visit)) {
+            $room = $this->app->db()->fetch('SELECT name FROM rooms WHERE id = :id', ['id' => (int) ($visit['room_id'] ?? 0)]);
+            $visit['room_name'] = $room['name'] ?? 'Studio';
+        }
+        $settings = new SettingsService($this->app->db());
         $this->view('user/access', [
             'title' => 'Vstup',
-            'state' => $access->canAttempt($user),
-            'status' => $access->doorStatus(),
+            'state' => $state,
+            'visit' => $visit,
+            'upcoming' => ReservationService::make($this->app->db())->upcoming((int) $user['id']),
+            'earlyMinutes' => $settings->int('access.early_minutes', 5),
+            'lateMinutes' => $settings->int('access.late_minutes', 5),
+            'pageScripts' => ['js/access.js'],
+            'verified' => !empty($user['email_verified_at']),
         ]);
     }
 

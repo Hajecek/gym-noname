@@ -83,6 +83,14 @@ final class MobileApiService
         return $this->sessionPayload($this->auth->issueApiTokens($user, $request, $deviceName, $platform));
     }
 
+    public function live(): array
+    {
+        $settings = new \App\Services\SettingsService($this->db);
+        return [
+            'revision' => $settings->liveRevision(),
+        ];
+    }
+
     public function gymInfo(): array
     {
         $hero = $this->content->page('home.hero', 'PRIVOFIT', 'Soukromé fitness studio.');
@@ -94,8 +102,9 @@ final class MobileApiService
                 break;
             }
         }
+        $title = trim((string) ($hero['title'] ?? ''));
         return [
-            'name' => (string) config('app.name', 'PRIVOFIT'),
+            'name' => $title !== '' ? $title : (string) config('app.name', 'PRIVOFIT'),
             'description' => trim(strip_tags((string) ($hero['body_html'] ?? ''))),
             'openingHours' => (string) ($contact['hours'] ?? 'Podle rezervací'),
             'announcements' => $announcements,

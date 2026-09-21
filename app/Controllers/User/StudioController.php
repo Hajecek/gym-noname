@@ -69,6 +69,7 @@ final class StudioController extends Controller
             );
         }
         $this->flashSuccess('Ceny jsou uložené.');
+        bump_live();
         $this->redirect($back);
     }
 
@@ -125,6 +126,7 @@ final class StudioController extends Controller
         }
         $room = $this->app->db()->fetch('SELECT public_id FROM rooms WHERE id = :id', ['id' => $id]);
         $this->flashSuccess('Prostor je přidaný. Nastav u něj dny, časy a cenu.');
+        bump_live();
         $this->redirect('/user/studio?room=' . rawurlencode((string) ($room['public_id'] ?? '')));
     }
 
@@ -144,6 +146,7 @@ final class StudioController extends Controller
             'is_active' => $request->input('is_active') ? 1 : 0,
         ], 'id = :id', ['id' => (int) $room['id']]);
         $this->flashSuccess('Prostor je uložený.');
+        bump_live();
         $this->redirect('/user/studio?room=' . rawurlencode((string) $room['public_id']));
     }
 
@@ -178,6 +181,7 @@ final class StudioController extends Controller
             );
         }
         $this->flashSuccess('Otevírací doba je uložená.');
+        bump_live();
         $this->redirect($back);
     }
 
@@ -202,6 +206,7 @@ final class StudioController extends Controller
             ]
         );
         $this->flashSuccess('Den je zavřený.');
+        bump_live();
         $this->redirect($this->roomUrl($room, '/user/studio/doba'));
     }
 
@@ -214,6 +219,7 @@ final class StudioController extends Controller
             ['id' => (int) $request->input('id', 0), 'rid' => (int) $room['id']]
         );
         $this->flashSuccess('Výjimka je smazaná.');
+        bump_live();
         $this->redirect($this->roomUrl($room, '/user/studio/doba'));
     }
 

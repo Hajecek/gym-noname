@@ -265,7 +265,7 @@ final class ReservationService
         }
 
         try {
-            return $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $startLocal, $open, $buffer, $durationStep, $guestCount, $price, $membership, $useMembership, $ignoreReservationIds) {
+            $reservation = $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $startLocal, $open, $buffer, $durationStep, $guestCount, $price, $membership, $useMembership, $ignoreReservationIds) {
                 $db->query('SELECT id FROM rooms WHERE id = :id FOR UPDATE', ['id' => (int) $room['id']]);
                 $db->query(
                     "SELECT id FROM reservations
@@ -314,8 +314,8 @@ final class ReservationService
 
                 $door = $db->fetch('SELECT id FROM doors WHERE room_id = :rid AND is_active = 1 LIMIT 1', ['rid' => (int) $room['id']]);
                 if ($door && $status === 'confirmed') {
-                    $early = $this->settings->int('access.early_minutes', 10);
-                    $late = $this->settings->int('access.late_minutes', 10);
+                    $early = $this->settings->int('access.early_minutes', 5);
+                    $late = $this->settings->int('access.late_minutes', 5);
                     try {
                         $db->insert('access_permissions', [
                             'user_id' => (int) $user['id'],
@@ -345,6 +345,8 @@ final class ReservationService
                 }
                 return $reservation;
             });
+            $this->touchLive();
+            return $reservation;
         } catch (\PDOException $e) {
             if ($this->isDuplicateKey($e)) {
                 throw new HttpException(409, 'Tento termín je již obsazený.');
@@ -405,6 +407,7 @@ final class ReservationService
         } catch (\Throwable) {
             // zrušení platí i bez e-mailu
         }
+        $this->touchLive();
         return $money;
     }
 
@@ -485,7 +488,7 @@ final class ReservationService
 
     public function current(int $userId): ?array
     {
-        $early = $this->settings->int('access.early_minutes', 10);
+        $early = $this->settings->int('access.early_minutes', 5);
         return $this->db->fetch(
             "SELECT r.*, rm.name AS room_name
              FROM reservations r
@@ -515,7 +518,11 @@ final class ReservationService
              WHERE status = 'confirmed' AND ends_at < :now",
             ['now' => Clock::utc()]
         );
-        return count($rows);
+        $count = count($rows);
+        if ($count > 0) {
+            $this->touchLive();
+        }
+        return $count;
     }
 
     public function today(int $roomId): array
@@ -885,6 +892,7 @@ final class ReservationService
                 $this->releaseOccupancy((int) $row['id']);
             }
         }
+        $this->touchLive();
     }
 
     public function confirmPending(array $reservation, array $user): array
@@ -907,8 +915,8 @@ final class ReservationService
         }
         $door = $this->db->fetch('SELECT id FROM doors WHERE room_id = :rid AND is_active = 1 LIMIT 1', ['rid' => (int) $fresh['room_id']]);
         if ($door) {
-            $early = $this->settings->int('access.early_minutes', 10);
-            $late = $this->settings->int('access.late_minutes', 10);
+            $early = $this->settings->int('access.early_minutes', 5);
+            $late = $this->settings->int('access.late_minutes', 5);
             $startUtc = new \DateTimeImmutable($fresh['starts_at'], new \DateTimeZone('UTC'));
             $endUtc = new \DateTimeImmutable($fresh['ends_at'], new \DateTimeZone('UTC'));
             $exists = $this->db->fetch('SELECT id FROM access_permissions WHERE reservation_id = :id', ['id' => (int) $fresh['id']]);
@@ -939,6 +947,7 @@ final class ReservationService
         } catch (\Throwable) {
             // rezervace platí i bez e-mailu
         }
+        $this->touchLive();
         return $fresh;
     }
 
@@ -955,6 +964,7 @@ final class ReservationService
             'pending' => 'pending_payment',
         ]);
         $this->releaseOccupancy((int) $reservation['id']);
+        $this->touchLive();
     }
 
     /** @return array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,currencyCode:string} */
@@ -1077,5 +1087,13 @@ final class ReservationService
         $hourly = $hourlyOverride ?? (float) $this->settings->get('pricing.hourly', 150);
         $hours = max(1, (int) ceil($minutes / 60));
         return number_format($hourly * $hours, 2, '.', '');
+    }
+
+    private function touchLive(): void
+    {
+        try {
+            $this->settings->bumpLive();
+        } catch (\Throwable) {
+        }
     }
 }

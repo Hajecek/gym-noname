@@ -195,8 +195,8 @@ final class AccessControlService
 
     private function currentEligibleReservation(array $user): ?array
     {
-        $early = $this->settings->int('access.early_minutes', 10);
-        $late = $this->settings->int('access.late_minutes', 10);
+        $early = $this->settings->int('access.early_minutes', 5);
+        $late = $this->settings->int('access.late_minutes', 5);
         return $this->db->fetch(
             "SELECT r.* FROM reservations r
              WHERE r.user_id = :uid AND r.status = 'confirmed'

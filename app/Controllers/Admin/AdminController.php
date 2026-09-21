@@ -182,6 +182,7 @@ final class AdminController extends Controller
             'created_at' => Clock::utc(),
         ]);
         $this->flashSuccess('Termín byl zablokován.');
+        bump_live();
         $this->redirect('/admin/rezervace');
     }
 
@@ -213,6 +214,7 @@ final class AdminController extends Controller
             );
         }
         $this->flashSuccess('Provozní doba byla uložena.');
+        bump_live();
         $this->redirect('/admin/rezervace');
     }
 
@@ -234,6 +236,7 @@ final class AdminController extends Controller
             ]
         );
         $this->flashSuccess('Výjimka byla uložena.');
+        bump_live();
         $this->redirect('/admin/rezervace');
     }
 
@@ -262,6 +265,7 @@ final class AdminController extends Controller
         $this->app->settings()->set('contact.hours', (string) $request->input('hours'));
         $this->app->settings()->set('contact.map_embed', (string) $request->input('map_embed'));
         $this->flashSuccess('Obsah byl uložen.');
+        bump_live();
         $this->redirect('/admin/obsah');
     }
 
@@ -274,6 +278,7 @@ final class AdminController extends Controller
             'is_published' => 1,
         ]);
         $this->flashSuccess('FAQ položka byla přidána.');
+        bump_live();
         $this->redirect('/admin/obsah');
     }
 
@@ -309,6 +314,7 @@ final class AdminController extends Controller
             ]);
         }
         $this->flashSuccess('Tarif byl uložen.');
+        bump_live();
         $this->redirect('/admin/clenstvi');
     }
 
@@ -355,6 +361,7 @@ final class AdminController extends Controller
         }
         (new AuditService($this->app->db()))->log($this->app->auth()->id(), 'settings.update', 'app_settings', null, null, $request->all(), $request->ip());
         $this->flashSuccess('Nastavení bylo uloženo.');
+        bump_live();
         $this->redirect('/admin/nastaveni');
     }
 
