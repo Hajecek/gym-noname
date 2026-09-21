@@ -32,6 +32,8 @@ final class AuthService
     ) {
     }
 
+    private bool $issueMfaTrust = false;
+
     public static function make(Database $db): self
     {
         return new self(
@@ -146,12 +148,19 @@ final class AuthService
 
     public function login(string $identifier, string $password, Request $request, bool $remember = false, ?string $totp = null): array
     {
+        $this->issueMfaTrust = false;
         $user = $this->verifyCredentials($identifier, $password, $request, $totp);
-        return $this->establishWebSession($user, $request, $remember);
+        $sessionUser = $this->establishWebSession($user, $request, $remember);
+        if ($this->issueMfaTrust) {
+            $this->rememberBrowser((int) $user['id'], $request);
+            $this->issueMfaTrust = false;
+        }
+        return $sessionUser;
     }
 
     public function loginFromApp(string $identifier, string $password, Request $request, ?string $totp = null): array
     {
+        $this->issueMfaTrust = false;
         $user = $this->verifyCredentials($identifier, $password, $request, $totp);
         $this->db->update('users', [
             'last_login_at' => Clock::utc(),
@@ -200,13 +209,14 @@ final class AuthService
             throw new HttpException(422, $generic);
         }
 
-        if ((int) $user['mfa_enabled'] === 1) {
+        if ((int) $user['mfa_enabled'] === 1 && !$this->browserIsTrusted((int) $user['id'])) {
             if ($totp === null || $totp === '') {
                 throw new MfaRequiredException($user);
             }
             if (!$this->verifyTotp($user, $totp) && !$this->consumeRecoveryCode($user, $totp)) {
                 throw new HttpException(422, 'Neplatný ověřovací kód.');
             }
+            $this->issueMfaTrust = true;
         }
 
         $this->db->insert('login_attempts', [
@@ -225,7 +235,9 @@ final class AuthService
         if (!$this->verifyTotp($user, $totp) && !$this->consumeRecoveryCode($user, $totp)) {
             throw new HttpException(401, 'Neplatný ověřovací kód.');
         }
-        return $this->establishWebSession($user, $request, $remember);
+        $sessionUser = $this->establishWebSession($user, $request, $remember);
+        $this->rememberBrowser((int) $user['id'], $request);
+        return $sessionUser;
     }
 
     public function establishWebSession(array $user, Request $request, bool $remember = false): array
@@ -277,6 +289,7 @@ final class AuthService
             'UPDATE api_refresh_tokens SET revoked_at = :now WHERE user_id = :uid AND revoked_at IS NULL',
             ['now' => Clock::utc(), 'uid' => $userId]
         );
+        $this->revokeTrustedBrowsers($userId);
     }
 
     public function sendVerification(array $user): void
@@ -706,6 +719,7 @@ final class AuthService
         $this->db->update('users', ['mfa_enabled' => 0], 'id = :id', ['id' => (int) $user['id']]);
         $this->db->query('DELETE FROM totp_secrets WHERE user_id = :id', ['id' => (int) $user['id']]);
         $this->db->query('DELETE FROM recovery_codes WHERE user_id = :id', ['id' => (int) $user['id']]);
+        $this->revokeTrustedBrowsers((int) $user['id']);
         $this->audit->log((int) $user['id'], 'mfa.disable', 'user', $user['id'], ['mfa' => true], ['mfa' => false]);
     }
 
@@ -833,6 +847,94 @@ final class AuthService
         }
         $totp = TOTP::createFromSecret(Crypto::decrypt($row['secret_encrypted']));
         return $totp->verify($code, null, 1);
+    }
+
+    private function mfaTrustCookie(): string
+    {
+        $name = (string) config('security.session.mfa_trust_cookie', 'privofit_mfa');
+        return $name !== '' ? $name : 'privofit_mfa';
+    }
+
+    private function mfaTrustDays(): int
+    {
+        return max(1, (int) config('security.session.mfa_trust_days', 30));
+    }
+
+    private function browserIsTrusted(int $userId): bool
+    {
+        $raw = $_COOKIE[$this->mfaTrustCookie()] ?? '';
+        if (!is_string($raw) || $raw === '') {
+            return false;
+        }
+        $row = $this->db->fetch(
+            'SELECT id FROM mfa_trusted_devices WHERE user_id = :uid AND token_hash = :h AND expires_at > :now LIMIT 1',
+            ['uid' => $userId, 'h' => Crypto::hash($raw), 'now' => Clock::utc()]
+        );
+        if (!$row) {
+            return false;
+        }
+        $this->db->update('mfa_trusted_devices', ['last_used_at' => Clock::utc()], 'id = :id', ['id' => (int) $row['id']]);
+        return true;
+    }
+
+    private function rememberBrowser(int $userId, Request $request): void
+    {
+        $raw = Crypto::token(32);
+        $days = $this->mfaTrustDays();
+        $this->db->insert('mfa_trusted_devices', [
+            'user_id' => $userId,
+            'token_hash' => Crypto::hash($raw),
+            'ip_address' => $request->ip(),
+            'user_agent' => substr($request->userAgent(), 0, 500),
+            'expires_at' => Clock::nowUtc()->modify('+' . $days . ' days')->format('Y-m-d H:i:s'),
+            'last_used_at' => Clock::utc(),
+            'created_at' => Clock::utc(),
+        ]);
+        $this->setTrustCookie($raw, time() + ($days * 86400));
+    }
+
+    private function revokeTrustedBrowsers(int $userId): void
+    {
+        $name = $this->mfaTrustCookie();
+        $raw = $_COOKIE[$name] ?? '';
+        if (is_string($raw) && $raw !== '') {
+            $row = $this->db->fetch(
+                'SELECT id FROM mfa_trusted_devices WHERE user_id = :uid AND token_hash = :h LIMIT 1',
+                ['uid' => $userId, 'h' => Crypto::hash($raw)]
+            );
+            if ($row) {
+                $this->setTrustCookie('', time() - 42000);
+            }
+        }
+        $this->db->query('DELETE FROM mfa_trusted_devices WHERE user_id = :uid', ['uid' => $userId]);
+    }
+
+    private function setTrustCookie(string $value, int $expires): void
+    {
+        $name = $this->mfaTrustCookie();
+        if ($value === '') {
+            unset($_COOKIE[$name]);
+        } else {
+            $_COOKIE[$name] = $value;
+        }
+        if (headers_sent()) {
+            return;
+        }
+        $secure = (bool) config('security.session.secure', false);
+        if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            $secure = true;
+        }
+        $sameSite = (string) config('security.session.same_site', 'Lax');
+        if (!in_array($sameSite, ['Lax', 'Strict', 'None'], true)) {
+            $sameSite = 'Lax';
+        }
+        setcookie($name, $value, [
+            'expires' => $expires,
+            'path' => '/',
+            'secure' => $secure,
+            'httponly' => true,
+            'samesite' => $sameSite,
+        ]);
     }
 
     private function consumeRecoveryCode(array $user, string $code): bool

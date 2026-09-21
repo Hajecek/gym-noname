@@ -1279,11 +1279,29 @@ input[data-avatar-input] {
   flex-shrink: 0;
   cursor: pointer;
 }
-.profile-avatar-edit .avatar {
+.profile-avatar-preview {
   width: 120px;
   height: 120px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
   border: 1px solid var(--line);
+  background: rgba(198, 242, 26, 0.12);
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
   box-shadow: 0 0 0 6px #c6f21a12;
+}
+.profile-avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.profile-avatar-preview.has-photo {
+  background: rgba(0, 0, 0, 0.22);
 }
 .profile-avatar-cam {
   position: absolute;
@@ -1305,8 +1323,67 @@ input[data-avatar-input] {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.profile-avatar-edit:hover .avatar {
+.profile-avatar-edit:hover .profile-avatar-preview {
   border-color: var(--lime);
+}
+.profile-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 0;
+  max-width: 420px;
+}
+.profile-facts div {
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.18);
+}
+.profile-facts dt {
+  margin: 0;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.profile-facts dd {
+  margin: 4px 0 0;
+  font-family: var(--display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.profile-facts .is-plan dd {
+  color: var(--lime);
+}
+.profile-mfa-points {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.profile-mfa-points li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.18);
+}
+.profile-mfa-points li > span:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.profile-mfa-points strong {
+  font-size: 14px;
+}
+.profile-mfa-points li span span {
+  color: var(--secondary);
+  font-size: 13px;
 }
 .profile-hero-copy {
   min-width: 0;

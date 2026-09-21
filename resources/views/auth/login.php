@@ -24,7 +24,7 @@
                 <div class="step-bars" aria-hidden="true"><i class="active"></i><i></i><i></i></div>
             </div>
             <h2 id="auth-title" tabindex="-1"><?= $mfa ? 'Ověření přihlášení' : 'Pojďme na to.' ?></h2>
-            <p id="auth-subtitle"><?= $mfa ? 'Zadej kód z autentizační aplikace.' : 'Přihlas se do svého prostoru.' ?></p>
+            <p id="auth-subtitle"><?= $mfa ? 'Zadej kód z autentizační aplikace. Na tomto prohlížeči pak ' . (int) config('security.session.mfa_trust_days', 30) . ' dní stačí heslo.' : 'Přihlas se do svého prostoru.' ?></p>
             <?php require dirname(__DIR__) . '/partials/form-alert.php'; ?>
             <?php if (!$mfa): ?>
                 <?php require dirname(__DIR__) . '/partials/social-auth.php'; ?>

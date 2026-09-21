@@ -9,6 +9,7 @@ use App\Core\Database;
 use App\Core\Env;
 use App\Services\Access\AccessControlService;
 use App\Services\Auth\AuthService;
+use App\Services\Auth\MfaRequiredException;
 use App\Services\MembershipService;
 use App\Services\ReservationService;
 use App\Support\Clock;
@@ -252,6 +253,61 @@ final class ApplicationFlowTest extends TestCase
         $row = $this->db->fetch('SELECT revoked_at, last_activity_at FROM user_sessions WHERE id = :id', ['id' => $sessionId]);
         $this->assertNotNull($row['revoked_at']);
         $this->assertSame($last, $row['last_activity_at']);
+    }
+
+    public function testTrustedBrowserSkipsMfaUntilEveryDeviceIsSignedOut(): void
+    {
+        $user = $this->createVerifiedUser('mfa');
+        $this->db->update('users', ['mfa_enabled' => 1], 'id = :id', ['id' => (int) $user['id']]);
+        $this->db->query("DELETE FROM rate_limit_events WHERE bucket IN ('login-ip', 'login-id')");
+        $request = $this->fakeRequest();
+        unset($_COOKIE['privofit_mfa']);
+
+        $asked = false;
+        try {
+            $this->auth->login($user['email'], 'spravne-dlouhe-heslo', $request);
+        } catch (MfaRequiredException $e) {
+            $asked = (int) $e->user['id'] === (int) $user['id'];
+        }
+        $this->assertTrue($asked);
+
+        $raw = Crypto::token(32);
+        $this->db->insert('mfa_trusted_devices', [
+            'user_id' => (int) $user['id'],
+            'token_hash' => Crypto::hash($raw),
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'phpunit',
+            'expires_at' => Clock::nowUtc()->modify('+30 days')->format('Y-m-d H:i:s'),
+            'last_used_at' => Clock::utc(),
+            'created_at' => Clock::utc(),
+        ]);
+        $_COOKIE['privofit_mfa'] = $raw;
+        $logged = $this->auth->login($user['email'], 'spravne-dlouhe-heslo', $request);
+        $this->assertSame((int) $user['id'], (int) $logged['id']);
+
+        $other = Crypto::token(32);
+        $_COOKIE['privofit_mfa'] = $other;
+        $foreign = false;
+        try {
+            $this->auth->login($user['email'], 'spravne-dlouhe-heslo', $request);
+        } catch (MfaRequiredException) {
+            $foreign = true;
+        }
+        $this->assertTrue($foreign);
+
+        $_COOKIE['privofit_mfa'] = $raw;
+        $this->auth->logoutAll((int) $user['id']);
+        $left = $this->db->fetch('SELECT id FROM mfa_trusted_devices WHERE user_id = :id', ['id' => (int) $user['id']]);
+        $this->assertNull($left);
+        $this->assertArrayNotHasKey('privofit_mfa', $_COOKIE);
+
+        $again = false;
+        try {
+            $this->auth->login($user['email'], 'spravne-dlouhe-heslo', $request);
+        } catch (MfaRequiredException) {
+            $again = true;
+        }
+        $this->assertTrue($again);
     }
 
     public function testPresenceCheckDoesNotRefreshIdleClock(): void

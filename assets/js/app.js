@@ -44,7 +44,14 @@
         return;
       }
       const applyUrl = (url) => {
-        if (preview.tagName === "IMG") {
+        const previewImg = preview.querySelector?.("[data-avatar-preview-img]") || (preview.tagName === "IMG" ? preview : null);
+        const initials = preview.querySelector?.("[data-avatar-initials]");
+        if (previewImg && previewImg !== preview) {
+          previewImg.src = url;
+          previewImg.hidden = false;
+          preview.classList.add("has-photo");
+          if (initials) initials.hidden = true;
+        } else if (preview.tagName === "IMG") {
           preview.src = url;
         } else {
           preview.style.backgroundImage = "url('" + url + "')";

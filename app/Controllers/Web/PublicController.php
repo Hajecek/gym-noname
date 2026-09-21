@@ -229,8 +229,8 @@ final class PublicController extends Controller
     private function sendInitialsSvg(string $initials): never
     {
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">'
-            . '<rect width="128" height="128" rx="64" fill="#1A2940"/>'
-            . '<text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#42E8B4" font-family="Manrope, Inter, sans-serif" font-size="44" font-weight="700">'
+            . '<rect width="128" height="128" rx="64" fill="#1c2914"/>'
+            . '<text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#c6f21a" font-family="Syne, Figtree, sans-serif" font-size="44" font-weight="700">'
             . htmlspecialchars($initials, ENT_QUOTES)
             . '</text></svg>';
         header('Content-Type: image/svg+xml; charset=UTF-8');

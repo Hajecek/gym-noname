@@ -11,6 +11,8 @@ return [
         'http_only' => (bool) env_value('SESSION_HTTP_ONLY', true),
         'same_site' => env_value('SESSION_SAME_SITE', 'Lax'),
         'remember_days' => (int) env_value('REMEMBER_ME_DAYS', 30),
+        'mfa_trust_days' => (int) env_value('MFA_TRUST_DAYS', 30),
+        'mfa_trust_cookie' => 'privofit_mfa',
     ],
     'login' => [
         'max_attempts_account' => 5,

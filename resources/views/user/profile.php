@@ -5,6 +5,10 @@ $fullName = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''))
 $planName = $membership['plan_name'] ?? 'Bez tarifu';
 $mfaEnabled = !empty($mfaEnabled);
 $mfaRequired = !empty($mfaRequired);
+$initials = mb_strtoupper(mb_substr((string) ($user['first_name'] ?? ''), 0, 1) . mb_substr((string) ($user['last_name'] ?? ''), 0, 1));
+if ($initials === '') {
+    $initials = mb_strtoupper(mb_substr((string) ($user['username'] ?? 'PF'), 0, 2)) ?: 'PF';
+}
 ?>
 <div class="page-head">
     <div>
@@ -20,19 +24,27 @@ $mfaRequired = !empty($mfaRequired);
         <?= csrf_field() ?>
         <input id="profile-avatar-file" data-avatar-input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" hidden>
         <label class="profile-avatar-edit" for="profile-avatar-file">
-            <img class="avatar avatar-xl" data-avatar-preview src="<?= e(avatar_url($user)) ?>" alt="Profilová fotka">
+            <span class="profile-avatar-preview<?= $hasAvatar ? ' has-photo' : '' ?>" data-avatar-preview>
+                <span data-avatar-initials<?= $hasAvatar ? ' hidden' : '' ?>><?= e($initials) ?></span>
+                <img data-avatar-preview-img<?= $hasAvatar ? ' src="' . e(avatar_url($user)) . '"' : ' hidden' ?> alt="">
+            </span>
             <span class="profile-avatar-cam" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 8h2.5l1.6-2.4h6L17.7 8H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><circle cx="12.5" cy="14" r="3.4"/></svg>
             </span>
         </label>
         <div class="profile-hero-copy">
             <h2><?= e($fullName !== '' ? $fullName : $user['username']) ?></h2>
-            <p class="muted">@<?= e($user['username']) ?></p>
-            <div class="profile-meta">
-                <span class="profile-chip profile-chip-plan"><?= e($planName) ?></span>
-                <span class="profile-chip">Člen od <?= e(format_datetime($user['created_at'], 'd. m. Y')) ?></span>
-                <span class="profile-chip"><?= e(role_label($user['role'] ?? 'user')) ?></span>
-            </div>
+            <p class="muted">@<?= e($user['username']) ?> · <?= e(role_label($user['role'] ?? 'user')) ?></p>
+            <dl class="profile-facts">
+                <div>
+                    <dt>Člen od</dt>
+                    <dd><?= e(format_datetime($user['created_at'], 'd. m. Y')) ?></dd>
+                </div>
+                <div class="is-plan">
+                    <dt>Tarif</dt>
+                    <dd><?= e($planName) ?></dd>
+                </div>
+            </dl>
             <p class="avatar-picker-error" data-avatar-error hidden></p>
             <div class="profile-hero-actions">
                 <button class="btn btn-primary button-small" type="submit" data-avatar-save hidden>Uložit fotku</button>
@@ -91,9 +103,29 @@ $mfaRequired = !empty($mfaRequired);
         <h3>Dvoufaktorové ověření</h3>
         <span class="badge <?= $mfaEnabled ? 'badge-ok' : 'badge-warn' ?>"><?= $mfaEnabled ? 'Aktivní' : 'Vypnuto' ?></span>
     </div>
-    <p class="muted">Po hesle zadáš šestimístný kód z autentizační aplikace. Bez telefonu použiješ záložní kód.</p>
+    <p class="muted"><?= $mfaEnabled ? 'Heslo samo účet neotevře. Po něm je ještě druhý krok.' : 'Heslo samo o sobě účet neotevře. Přidej druhý krok.' ?></p>
+    <ul class="profile-mfa-points">
+        <li>
+            <span class="session-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M10 18h4"/></svg>
+            </span>
+            <span>
+                <strong>Kód z aplikace</strong>
+                <span>Šest číslic z Authenticatoru, 1Password nebo Authy.</span>
+            </span>
+        </li>
+        <li>
+            <span class="session-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M7 11V8a5 5 0 0 1 10 0v3"/><rect x="5" y="11" width="14" height="9" rx="2"/></svg>
+            </span>
+            <span>
+                <strong>Záložní kód</strong>
+                <span>Jednorázový kód, když nemáš telefon po ruce.</span>
+            </span>
+        </li>
+    </ul>
     <?php if ($mfaRequired): ?>
-        <p class="profile-note">Pro účet <?= e(role_label($user['role'] ?? 'admin')) ?> je zapnutí povinné.</p>
+        <p class="profile-note">U účtu <?= e(role_label($user['role'] ?? 'admin')) ?> je zapnutí povinné.</p>
     <?php endif; ?>
     <div class="profile-hero-actions">
         <?php if ($mfaEnabled): ?>
