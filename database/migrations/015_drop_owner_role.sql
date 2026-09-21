@@ -22,4 +22,4 @@ WHERE r.slug = 'owner';
 DELETE FROM roles WHERE slug = 'owner';
 
 ALTER TABLE users
-    MODIFY role ENUM('user', 'staff', 'admin') NOT NULL DEFAULT 'user';
+    MODIFY role ENUM('user', 'admin') NOT NULL DEFAULT 'user';

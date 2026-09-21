@@ -30,7 +30,7 @@
 <form method="post" action="<?= e(url('/admin/zakaznici/' . $customer['public_id'] . '/role')) ?>" style="margin-top:16px">
 <?= csrf_field() ?>
 <div class="field"><label>Role</label>
-<select name="role"><?php foreach (['user','staff','admin'] as $role): ?><option value="<?= $role ?>" <?= $customer['role']===$role?'selected':'' ?>><?= e(role_label($role)) ?></option><?php endforeach; ?></select>
+<select name="role"><?php foreach (['user','admin'] as $role): ?><option value="<?= $role ?>" <?= $customer['role']===$role?'selected':'' ?>><?= e(role_label($role)) ?></option><?php endforeach; ?></select>
 </div>
 <button class="btn btn-danger">Změnit roli</button>
 </form>

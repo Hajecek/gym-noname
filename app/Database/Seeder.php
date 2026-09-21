@@ -27,7 +27,6 @@ final class Seeder
     {
         $roles = [
             ['slug' => 'user', 'name' => 'Zákazník', 'description' => 'Běžný zákazník'],
-            ['slug' => 'staff', 'name' => 'Personál', 'description' => 'Provozní pracovník'],
             ['slug' => 'admin', 'name' => 'Administrátor', 'description' => 'Správce fitka'],
         ];
         foreach ($roles as $role) {
@@ -52,7 +51,6 @@ final class Seeder
             }
         }
         $map = [
-            'staff' => ['reservations.view', 'users.view'],
             'admin' => ['reservations.view', 'reservations.manage', 'users.view', 'users.manage', 'users.roles', 'content.manage', 'settings.manage', 'access.manage', 'payments.manage'],
         ];
         foreach ($map as $roleSlug => $slugs) {

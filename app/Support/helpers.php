@@ -110,7 +110,6 @@ function role_label(string $role): string
 {
     return match ($role) {
         'admin' => 'Administrátor',
-        'staff' => 'Personál',
         default => 'Zákazník',
     };
 }

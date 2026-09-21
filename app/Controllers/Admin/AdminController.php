@@ -108,7 +108,7 @@ final class AdminController extends Controller
         }
         $user = $this->app->db()->fetch('SELECT * FROM users WHERE public_id = :id', ['id' => $params['id']]);
         $role = (string) $request->input('role');
-        if (!in_array($role, ['user', 'staff', 'admin'], true) || !$user) {
+        if (!in_array($role, ['user', 'admin'], true) || !$user) {
             throw new HttpException(422, 'Neplatná role.');
         }
         if ($user['role'] === 'admin' && $role !== 'admin') {
