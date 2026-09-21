@@ -52,7 +52,11 @@ $recoveryLeft = (int) ($recoveryLeft ?? 0);
         <h3>Naskenuj QR kód</h3>
         <p class="muted">Otevři Google Authenticator, 1Password, Authy nebo jinou TOTP aplikaci a přidej účet PRIVOFIT.</p>
         <div class="mfa-qr">
-            <img src="<?= e((string) ($setup['qr_src'] ?? url('/user/zabezpeceni/mfa/qr'))) ?>" alt="QR kód pro dvoufaktorové ověření" width="220" height="220">
+            <?php if (!empty($setup['qr_svg'])): ?>
+                <?= $setup['qr_svg'] ?>
+            <?php else: ?>
+                <p class="muted">QR se nepodařilo vytvořit<?php if (!empty($setup['qr_error'])): ?>: <?= e((string) $setup['qr_error']) ?><?php endif; ?></p>
+            <?php endif; ?>
         </div>
         <p class="profile-current-label">Nebo zadej klíč ručně</p>
         <p class="mfa-secret"><code><?= e($setup['secret_grouped'] ?? $setup['secret'] ?? '') ?></code></p>

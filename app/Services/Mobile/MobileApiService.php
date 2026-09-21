@@ -191,7 +191,12 @@ final class MobileApiService
     public function quote(array $user, array $slotIds): array
     {
         $resolved = $this->reservations->resolveSlotIds($slotIds);
-        $price = $this->reservations->slotPrice();
+        $localStart = null;
+        if (isset($resolved[0]['start'])) {
+            $startUtc = new \DateTimeImmutable((string) $resolved[0]['start'], new \DateTimeZone('UTC'));
+            $localStart = Clock::toLocal($startUtc->format('Y-m-d H:i:s'));
+        }
+        $price = $this->reservations->slotPrice($localStart);
         $membership = $this->memberships->activeForUser((int) $user['id']);
         $covered = $membership && (
             $membership['entries_remaining'] === null
@@ -249,12 +254,7 @@ final class MobileApiService
         $holds = [];
         try {
             $this->reservations->releasePendingForSlots($user, $slotIds);
-            $ignoreIds = [];
-            foreach ($slotIds as $slotId) {
-                $hold = $this->reservations->createFromSlotId($user, (string) $slotId, true, $ignoreIds);
-                $ignoreIds[] = (int) $hold['id'];
-                $holds[] = $hold;
-            }
+            $holds = $this->reservations->createFromSlotIds($user, $slotIds, true);
 
             $settlement = $this->settleCheckout($user, $unit, $count, $total, $requestId, $applePay, $holds);
             $confirmed = [];

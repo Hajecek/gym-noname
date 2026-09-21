@@ -30,6 +30,97 @@ final class StripeGateway
     }
 
     /**
+     * @param array<string, string> $metadata
+     * @return array{id:string,url:string,status:string}
+     */
+    public function createCheckoutSession(
+        int $amountMinor,
+        string $currency,
+        string $description,
+        string $successUrl,
+        string $cancelUrl,
+        string $idempotencyKey,
+        array $metadata = [],
+        ?int $expiresAt = null,
+    ): array {
+        $this->assertAmount($amountMinor);
+        $fields = [
+            'mode' => 'payment',
+            'locale' => 'cs',
+            'submit_type' => 'pay',
+            'success_url' => $successUrl,
+            'cancel_url' => $cancelUrl,
+            'client_reference_id' => $metadata['payment'] ?? $idempotencyKey,
+            'managed_payments[enabled]' => 'false',
+            'line_items[0][quantity]' => '1',
+            'line_items[0][price_data][currency]' => strtolower($currency),
+            'line_items[0][price_data][unit_amount]' => (string) $amountMinor,
+            'line_items[0][price_data][product_data][name]' => $description,
+        ] + $this->metadataFields($metadata);
+        if ($expiresAt !== null) {
+            $fields['expires_at'] = (string) $expiresAt;
+        }
+        $session = $this->request('POST', '/v1/checkout/sessions', $fields, $idempotencyKey . ':cs');
+        $url = (string) ($session['url'] ?? '');
+        $id = (string) ($session['id'] ?? '');
+        if ($url === '' || $id === '') {
+            throw new HttpException(502, 'Stripe Checkout se nepodařilo otevřít.');
+        }
+        return [
+            'id' => $id,
+            'url' => $url,
+            'status' => (string) ($session['status'] ?? ''),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function retrieveCheckoutSession(string $sessionId): array
+    {
+        $sessionId = trim($sessionId);
+        if ($sessionId === '' || !str_starts_with($sessionId, 'cs_')) {
+            throw new HttpException(422, 'Neplatná platební relace.');
+        }
+        return $this->request('GET', '/v1/checkout/sessions/' . rawurlencode($sessionId), [], $sessionId . ':get');
+    }
+
+    /** @return array<string, mixed> */
+    public function parseWebhook(string $payload, string $signatureHeader, string $secret): array
+    {
+        if ($secret === '' || !str_starts_with($secret, 'whsec_')) {
+            throw new HttpException(503, 'Stripe webhook není nakonfigurovaný.');
+        }
+        $parts = [];
+        foreach (explode(',', $signatureHeader) as $item) {
+            [$key, $value] = array_pad(explode('=', trim($item), 2), 2, '');
+            $parts[$key][] = $value;
+        }
+        $timestamp = (string) (($parts['t'][0] ?? ''));
+        $signatures = $parts['v1'] ?? [];
+        if ($timestamp === '' || $signatures === []) {
+            throw new HttpException(400, 'Neplatný podpis Stripe.');
+        }
+        if (abs(time() - (int) $timestamp) > 300) {
+            throw new HttpException(400, 'Podpis Stripe vypršel.');
+        }
+        $expected = hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
+        $ok = false;
+        foreach ($signatures as $signature) {
+            if (hash_equals($expected, $signature)) {
+                $ok = true;
+                break;
+            }
+        }
+        if (!$ok) {
+            throw new HttpException(400, 'Neplatný podpis Stripe.');
+        }
+        $event = json_decode($payload, true);
+        if (!is_array($event)) {
+            throw new HttpException(400, 'Neplatné tělo webhooku.');
+        }
+        return $event;
+    }
+
+    /**
      * @return array{id:string,status:string}
      */
     /**
@@ -142,13 +233,16 @@ final class StripeGateway
             'Idempotency-Key: ' . $idempotencyKey,
             'Stripe-Version: 2024-06-20',
         ];
-        curl_setopt_array($ch, [
+        $opts = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST => $method,
-            CURLOPT_POSTFIELDS => http_build_query($fields),
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_TIMEOUT => 20,
-        ]);
+        ];
+        if ($method !== 'GET') {
+            $opts[CURLOPT_POSTFIELDS] = http_build_query($fields);
+        }
+        curl_setopt_array($ch, $opts);
         $raw = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);

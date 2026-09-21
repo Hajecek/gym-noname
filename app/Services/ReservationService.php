@@ -28,58 +28,146 @@ final class ReservationService
     public function availability(string $localDate, ?int $roomId = null): array
     {
         $room = $this->room($roomId);
-        $slotMinutes = $this->settings->int('reservation.slot_minutes', 60);
+        $slotMinutes = $this->slotMinutes();
         $minMinutes = $this->settings->int('reservation.min_minutes', 60);
         $maxMinutes = $this->settings->int('reservation.max_minutes', 180);
-        $buffer = $this->settings->int('reservation.buffer_minutes', 15);
+        $durationStep = $this->durationStep();
+        $buffer = $this->bufferMinutes();
         $maxPersons = (int) $room['max_persons'];
 
         $day = Clock::parseLocal($localDate . ' 00:00:00');
         $hours = $this->hoursForDate($room, $day);
+        $hourlyPrice = $this->hourlyFromHours($hours);
+        $meta = [
+            'date' => $localDate,
+            'slot_minutes' => $slotMinutes,
+            'min_minutes' => $minMinutes,
+            'max_minutes' => $maxMinutes,
+            'duration_step_minutes' => $durationStep,
+            'buffer_minutes' => $buffer,
+            'max_persons' => $maxPersons,
+            'hourly_price' => number_format($hourlyPrice, 2, '.', ''),
+        ];
         if ($hours['closed']) {
-            return [
-                'date' => $localDate,
-                'closed' => true,
-                'slots' => [],
-                'slot_minutes' => $slotMinutes,
-                'min_minutes' => $minMinutes,
-                'max_minutes' => $maxMinutes,
-                'buffer_minutes' => $buffer,
-                'max_persons' => $maxPersons,
-            ];
+            return $meta + ['closed' => true, 'slots' => []];
         }
 
         $open = Clock::parseLocal($localDate . ' ' . $hours['opens_at']);
         $close = Clock::parseLocal($localDate . ' ' . $hours['closes_at']);
         $nowLocal = Clock::nowLocal();
-        $occupied = $this->occupiedIntervals((int) $room['id'], Clock::toUtc($open)->format('Y-m-d H:i:s'), Clock::toUtc($close)->format('Y-m-d H:i:s'));
+        $occupied = $this->occupiedIntervals(
+            (int) $room['id'],
+            Clock::toUtc($open)->modify('-6 hours')->format('Y-m-d H:i:s'),
+            Clock::toUtc($close)->modify('+6 hours')->format('Y-m-d H:i:s')
+        );
 
-        $slots = [];
-        for ($cursor = $open; $cursor < $close; $cursor = $cursor->modify('+' . $slotMinutes . ' minutes')) {
-            $end = $cursor->modify('+' . $minMinutes . ' minutes');
-            if ($end > $close) {
-                break;
-            }
-            $utcStart = Clock::toUtc($cursor);
-            $available = $utcStart > Clock::nowUtc() && !$this->overlaps($occupied, $utcStart, Clock::toUtc($end), $buffer);
-            $slots[] = [
-                'start' => $cursor->format('H:i'),
-                'start_at' => $utcStart->format('Y-m-d H:i:s'),
-                'available' => $available,
-            ];
+        $durations = [];
+        for ($m = $minMinutes; $m <= $maxMinutes; $m += $durationStep) {
+            $durations[] = $m;
         }
 
-        return [
-            'date' => $localDate,
+        $slots = [];
+        foreach ($this->startCandidates($open, $close, $occupied, $durationStep) as $cursor) {
+            $fits = [];
+            $availableFor = [];
+            foreach ($durations as $minutes) {
+                $end = $cursor->modify('+' . $minutes . ' minutes');
+                if ($end > $close) {
+                    continue;
+                }
+                $fits[] = $minutes;
+                $utcStart = Clock::toUtc($cursor);
+                if ($utcStart > Clock::nowUtc() && !$this->overlaps($occupied, $utcStart, Clock::toUtc($end), $buffer)) {
+                    $availableFor[] = $minutes;
+                }
+            }
+            $endHour = $cursor->modify('+' . $minMinutes . ' minutes');
+            if ($endHour > $close) {
+                continue;
+            }
+            $utcStart = Clock::toUtc($cursor);
+            $past = $utcStart <= Clock::nowUtc();
+            $free = in_array($minMinutes, $availableFor, true);
+            $taken = $this->overlapsBody($occupied, $utcStart, Clock::toUtc($endHour));
+            if (!$free && !$past && !$taken) {
+                continue;
+            }
+            $kind = 'free';
+            if ($past) {
+                $kind = 'past';
+            } elseif (!$free) {
+                $kind = 'busy';
+            }
+            $slots[] = [
+                'start' => $cursor->format('H:i'),
+                'end' => $endHour->format('H:i'),
+                'start_at' => $utcStart->format('Y-m-d H:i:s'),
+                'past' => $past,
+                'available' => $free,
+                'kind' => $kind,
+                'fits' => $fits,
+                'available_for' => $availableFor,
+            ];
+        }
+        foreach ($occupied as $item) {
+            $gap = (int) ($item['buffer_minutes'] ?? 0);
+            if ($gap <= 0) {
+                continue;
+            }
+            $endLocal = Clock::toLocal((string) $item['ends_at']);
+            $bufferEnd = $endLocal->modify('+' . $gap . ' minutes');
+            if ($bufferEnd <= $open || $endLocal >= $close) {
+                continue;
+            }
+            $slots[] = [
+                'start' => $endLocal->format('H:i'),
+                'end' => $bufferEnd->format('H:i'),
+                'start_at' => (new \DateTimeImmutable((string) $item['ends_at'], new \DateTimeZone('UTC')))->format('Y-m-d H:i:s'),
+                'past' => Clock::toUtc($endLocal) <= Clock::nowUtc(),
+                'available' => false,
+                'kind' => 'buffer',
+                'fits' => [],
+                'available_for' => [],
+            ];
+        }
+        usort($slots, static fn (array $a, array $b): int => strcmp((string) $a['start'], (string) $b['start']));
+
+        return $meta + [
             'closed' => false,
             'slots' => $slots,
-            'slot_minutes' => $slotMinutes,
-            'min_minutes' => $minMinutes,
-            'max_minutes' => $maxMinutes,
-            'buffer_minutes' => $buffer,
-            'max_persons' => $maxPersons,
             'now' => $nowLocal->format('Y-m-d H:i:s'),
         ];
+    }
+
+    /** @return list<array{date:string,closed:bool,free:int}> */
+    public function monthOverview(int $year, int $month, ?int $roomId = null): array
+    {
+        if ($month < 1 || $month > 12 || $year < 2020 || $year > 2100) {
+            throw new HttpException(422, 'Neplatný měsíc.');
+        }
+        $start = \DateTimeImmutable::createFromFormat('Y-n-j', $year . '-' . $month . '-1', new \DateTimeZone(Clock::displayTimezone()));
+        if (!$start) {
+            throw new HttpException(422, 'Neplatný měsíc.');
+        }
+        $start = $start->setTime(0, 0);
+        $last = (int) $start->format('t');
+        $days = [];
+        for ($day = 1; $day <= $last; $day++) {
+            $date = $start->setDate($year, $month, $day)->format('Y-m-d');
+            $availability = $this->availability($date, $roomId);
+            $free = 0;
+            foreach ($availability['slots'] as $slot) {
+                if (!empty($slot['available'])) {
+                    $free++;
+                }
+            }
+            $days[] = [
+                'date' => $date,
+                'closed' => !empty($availability['closed']),
+                'free' => $free,
+            ];
+        }
+        return $days;
     }
 
     public function create(array $user, string $localStart, int $durationMinutes, int $guestCount, ?int $roomId = null, bool $paidCheckout = false, array $ignoreReservationIds = []): array
@@ -94,9 +182,9 @@ final class ReservationService
         $room = $this->room($roomId);
         $min = $this->settings->int('reservation.min_minutes', 60);
         $max = $this->settings->int('reservation.max_minutes', 180);
-        $buffer = $this->settings->int('reservation.buffer_minutes', 15);
-        $slot = $this->settings->int('reservation.slot_minutes', 60);
-        if ($durationMinutes < $min || $durationMinutes > $max || $durationMinutes % $slot !== 0) {
+        $buffer = $this->bufferMinutes();
+        $durationStep = $this->durationStep();
+        if ($durationMinutes < $min || $durationMinutes > $max || $durationMinutes % $durationStep !== 0) {
             throw new HttpException(422, 'Neplatná délka rezervace.');
         }
         if ($guestCount < 1 || $guestCount > (int) $room['max_persons']) {
@@ -122,7 +210,7 @@ final class ReservationService
             throw new HttpException(422, 'Termín je mimo provozní dobu.');
         }
 
-        $price = $this->priceForDuration($durationMinutes);
+        $price = $this->priceForDuration($durationMinutes, $this->hourlyFromHours($hours));
         $membership = $this->memberships->activeForUser((int) $user['id']);
         $useMembership = !$paidCheckout && $membership && ($membership['entries_remaining'] === null || (int) $membership['entries_remaining'] > 0);
 
@@ -135,7 +223,7 @@ final class ReservationService
         }
 
         try {
-            return $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $buffer, $guestCount, $price, $membership, $useMembership, $ignoreReservationIds) {
+            return $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $startLocal, $open, $buffer, $durationStep, $guestCount, $price, $membership, $useMembership, $ignoreReservationIds) {
                 $db->query('SELECT id FROM rooms WHERE id = :id FOR UPDATE', ['id' => (int) $room['id']]);
                 $db->query(
                     "SELECT id FROM reservations
@@ -152,6 +240,9 @@ final class ReservationService
                     $this->occupiedIntervals((int) $room['id'], $startUtc->modify('-6 hours')->format('Y-m-d H:i:s'), $endUtc->modify('+6 hours')->format('Y-m-d H:i:s')),
                     static fn (array $row): bool => !in_array((int) ($row['id'] ?? 0), $ignoreReservationIds, true)
                 ));
+                if (!$this->isValidStart($open, $startLocal, $occupied, $durationStep)) {
+                    throw new HttpException(422, 'Začátek musí být v celou hodinu, nebo hned po 15 minutách na převlečení.');
+                }
                 if ($this->overlaps($occupied, $startUtc, $endUtc, $buffer)) {
                     throw new HttpException(409, 'Tento termín je již obsazený.');
                 }
@@ -177,7 +268,7 @@ final class ReservationService
                     'created_at' => Clock::utc(),
                     'updated_at' => Clock::utc(),
                 ]);
-                $this->claimOccupancy($db, (int) $room['id'], $startUtc->format('Y-m-d H:i:s'), $id);
+                $this->claimOccupancy($db, (int) $room['id'], $startUtc, $endUtc, $buffer, $id);
 
                 $door = $db->fetch('SELECT id FROM doors WHERE room_id = :rid AND is_active = 1 LIMIT 1', ['rid' => (int) $room['id']]);
                 if ($door && $status === 'confirmed') {
@@ -267,6 +358,16 @@ final class ReservationService
         }
     }
 
+    public function find(string $publicId): ?array
+    {
+        return $this->db->fetch('SELECT * FROM reservations WHERE public_id = :pid', ['pid' => $publicId]);
+    }
+
+    public function findById(int $id): ?array
+    {
+        return $this->db->fetch('SELECT * FROM reservations WHERE id = :id', ['id' => $id]);
+    }
+
     public function owned(array $user, string $publicId, bool $admin = false): array
     {
         $reservation = $this->db->fetch('SELECT * FROM reservations WHERE public_id = :pid', ['pid' => $publicId]);
@@ -282,11 +383,11 @@ final class ReservationService
     public function forUser(int $userId): array
     {
         return $this->db->fetchAll(
-            'SELECT r.*, rm.name AS room_name
+            "SELECT r.*, rm.name AS room_name
              FROM reservations r
              INNER JOIN rooms rm ON rm.id = r.room_id
-             WHERE r.user_id = :uid
-             ORDER BY r.starts_at DESC',
+             WHERE r.user_id = :uid AND r.status <> 'expired'
+             ORDER BY r.starts_at DESC",
             ['uid' => $userId]
         );
     }
@@ -320,7 +421,7 @@ final class ReservationService
 
     public function expireHolds(): int
     {
-        $minutes = $this->settings->int('reservation.hold_minutes', 15);
+        $minutes = $this->settings->int('reservation.hold_minutes', 40);
         $limit = Clock::nowUtc()->modify('-' . $minutes . ' minutes')->format('Y-m-d H:i:s');
         $rows = $this->db->fetchAll(
             "SELECT id FROM reservations WHERE status = 'pending_payment' AND created_at < :limit",
@@ -392,25 +493,29 @@ final class ReservationService
             'SELECT * FROM opening_hour_exceptions WHERE room_id = :rid AND exception_date = :d',
             ['rid' => (int) $room['id'], 'd' => $date]
         );
-        if ($exception) {
-            return [
-                'closed' => (int) $exception['is_closed'] === 1,
-                'opens_at' => $exception['opens_at'] ?? '06:00:00',
-                'closes_at' => $exception['closes_at'] ?? '22:00:00',
-            ];
-        }
         $weekday = (int) $localDay->format('N');
         $hours = $this->db->fetch(
             'SELECT * FROM opening_hours WHERE room_id = :rid AND weekday = :w',
             ['rid' => (int) $room['id'], 'w' => $weekday]
         );
+        $hourlyPrice = $hours['hourly_price'] ?? null;
+
+        if ($exception) {
+            return [
+                'closed' => (int) $exception['is_closed'] === 1,
+                'opens_at' => $exception['opens_at'] ?? '06:00:00',
+                'closes_at' => $exception['closes_at'] ?? '22:00:00',
+                'hourly_price' => $hourlyPrice,
+            ];
+        }
         if (!$hours || (int) $hours['is_closed'] === 1) {
-            return ['closed' => true, 'opens_at' => '00:00:00', 'closes_at' => '00:00:00'];
+            return ['closed' => true, 'opens_at' => '00:00:00', 'closes_at' => '00:00:00', 'hourly_price' => $hourlyPrice];
         }
         return [
             'closed' => false,
             'opens_at' => $hours['opens_at'],
             'closes_at' => $hours['closes_at'],
+            'hourly_price' => $hourlyPrice,
         ];
     }
 
@@ -445,6 +550,18 @@ final class ReservationService
         return false;
     }
 
+    private function overlapsBody(array $occupied, \DateTimeImmutable $start, \DateTimeImmutable $end): bool
+    {
+        foreach ($occupied as $item) {
+            $existingStart = new \DateTimeImmutable((string) $item['starts_at'], new \DateTimeZone('UTC'));
+            $existingEnd = new \DateTimeImmutable((string) $item['ends_at'], new \DateTimeZone('UTC'));
+            if ($start < $existingEnd && $end > $existingStart) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function ensureOccupancyTable(): void
     {
         static $ready = false;
@@ -466,19 +583,38 @@ final class ReservationService
         }
     }
 
-    private function claimOccupancy(Database $db, int $roomId, string $startsAt, int $reservationId): void
+    private function occupancyTicks(\DateTimeImmutable $startUtc, \DateTimeImmutable $endUtc, int $buffer): array
     {
-        try {
-            $db->insert('reservation_occupancy', [
-                'room_id' => $roomId,
-                'starts_at' => $startsAt,
-                'reservation_id' => $reservationId,
-            ]);
-        } catch (\PDOException $e) {
-            if ($this->isDuplicateKey($e)) {
-                throw new HttpException(409, 'Tento termín je již obsazený.');
+        $step = 15;
+        $until = $endUtc->modify('+' . $buffer . ' minutes');
+        $ticks = [];
+        for ($cursor = $startUtc; $cursor < $until; $cursor = $cursor->modify('+' . $step . ' minutes')) {
+            $ticks[] = $cursor->format('Y-m-d H:i:s');
+        }
+        return $ticks;
+    }
+
+    private function claimOccupancy(
+        Database $db,
+        int $roomId,
+        \DateTimeImmutable $startUtc,
+        \DateTimeImmutable $endUtc,
+        int $buffer,
+        int $reservationId,
+    ): void {
+        foreach ($this->occupancyTicks($startUtc, $endUtc, $buffer) as $tick) {
+            try {
+                $db->insert('reservation_occupancy', [
+                    'room_id' => $roomId,
+                    'starts_at' => $tick,
+                    'reservation_id' => $reservationId,
+                ]);
+            } catch (\PDOException $e) {
+                if ($this->isDuplicateKey($e)) {
+                    throw new HttpException(409, 'Tento termín je již obsazený.');
+                }
+                throw $e;
             }
-        } catch (\Throwable) {
         }
     }
 
@@ -497,9 +633,13 @@ final class ReservationService
         return $sqlState === '23000' || $driver === 1062;
     }
 
-    public function slotPrice(): string
+    public function slotPrice(?\DateTimeImmutable $localStart = null): string
     {
-        return $this->priceForDuration($this->settings->int('reservation.min_minutes', 60));
+        $hourly = null;
+        if ($localStart !== null) {
+            $hourly = $this->hourlyFromHours($this->hoursForDate($this->room(), $localStart));
+        }
+        return $this->priceForDuration($this->settings->int('reservation.min_minutes', 60), $hourly);
     }
 
     /** @return list<array{id:string,start:string,end:string,room:string}> */
@@ -551,14 +691,75 @@ final class ReservationService
 
     public function createFromSlotId(array $user, string $slotId, bool $paidCheckout, array $ignoreReservationIds = []): array
     {
-        $slot = $this->decodeSlotId($slotId);
-        $startUtc = new \DateTimeImmutable($slot['start'], new \DateTimeZone('UTC'));
-        $local = Clock::toLocal($startUtc->format('Y-m-d H:i:s'))->format('Y-m-d H:i:s');
-        $room = $this->db->fetch('SELECT * FROM rooms WHERE public_id = :pid AND is_active = 1', [
-            'pid' => $this->roomPublicIdFromSlot($slotId),
-        ]);
-        $duration = $this->settings->int('reservation.min_minutes', 60);
-        return $this->create($user, $local, $duration, 1, $room ? (int) $room['id'] : null, $paidCheckout, $ignoreReservationIds);
+        $created = $this->createFromSlotIds($user, [$slotId], $paidCheckout, $ignoreReservationIds);
+        return $created[0];
+    }
+
+    /**
+     * @param list<string> $slotIds
+     * @param list<int> $ignoreReservationIds
+     * @return list<array<string, mixed>>
+     */
+    public function createFromSlotIds(array $user, array $slotIds, bool $paidCheckout, array $ignoreReservationIds = []): array
+    {
+        $groups = $this->groupConsecutiveSlots($this->resolveSlotIds($slotIds));
+        $created = [];
+        $ignore = $ignoreReservationIds;
+        foreach ($groups as $group) {
+            $room = $this->db->fetch('SELECT * FROM rooms WHERE public_id = :pid AND is_active = 1', [
+                'pid' => $this->roomPublicIdFromSlot($group['id']),
+            ]);
+            $reservation = $this->create(
+                $user,
+                $group['local_start'],
+                $group['duration'],
+                1,
+                $room ? (int) $room['id'] : null,
+                $paidCheckout,
+                $ignore
+            );
+            $ignore[] = (int) $reservation['id'];
+            $created[] = $reservation;
+        }
+        return $created;
+    }
+
+    /**
+     * @param list<array{id:string,start:string,end:string,room:string}> $slots
+     * @return list<array{id:string,local_start:string,duration:int,slots:list<array{id:string,start:string,end:string,room:string}>}>
+     */
+    public function groupConsecutiveSlots(array $slots): array
+    {
+        if ($slots === []) {
+            throw new HttpException(422, 'Vyberte alespoň jeden termín.');
+        }
+        usort($slots, static fn (array $a, array $b): int => strcmp($a['start'], $b['start']));
+        $groups = [];
+        $current = null;
+        foreach ($slots as $slot) {
+            $start = new \DateTimeImmutable($slot['start'], new \DateTimeZone('UTC'));
+            $end = new \DateTimeImmutable($slot['end'], new \DateTimeZone('UTC'));
+            if ($current !== null && $current['end_utc'] === $start->format('Y-m-d H:i:s')) {
+                $current['end_utc'] = $end->format('Y-m-d H:i:s');
+                $current['duration'] += (int) (($end->getTimestamp() - $start->getTimestamp()) / 60);
+                $current['slots'][] = $slot;
+                continue;
+            }
+            if ($current !== null) {
+                $groups[] = $current;
+            }
+            $current = [
+                'id' => $slot['id'],
+                'local_start' => Clock::toLocal($start->format('Y-m-d H:i:s'))->format('Y-m-d H:i:s'),
+                'end_utc' => $end->format('Y-m-d H:i:s'),
+                'duration' => (int) (($end->getTimestamp() - $start->getTimestamp()) / 60),
+                'slots' => [$slot],
+            ];
+        }
+        if ($current !== null) {
+            $groups[] = $current;
+        }
+        return $groups;
     }
 
     /** @param list<string> $slotIds */
@@ -590,18 +791,16 @@ final class ReservationService
 
     public function confirmPending(array $reservation, array $user): array
     {
-        if (($reservation['status'] ?? '') === 'confirmed') {
-            return $this->db->fetch('SELECT r.*, rm.name AS room_name FROM reservations r INNER JOIN rooms rm ON rm.id = r.room_id WHERE r.id = :id', [
+        $wasPending = ($reservation['status'] ?? '') === 'pending_payment';
+        if ($wasPending) {
+            $this->db->update('reservations', [
+                'status' => 'confirmed',
+                'updated_at' => Clock::utc(),
+            ], 'id = :id AND status = :pending', [
                 'id' => (int) $reservation['id'],
-            ]) ?? $reservation;
+                'pending' => 'pending_payment',
+            ]);
         }
-        $this->db->update('reservations', [
-            'status' => 'confirmed',
-            'updated_at' => Clock::utc(),
-        ], 'id = :id AND status = :pending', [
-            'id' => (int) $reservation['id'],
-            'pending' => 'pending_payment',
-        ]);
         $fresh = $this->db->fetch('SELECT r.*, rm.name AS room_name FROM reservations r INNER JOIN rooms rm ON rm.id = r.room_id WHERE r.id = :id', [
             'id' => (int) $reservation['id'],
         ]);
@@ -631,12 +830,14 @@ final class ReservationService
             }
         }
         try {
-            $this->mail->queue('reservation-confirmed', $user['email'], [
-                'subject' => 'Potvrzení rezervace PRIVOFIT',
-                'first_name' => $user['first_name'],
-                'starts_at' => Clock::format($fresh['starts_at']),
-                'ends_at' => Clock::format($fresh['ends_at']),
-            ], (int) $user['id']);
+            if ($wasPending) {
+                $this->mail->queue('reservation-confirmed', $user['email'], [
+                    'subject' => 'Potvrzení rezervace PRIVOFIT',
+                    'first_name' => $user['first_name'],
+                    'starts_at' => Clock::format($fresh['starts_at']),
+                    'ends_at' => Clock::format($fresh['ends_at']),
+                ], (int) $user['id']);
+            }
         } catch (\Throwable) {
             // rezervace platí i bez e-mailu
         }
@@ -687,9 +888,75 @@ final class ReservationService
         return substr($slotId, 0, 36);
     }
 
-    private function priceForDuration(int $minutes): string
+    private function slotMinutes(): int
     {
-        $hourly = (float) $this->settings->get('pricing.hourly', 249);
+        return max(1, $this->settings->int('reservation.slot_minutes', 15));
+    }
+
+    private function bufferMinutes(): int
+    {
+        return max(0, $this->settings->int('reservation.buffer_minutes', 15));
+    }
+
+    private function durationStep(): int
+    {
+        return 60;
+    }
+
+    /**
+     * Začátky po hodinách od otevíračky + čas hned po 15 min úklidu po existující rezervaci.
+     *
+     * @param list<array<string, mixed>> $occupied
+     * @return list<\DateTimeImmutable>
+     */
+    private function startCandidates(\DateTimeImmutable $open, \DateTimeImmutable $close, array $occupied, int $hourMinutes): array
+    {
+        $candidates = [];
+        for ($cursor = $open; $cursor < $close; $cursor = $cursor->modify('+' . $hourMinutes . ' minutes')) {
+            $candidates[$cursor->format('Y-m-d H:i:s')] = $cursor;
+        }
+        foreach ($occupied as $item) {
+            $endUtc = new \DateTimeImmutable((string) $item['ends_at'], new \DateTimeZone('UTC'));
+            $gap = (int) ($item['buffer_minutes'] ?? 0);
+            $next = Clock::toLocal($endUtc->modify('+' . $gap . ' minutes')->format('Y-m-d H:i:s'));
+            if ($next >= $open && $next < $close) {
+                $candidates[$next->format('Y-m-d H:i:s')] = $next;
+            }
+        }
+        ksort($candidates);
+        return array_values($candidates);
+    }
+
+    /** @param list<array<string, mixed>> $occupied */
+    private function isValidStart(\DateTimeImmutable $open, \DateTimeImmutable $startLocal, array $occupied, int $hourMinutes): bool
+    {
+        $delta = (int) floor(($startLocal->getTimestamp() - $open->getTimestamp()) / 60);
+        if ($delta >= 0 && $delta % $hourMinutes === 0) {
+            return true;
+        }
+        foreach ($occupied as $item) {
+            $endUtc = new \DateTimeImmutable((string) $item['ends_at'], new \DateTimeZone('UTC'));
+            $gap = (int) ($item['buffer_minutes'] ?? 0);
+            $next = Clock::toLocal($endUtc->modify('+' . $gap . ' minutes')->format('Y-m-d H:i:s'));
+            if ($next->format('Y-m-d H:i') === $startLocal->format('Y-m-d H:i')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function hourlyFromHours(array $hours): float
+    {
+        $override = $hours['hourly_price'] ?? null;
+        if ($override !== null && $override !== '' && is_numeric($override)) {
+            return (float) $override;
+        }
+        return (float) $this->settings->get('pricing.hourly', 150);
+    }
+
+    private function priceForDuration(int $minutes, ?float $hourlyOverride = null): string
+    {
+        $hourly = $hourlyOverride ?? (float) $this->settings->get('pricing.hourly', 150);
         $hours = max(1, (int) ceil($minutes / 60));
         return number_format($hourly * $hours, 2, '.', '');
     }

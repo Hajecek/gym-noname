@@ -170,15 +170,15 @@ final class Seeder
     private function settings(): void
     {
         $defaults = [
-            'reservation.slot_minutes' => 60,
+            'reservation.slot_minutes' => 15,
             'reservation.min_minutes' => 60,
             'reservation.max_minutes' => 180,
             'reservation.buffer_minutes' => 15,
-            'reservation.hold_minutes' => 15,
+            'reservation.hold_minutes' => 40,
             'reservation.cancellation_hours' => 12,
             'access.early_minutes' => 10,
             'access.late_minutes' => 10,
-            'pricing.hourly' => 249,
+            'pricing.hourly' => 150,
             'contact.address' => 'Adresa studia bude doplněna v administraci.',
             'contact.email' => 'ahoj@privofit.cz',
             'contact.phone' => '',

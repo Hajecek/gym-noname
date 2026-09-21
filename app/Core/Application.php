@@ -91,7 +91,7 @@ final class Application
         try {
             $this->auth->hydrate($request);
 
-            if (!$request->isApi()) {
+            if (!$request->isApi() && $request->path() !== '/platba/stripe') {
                 if (!Csrf::verifyRequest($request)) {
                     if ($request->wantsJson()) {
                         Response::error('Neplatný bezpečnostní token. Obnovte stránku a zkuste to znovu.', 419);
@@ -199,6 +199,17 @@ final class Application
         return ($base === '' ? '' : $base) . ($path === '/' ? '/' : $path);
     }
 
+    public function absoluteUrl(string $path = '/'): string
+    {
+        $relative = $this->url($path);
+        if (preg_match('#^https?://#i', $relative) === 1) {
+            return $relative;
+        }
+        $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+        $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        return ($https ? 'https' : 'http') . '://' . $host . $relative;
+    }
+
     public function abort(int $status, string $message = ''): never
     {
         if ($this->request->wantsJson()) {
@@ -247,7 +258,7 @@ final class Application
             "connect-src 'self'",
             "frame-ancestors 'none'",
             "base-uri 'self'",
-            "form-action 'self'",
+            "form-action 'self' https://checkout.stripe.com",
         ]);
         header('Content-Security-Policy: ' . $csp);
         if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {

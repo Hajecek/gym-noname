@@ -194,13 +194,21 @@ h3 { font-size: 1.15rem; }
 .bottom-nav a { flex-direction: column; font-size: .68rem; letter-spacing: .02em; justify-content: center; }
 .bottom-nav svg { width: 20px; height: 20px; }
 
-.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .slot {
   border: 1px solid var(--border); border-radius: 12px; min-height: 44px;
   background: var(--bg-secondary); color: var(--text-primary); cursor: pointer;
 }
 .slot.busy { opacity: .35; cursor: not-allowed; }
 .slot.selected { border-color: var(--accent); background: rgba(66,232,180,.12); }
+.slot[hidden] { display: none; }
+.hours-day {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.field .muted { margin: 6px 0 0; font-size: .85rem; }
 
 .badge { display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; }
 .badge-ok { background: rgba(66,232,180,.12); color: var(--accent); }
@@ -231,6 +239,6 @@ th { color: var(--text-secondary); font-weight: 600; }
   .bottom-nav { display: none; }
   .app-main { padding: 32px 36px; }
   .site-footer { padding-bottom: 32px; }
-  .slots { grid-template-columns: repeat(6, 1fr); }
+  .slots { grid-template-columns: repeat(8, 1fr); }
   .hero-grid { grid-template-columns: 1.2fr .8fr; align-items: center; }
 }

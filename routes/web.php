@@ -9,6 +9,7 @@ use App\Controllers\User\ProfileController;
 use App\Controllers\User\ReservationController;
 use App\Controllers\Web\AuthController;
 use App\Controllers\Web\PublicController;
+use App\Controllers\Web\StripeWebhookController;
 use App\Middleware\AdminMiddleware;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\GuestMiddleware;
@@ -47,7 +48,11 @@ $router->post('/user/overeni', [DashboardController::class, 'resendVerification'
 $router->get('/user/vstup', [DashboardController::class, 'access'], [AuthMiddleware::class]);
 $router->post('/user/vstup', [DashboardController::class, 'openDoor'], [AuthMiddleware::class]);
 $router->get('/user/rezervace', [ReservationController::class, 'index'], [AuthMiddleware::class]);
+$router->get('/user/rezervace/dostupnost', [ReservationController::class, 'availability'], [AuthMiddleware::class]);
+$router->get('/user/rezervace/kalendar', [ReservationController::class, 'calendar'], [AuthMiddleware::class]);
 $router->post('/user/rezervace', [ReservationController::class, 'store'], [AuthMiddleware::class]);
+$router->get('/user/rezervace/platba', [ReservationController::class, 'paid'], [AuthMiddleware::class]);
+$router->get('/user/rezervace/platba/zruseno', [ReservationController::class, 'checkoutCancel'], [AuthMiddleware::class]);
 $router->post('/user/rezervace/{id}/zrusit', [ReservationController::class, 'cancel'], [AuthMiddleware::class]);
 $router->get('/user/clenstvi', [ProfileController::class, 'membership'], [AuthMiddleware::class]);
 $router->get('/user/profil', [ProfileController::class, 'index'], [AuthMiddleware::class]);
@@ -92,3 +97,5 @@ $router->get('/admin/zajem', [AdminController::class, 'interest'], [AuthMiddlewa
 $router->get('/admin/zajem/export', [AdminController::class, 'exportInterest'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/admin/nastaveni', [AdminController::class, 'settings'], [AuthMiddleware::class, OwnerMiddleware::class]);
 $router->post('/admin/nastaveni', [AdminController::class, 'saveSettings'], [AuthMiddleware::class, OwnerMiddleware::class]);
+
+$router->post('/platba/stripe', [StripeWebhookController::class, 'handle']);

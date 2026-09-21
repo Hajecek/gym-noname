@@ -145,6 +145,8 @@ final class AdminController extends Controller
             'today' => $service->today((int) $room['id']),
             'hours' => $this->app->db()->fetchAll('SELECT * FROM opening_hours WHERE room_id = :id ORDER BY weekday', ['id' => (int) $room['id']]),
             'exceptions' => $this->app->db()->fetchAll('SELECT * FROM opening_hour_exceptions WHERE room_id = :id ORDER BY exception_date DESC LIMIT 40', ['id' => (int) $room['id']]),
+            'hourly_price' => $this->app->settings()->get('pricing.hourly', 150),
+            'buffer_minutes' => $this->app->settings()->int('reservation.buffer_minutes', 15),
         ], 'layouts/admin');
     }
 
@@ -186,15 +188,28 @@ final class AdminController extends Controller
     public function openingHours(Request $request): never
     {
         $room = ReservationService::make($this->app->db())->room();
+        $defaultPrice = trim((string) $request->input('default_hourly_price', ''));
+        if ($defaultPrice !== '') {
+            $this->app->settings()->set('pricing.hourly', number_format((float) str_replace(',', '.', $defaultPrice), 2, '.', ''));
+        }
         foreach (range(1, 7) as $day) {
             $open = (string) $request->input('opens_' . $day, '06:00');
             $close = (string) $request->input('closes_' . $day, '22:00');
             $closed = $request->input('closed_' . $day) ? 1 : 0;
+            $rawPrice = trim((string) $request->input('price_' . $day, ''));
+            $hourlyPrice = $rawPrice === '' ? null : number_format((float) str_replace(',', '.', $rawPrice), 2, '.', '');
             $this->app->db()->query(
-                'INSERT INTO opening_hours (room_id, weekday, opens_at, closes_at, is_closed)
-                 VALUES (:rid, :d, :o, :c, :x)
-                 ON DUPLICATE KEY UPDATE opens_at = VALUES(opens_at), closes_at = VALUES(closes_at), is_closed = VALUES(is_closed)',
-                ['rid' => (int) $room['id'], 'd' => $day, 'o' => $open . ':00', 'c' => $close . ':00', 'x' => $closed]
+                'INSERT INTO opening_hours (room_id, weekday, opens_at, closes_at, is_closed, hourly_price)
+                 VALUES (:rid, :d, :o, :c, :x, :p)
+                 ON DUPLICATE KEY UPDATE opens_at = VALUES(opens_at), closes_at = VALUES(closes_at), is_closed = VALUES(is_closed), hourly_price = VALUES(hourly_price)',
+                [
+                    'rid' => (int) $room['id'],
+                    'd' => $day,
+                    'o' => strlen($open) === 5 ? $open . ':00' : $open,
+                    'c' => strlen($close) === 5 ? $close . ':00' : $close,
+                    'x' => $closed,
+                    'p' => $hourlyPrice,
+                ]
             );
         }
         $this->flashSuccess('Provozní doba byla uložena.');

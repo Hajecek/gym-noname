@@ -339,6 +339,7 @@ CREATE TABLE IF NOT EXISTS opening_hours (
     opens_at TIME NOT NULL,
     closes_at TIME NOT NULL,
     is_closed TINYINT(1) NOT NULL DEFAULT 0,
+    hourly_price DECIMAL(12,2) DEFAULT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uq_opening_hours_room_day (room_id, weekday),
     CONSTRAINT fk_opening_hours_room FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE
@@ -400,6 +401,14 @@ CREATE TABLE IF NOT EXISTS blocked_slots (
     KEY idx_blocked_slots_room_time (room_id, starts_at, ends_at),
     CONSTRAINT fk_blocked_slots_room FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE,
     CONSTRAINT fk_blocked_slots_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS reservation_occupancy (
+    room_id BIGINT UNSIGNED NOT NULL,
+    starts_at DATETIME NOT NULL,
+    reservation_id BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (room_id, starts_at),
+    KEY idx_reservation_occupancy_reservation (reservation_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------

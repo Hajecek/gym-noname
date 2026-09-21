@@ -22,7 +22,7 @@ return [
     'password_reset_ttl_minutes' => 30,
     'access_token_ttl_minutes' => 15,
     'refresh_token_ttl_days' => 30,
-    'reservation_hold_minutes' => 15,
+    'reservation_hold_minutes' => 40,
     'cancellation_hours' => 12,
     'early_access_minutes' => 10,
     'late_access_minutes' => 10,

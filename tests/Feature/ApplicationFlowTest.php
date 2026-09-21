@@ -80,7 +80,18 @@ final class ApplicationFlowTest extends TestCase
         $user = $this->createVerifiedUser('res');
         $this->grantMembership((int) $user['id']);
         $hour = 9 + (hexdec(bin2hex(random_bytes(1))) % 8);
-        $start = Clock::nowLocal()->modify('+8 days')->setTime($hour, 0)->format('Y-m-d H:i');
+        $startLocal = Clock::nowLocal()->modify('+8 days')->setTime($hour, 0);
+        $start = $startLocal->format('Y-m-d H:i');
+        $from = Clock::toUtc($startLocal->modify('-1 hour'))->format('Y-m-d H:i:s');
+        $to = Clock::toUtc($startLocal->modify('+3 hours'))->format('Y-m-d H:i:s');
+        $this->db->query(
+            "UPDATE reservations SET status = 'cancelled' WHERE starts_at >= :a AND starts_at < :b AND status IN ('pending_payment', 'confirmed')",
+            ['a' => $from, 'b' => $to]
+        );
+        try {
+            $this->db->query('DELETE FROM reservation_occupancy WHERE starts_at >= :a AND starts_at < :b', ['a' => $from, 'b' => $to]);
+        } catch (\Throwable) {
+        }
         $first = ReservationService::make($this->db)->create($user, $start, 60, 1);
         $this->assertSame('confirmed', $first['status']);
         $this->expectException(\App\Core\HttpException::class);
@@ -99,7 +110,13 @@ final class ApplicationFlowTest extends TestCase
             ['s' => $startUtc]
         );
         try {
-            $this->db->query('DELETE FROM reservation_occupancy WHERE starts_at = :s', ['s' => $startUtc]);
+            $this->db->query(
+                'DELETE FROM reservation_occupancy WHERE starts_at >= :a AND starts_at < :b',
+                [
+                    'a' => $startUtc,
+                    'b' => Clock::toUtc($startLocal->modify('+2 hours'))->format('Y-m-d H:i:s'),
+                ]
+            );
         } catch (\Throwable) {
         }
         $service = ReservationService::make($this->db);
@@ -111,6 +128,123 @@ final class ApplicationFlowTest extends TestCase
         $second = $service->create($user, $start, 60, 1);
         $this->assertSame('confirmed', $second['status']);
         $this->assertNotSame($first['id'], $second['id']);
+    }
+
+    public function testBufferKeepsFifteenMinutesBetweenReservations(): void
+    {
+        $user = $this->createVerifiedUser('buf');
+        $this->grantMembership((int) $user['id']);
+        $day = Clock::nowLocal()->modify('+11 days')->setTime(10, 0);
+        $from = Clock::toUtc($day)->format('Y-m-d H:i:s');
+        $to = Clock::toUtc($day->modify('+4 hours'))->format('Y-m-d H:i:s');
+        $this->db->query(
+            "UPDATE reservations SET status = 'cancelled' WHERE starts_at >= :a AND starts_at < :b AND status IN ('pending_payment', 'confirmed')",
+            ['a' => $from, 'b' => $to]
+        );
+        try {
+            $this->db->query('DELETE FROM reservation_occupancy WHERE starts_at >= :a AND starts_at < :b', ['a' => $from, 'b' => $to]);
+        } catch (\Throwable) {
+        }
+        $service = ReservationService::make($this->db);
+        $first = $service->create($user, $day->format('Y-m-d H:i'), 60, 1);
+        $this->assertSame('confirmed', $first['status']);
+        $availability = $service->availability($day->format('Y-m-d'));
+        $byStart = [];
+        foreach ($availability['slots'] as $slot) {
+            $byStart[$slot['start']] = $slot;
+        }
+        $this->assertSame('buffer', $byStart['11:00']['kind'] ?? '');
+        $this->assertFalse(!empty($byStart['11:00']['available']));
+        $this->assertTrue(!empty($byStart['11:15']['available']));
+        try {
+            $service->create($user, $day->modify('+60 minutes')->format('Y-m-d H:i'), 60, 1);
+            $this->fail('Hodina hned po tréninku musí být blokovaná 15min rezervou.');
+        } catch (\App\Core\HttpException $e) {
+            $this->assertSame(409, $e->status);
+        }
+        $next = $service->create($user, $day->modify('+75 minutes')->format('Y-m-d H:i'), 60, 1);
+        $this->assertSame('confirmed', $next['status']);
+    }
+
+    public function testTwoHourBlockIsContinuousAndBufferIsOnlyAfter(): void
+    {
+        $user = $this->createVerifiedUser('twoh');
+        $this->grantMembership((int) $user['id']);
+        $day = Clock::nowLocal()->modify('+12 days')->setTime(10, 0);
+        $from = Clock::toUtc($day)->format('Y-m-d H:i:s');
+        $to = Clock::toUtc($day->modify('+5 hours'))->format('Y-m-d H:i:s');
+        $this->db->query(
+            "UPDATE reservations SET status = 'cancelled' WHERE starts_at >= :a AND starts_at < :b AND status IN ('pending_payment', 'confirmed')",
+            ['a' => $from, 'b' => $to]
+        );
+        try {
+            $this->db->query('DELETE FROM reservation_occupancy WHERE starts_at >= :a AND starts_at < :b', ['a' => $from, 'b' => $to]);
+        } catch (\Throwable) {
+        }
+        $service = ReservationService::make($this->db);
+        $block = $service->create($user, $day->format('Y-m-d H:i'), 120, 1);
+        $this->assertSame('confirmed', $block['status']);
+        $endLocal = Clock::toLocal($block['ends_at']);
+        $this->assertSame('12:00', $endLocal->format('H:i'));
+
+        $availability = $service->availability($day->format('Y-m-d'));
+        $availableStarts = [];
+        $allStarts = [];
+        foreach ($availability['slots'] as $slot) {
+            $allStarts[] = $slot['start'];
+            if (!empty($slot['available'])) {
+                $availableStarts[] = $slot['start'];
+            }
+        }
+        $this->assertNotContains('10:15', $allStarts);
+        $this->assertNotContains('10:30', $allStarts);
+        $this->assertNotContains('11:00', $availableStarts);
+        $this->assertContains('12:15', $availableStarts);
+
+        try {
+            $service->create($user, $day->modify('+60 minutes')->format('Y-m-d H:i'), 60, 1);
+            $this->fail('Uprostřed dvouhodinového bloku nesmí jít další rezervace.');
+        } catch (\App\Core\HttpException $e) {
+            $this->assertContains($e->status, [409, 422]);
+        }
+        $next = $service->create($user, $day->modify('+135 minutes')->format('Y-m-d H:i'), 60, 1);
+        $this->assertSame('confirmed', $next['status']);
+    }
+
+    public function testPaidHoldConfirmsAfterCheckoutFulfillment(): void
+    {
+        $user = $this->createVerifiedUser('stripe');
+        $day = Clock::nowLocal()->modify('+16 days')->setTime(10, 0);
+        $from = Clock::toUtc($day)->format('Y-m-d H:i:s');
+        $to = Clock::toUtc($day->modify('+5 hours'))->format('Y-m-d H:i:s');
+        $this->db->query(
+            "UPDATE reservations SET status = 'cancelled' WHERE starts_at >= :a AND starts_at < :b AND status IN ('pending_payment', 'confirmed')",
+            ['a' => $from, 'b' => $to]
+        );
+        try {
+            $this->db->query('DELETE FROM reservation_occupancy WHERE starts_at >= :a AND starts_at < :b', ['a' => $from, 'b' => $to]);
+        } catch (\Throwable) {
+        }
+        $service = ReservationService::make($this->db);
+        $hold = $service->create($user, $day->format('Y-m-d H:i'), 60, 1);
+        $this->assertSame('pending_payment', $hold['status']);
+        $this->assertGreaterThan(0, (float) $hold['price']);
+
+        $confirmed = $service->confirmPending($hold, $user);
+        $this->assertSame('confirmed', $confirmed['status']);
+        $permission = $this->db->fetch('SELECT id FROM access_permissions WHERE reservation_id = :id', ['id' => (int) $confirmed['id']]);
+        $this->assertNotEmpty($permission);
+
+        $other = $this->createVerifiedUser('strp2');
+        $later = $day->modify('+3 hours')->format('Y-m-d H:i');
+        $hold2 = $service->create($other, $later, 60, 1);
+        $this->assertSame('pending_payment', $hold2['status']);
+        $service->failPending($hold2);
+        $fresh = $this->db->fetch('SELECT status FROM reservations WHERE id = :id', ['id' => (int) $hold2['id']]);
+        $this->assertSame('expired', $fresh['status']);
+        $again = $service->create($other, $later, 60, 1);
+        $this->assertSame('pending_payment', $again['status']);
+        $this->assertNotSame($hold2['id'], $again['id']);
     }
 
     public function testDoorOpenWithoutReservationIsDenied(): void

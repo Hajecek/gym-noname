@@ -189,11 +189,12 @@ final class ProfileController extends Controller
         $recoveryLeft = $enabled ? $auth->remainingRecoveryCodes((int) $user['id']) : 0;
         if (is_array($setup)) {
             try {
-                $setup['qr_src'] = QrSvg::dataUri((string) $setup['otpauth']);
+                $setup['qr_svg'] = QrSvg::inline((string) $setup['otpauth']);
             } catch (\Throwable $e) {
                 Logger::error($e->getMessage(), ['file' => $e->getFile(), 'line' => $e->getLine()]);
-                error_log('PRIVOFIT QR: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
-                $setup['qr_src'] = url('/user/zabezpeceni/mfa/qr');
+                error_log('PRIVOFIT QR: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+                $setup['qr_svg'] = '';
+                $setup['qr_error'] = $e->getMessage();
             }
         }
         if (session_status() === PHP_SESSION_ACTIVE) {

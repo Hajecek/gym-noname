@@ -159,7 +159,7 @@ final class Request
         if (!str_contains($contentType, 'application/json')) {
             return $this->json;
         }
-        $raw = file_get_contents('php://input');
+        $raw = $this->rawBody();
         if (!is_string($raw) || $raw === '') {
             return $this->json;
         }
@@ -178,6 +178,16 @@ final class Request
             return null;
         }
         return $file;
+    }
+
+    public function rawBody(): string
+    {
+        static $raw = null;
+        if ($raw === null) {
+            $read = file_get_contents('php://input');
+            $raw = is_string($read) ? $read : '';
+        }
+        return $raw;
     }
 
     public function wantsJson(): bool
