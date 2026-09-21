@@ -238,7 +238,7 @@
     if (barTime) barTime.textContent = first.start + "–" + end;
     if (barMeta) {
       barMeta.textContent = membershipCovers
-        ? hoursWord(count) + " · z členství"
+        ? hoursWord(count) + " · odečte se 1 vstup"
         : hoursWord(count) + " · " + money(price);
     }
     if (guestCountEl) guestCountEl.textContent = String(state.guests);

@@ -35,6 +35,22 @@ final class PaymentService
         return $this->db->fetch('SELECT * FROM payments WHERE id = :id', ['id' => $id]) ?? [];
     }
 
+    public function createStripeMembership(array $user, string $amount, int $membershipId): array
+    {
+        $id = (int) $this->db->insert('payments', [
+            'public_id' => Crypto::uuid(),
+            'user_id' => (int) $user['id'],
+            'membership_id' => $membershipId,
+            'provider' => 'stripe',
+            'amount' => $amount,
+            'currency' => 'CZK',
+            'status' => 'pending',
+            'created_at' => Clock::utc(),
+            'updated_at' => Clock::utc(),
+        ]);
+        return $this->db->fetch('SELECT * FROM payments WHERE id = :id', ['id' => $id]) ?? [];
+    }
+
     public function createStripeHold(array $user, string $amount, int $reservationId): array
     {
         $id = (int) $this->db->insert('payments', [

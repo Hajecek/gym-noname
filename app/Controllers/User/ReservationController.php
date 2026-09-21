@@ -26,8 +26,9 @@ final class ReservationController extends Controller
         $rooms = $service->activeRooms();
         $room = $service->roomByPublicId((string) $request->query('room', '')) ?? ($rooms[0] ?? null);
         $roomId = $room ? (int) $room['id'] : null;
-        $membership = (new MembershipService($this->app->db()))->activeForUser((int) $user['id']);
-        $covers = $membership && ($membership['entries_remaining'] === null || (int) $membership['entries_remaining'] > 0);
+        $memberships = new MembershipService($this->app->db());
+        $membership = $memberships->activeForUser((int) $user['id']);
+        $covers = $memberships->coversBooking($membership);
         $this->view('user/reservations', [
             'title' => 'Rezervace',
             'availability' => $service->availability($date, $roomId),
@@ -84,7 +85,9 @@ final class ReservationController extends Controller
                 $room ? (int) $room['id'] : null
             );
             if (($reservation['status'] ?? '') === 'confirmed' || (float) ($reservation['price'] ?? 0) <= 0) {
-                $this->flashSuccess('Rezervace je potvrzená.');
+                $this->flashSuccess(!empty($reservation['membership_id'])
+                    ? 'Rezervace je potvrzená. Vstup se odečetl z členství.'
+                    : 'Rezervace je potvrzená.');
                 if ($request->wantsJson()) {
                     $this->jsonOk(['redirect' => $this->app->url($back)]);
                 }

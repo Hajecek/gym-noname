@@ -196,10 +196,10 @@ final class MobileApiService
             $sum += (float) ($slot['price'] ?? 0);
         }
         $membership = $this->memberships->activeForUser((int) $user['id']);
-        $covered = $membership && (
-            $membership['entries_remaining'] === null
-            || (int) $membership['entries_remaining'] >= count($resolved)
-        );
+        $covered = $this->memberships->coversBooking($membership);
+        if ($covered && $membership['entries_remaining'] !== null && (int) $membership['entries_remaining'] < count($resolved)) {
+            $covered = false;
+        }
         if ($covered) {
             $resolved = array_map(static function (array $slot): array {
                 $slot['price'] = '0.00';

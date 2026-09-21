@@ -14,6 +14,7 @@ use App\Support\QrSvg;
 use App\Services\Auth\AuthService;
 use App\Services\Auth\ValidationException;
 use App\Services\AvatarService;
+use App\Services\Billing\CheckoutService;
 use App\Services\Billing\PaymentService;
 use App\Services\MembershipService;
 use App\Services\ReservationService;
@@ -46,7 +47,55 @@ final class ProfileController extends Controller
             'plans' => $service->plans(),
             'current' => $service->activeForUser((int) $user['id']),
             'history' => $service->history((int) $user['id']),
+            'pageScripts' => ['js/membership.js'],
         ]);
+    }
+
+    public function buyMembership(Request $request): never
+    {
+        $user = $this->requireUser();
+        $service = new MembershipService($this->app->db());
+        try {
+            $pending = $service->beginPurchase((int) $user['id'], (string) $request->input('plan', ''));
+            $url = CheckoutService::make($this->app->db())->startMembership($user, $pending, $this->app);
+        } catch (HttpException $e) {
+            if ($request->wantsJson()) {
+                $this->jsonError($e->getMessage(), $e->status);
+            }
+            $this->flashError($e->getMessage());
+            $this->redirect('/user/clenstvi');
+        }
+        if ($request->wantsJson()) {
+            $this->jsonOk(['checkout_url' => $url]);
+        }
+        Response::redirect($url);
+    }
+
+    public function membershipPaid(Request $request): never
+    {
+        $user = $this->requireUser();
+        $sessionId = trim((string) $request->query('session_id', ''));
+        try {
+            $payment = CheckoutService::make($this->app->db())->fulfillSession($sessionId);
+            if ((int) ($payment['user_id'] ?? 0) !== (int) $user['id']) {
+                throw new HttpException(403, 'Tato platba nepatří k tvému účtu.');
+            }
+            $this->flashSuccess('Platba prošla. Členství je na účtu a vstupy můžeš čerpat rezervací dne.');
+        } catch (HttpException $e) {
+            $this->flashError($e->getMessage());
+        }
+        $this->redirect('/user');
+    }
+
+    public function membershipCheckoutCancel(Request $request): never
+    {
+        $user = $this->requireUser();
+        $paymentId = trim((string) $request->query('platba', ''));
+        if ($paymentId !== '') {
+            CheckoutService::make($this->app->db())->cancelHold($paymentId, $user);
+        }
+        $this->flashError('Platba se nedokončila. Tarif se nezapsal.');
+        $this->redirect('/user/clenstvi');
     }
 
     public function update(Request $request): never

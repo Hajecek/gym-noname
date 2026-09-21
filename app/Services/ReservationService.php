@@ -249,7 +249,7 @@ final class ReservationService
 
         $price = $this->priceForDuration($durationMinutes, $this->hourlyFromHours($hours));
         $membership = $this->memberships->activeForUser((int) $user['id']);
-        $useMembership = !$paidCheckout && $membership && ($membership['entries_remaining'] === null || (int) $membership['entries_remaining'] > 0);
+        $useMembership = !$paidCheckout && $this->memberships->coversBooking($membership);
 
         $this->expireHolds();
         $this->ensureOccupancyTable();
@@ -373,6 +373,12 @@ final class ReservationService
             'updated_at' => Clock::utc(),
         ], 'id = :id', ['id' => (int) $reservation['id']]);
         $this->releaseOccupancy((int) $reservation['id']);
+        if (!empty($reservation['membership_id']) && (float) ($reservation['price'] ?? 0) <= 0) {
+            try {
+                $this->memberships->restoreEntry((int) $reservation['membership_id'], (int) $user['id']);
+            } catch (\Throwable) {
+            }
+        }
         try {
             $this->db->query('DELETE FROM access_permissions WHERE reservation_id = :id', ['id' => (int) $reservation['id']]);
         } catch (\Throwable) {

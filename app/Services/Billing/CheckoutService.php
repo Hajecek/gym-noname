@@ -8,6 +8,7 @@ use App\Core\Application;
 use App\Core\Database;
 use App\Core\HttpException;
 use App\Services\Auth\AuthService;
+use App\Services\MembershipService;
 use App\Services\ReservationService;
 use App\Support\Clock;
 
@@ -55,6 +56,39 @@ final class CheckoutService
             );
         } catch (HttpException $e) {
             $this->reservations->failPending($reservation);
+            throw $e;
+        }
+        $this->payments->attachProviderReference((int) $payment['id'], $session['id']);
+        return $session['url'];
+    }
+
+    public function startMembership(array $user, array $membership, Application $app): string
+    {
+        $amount = number_format((float) ($membership['price'] ?? 0), 2, '.', '');
+        if ((float) $amount <= 0) {
+            throw new HttpException(422, 'Tenhle tarif nemá cenu k zaplacení.');
+        }
+        $payment = $this->payments->createStripeMembership($user, $amount, (int) $membership['id']);
+        $entries = $membership['entries'] === null ? 'neomezené vstupy' : ((int) $membership['entries'] . ' vstupů');
+        $success = $app->absoluteUrl('/user/clenstvi/platba') . '?session_id={CHECKOUT_SESSION_ID}';
+        $cancel = $app->absoluteUrl('/user/clenstvi/platba/zruseno') . '?platba=' . rawurlencode((string) $payment['public_id']);
+        try {
+            $session = StripeGateway::fromConfig()->createCheckoutSession(
+                (int) round(((float) $amount) * 100),
+                'czk',
+                'PRIVOFIT ' . (string) ($membership['plan_name'] ?? 'členství') . ' · ' . $entries,
+                $success,
+                $cancel,
+                (string) $payment['public_id'],
+                [
+                    'payment' => (string) $payment['public_id'],
+                    'membership' => (string) $membership['public_id'],
+                    'user' => (string) ($user['public_id'] ?? $user['id']),
+                ],
+                time() + 35 * 60,
+            );
+        } catch (HttpException $e) {
+            (new MembershipService($this->db))->cancelPending((int) $membership['id'], (int) $user['id']);
             throw $e;
         }
         $this->payments->attachProviderReference((int) $payment['id'], $session['id']);
@@ -109,6 +143,9 @@ final class CheckoutService
                 $this->reservations->failPending($reservation);
             }
         }
+        if (!empty($payment['membership_id'])) {
+            (new MembershipService($this->db))->cancelPending((int) $payment['membership_id'], (int) $user['id']);
+        }
     }
 
     /** @param array<string, mixed> $session */
@@ -120,9 +157,12 @@ final class CheckoutService
         }
         $eventKey = 'stripe:' . ((string) ($session['id'] ?? $reference));
         $this->payments->markPaid((int) $payment['id'], $reference !== '' ? $reference : (string) $session['id'], $eventKey);
+        if (!empty($payment['membership_id'])) {
+            (new MembershipService($this->db))->activatePurchase((int) $payment['membership_id']);
+        }
         $reservation = $payment['reservation_id'] ? $this->reservations->findById((int) $payment['reservation_id']) : null;
         if (!$reservation) {
-            return $payment;
+            return $this->payments->findByPublicId((string) $payment['public_id']) ?? $payment;
         }
         $user = AuthService::make($this->db)->findById((int) $reservation['user_id']);
         $this->reservations->confirmPending($reservation, $user);

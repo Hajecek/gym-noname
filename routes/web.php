@@ -65,6 +65,9 @@ $router->post('/user/studio/doba', [StudioController::class, 'hours'], [AuthMidd
 $router->post('/user/studio/vyjimka', [StudioController::class, 'exception'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->post('/user/studio/vyjimka/smazat', [StudioController::class, 'deleteException'], [AuthMiddleware::class, AdminMiddleware::class]);
 $router->get('/user/clenstvi', [ProfileController::class, 'membership'], [AuthMiddleware::class]);
+$router->post('/user/clenstvi', [ProfileController::class, 'buyMembership'], [AuthMiddleware::class]);
+$router->get('/user/clenstvi/platba', [ProfileController::class, 'membershipPaid'], [AuthMiddleware::class]);
+$router->get('/user/clenstvi/platba/zruseno', [ProfileController::class, 'membershipCheckoutCancel'], [AuthMiddleware::class]);
 $router->get('/user/profil', [ProfileController::class, 'index'], [AuthMiddleware::class]);
 $router->post('/user/profil', [ProfileController::class, 'update'], [AuthMiddleware::class]);
 $router->post('/user/profil/heslo', [ProfileController::class, 'password'], [AuthMiddleware::class]);
