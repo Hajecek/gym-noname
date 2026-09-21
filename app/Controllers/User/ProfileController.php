@@ -35,6 +35,8 @@ final class ProfileController extends Controller
             'mfaEnabled' => (int) $user['mfa_enabled'] === 1,
             'mfaRequired' => AuthService::mfaRequiredFor($user),
             'errors' => Session::pull('errors', []),
+            'old' => Session::pull('_old', []),
+            'pageScripts' => ['js/profile.js'],
         ]);
     }
 
@@ -101,10 +103,36 @@ final class ProfileController extends Controller
     public function update(Request $request): never
     {
         $user = $this->requireUser();
+        $auth = AuthService::make($this->app->db());
+        $input = $request->all();
+        $email = trim((string) ($input['email'] ?? ''));
+        $emailChanged = $email !== '' && strcasecmp($email, (string) $user['email']) !== 0;
+        $passwordTouched = trim((string) ($input['current_password'] ?? '')) !== ''
+            || trim((string) ($input['password'] ?? '')) !== ''
+            || trim((string) ($input['password_confirmation'] ?? '')) !== '';
+        $notes = [];
         try {
-            AuthService::make($this->app->db())->updateProfile($user, $request->all());
-            $this->flashSuccess('Profil byl uložen.');
+            $this->app->db()->transaction(function () use ($auth, $user, $input, $email, $emailChanged, $passwordTouched, &$notes): void {
+                $auth->updateProfile($user, $input);
+                $fresh = $auth->findById((int) $user['id']);
+                if ($emailChanged) {
+                    $auth->requestEmailChange($fresh, $email);
+                    $notes[] = 'Na novou adresu jsme poslali ověřovací odkaz.';
+                }
+                if ($passwordTouched) {
+                    $auth->changePassword(
+                        $fresh,
+                        (string) ($input['current_password'] ?? ''),
+                        (string) ($input['password'] ?? ''),
+                        (string) ($input['password_confirmation'] ?? ''),
+                        $this->app->auth()->sessionRowId()
+                    );
+                    $notes[] = 'Heslo je změněné a ostatní zařízení jsou odhlášená.';
+                }
+            });
+            $this->flashSuccess($notes === [] ? 'Úpravy jsou uložené.' : 'Úpravy jsou uložené. ' . implode(' ', $notes));
         } catch (ValidationException $e) {
+            $this->rememberOld($request);
             Session::set('errors', $e->errors);
             $this->flashError($e->getMessage());
         }

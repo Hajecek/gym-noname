@@ -315,14 +315,13 @@ final class ReservationService
                 $door = $db->fetch('SELECT id FROM doors WHERE room_id = :rid AND is_active = 1 LIMIT 1', ['rid' => (int) $room['id']]);
                 if ($door && $status === 'confirmed') {
                     $early = $this->settings->int('access.early_minutes', 5);
-                    $late = $this->settings->int('access.late_minutes', 5);
                     try {
                         $db->insert('access_permissions', [
                             'user_id' => (int) $user['id'],
                             'door_id' => (int) $door['id'],
                             'reservation_id' => $id,
                             'valid_from' => $startUtc->modify('-' . $early . ' minutes')->format('Y-m-d H:i:s'),
-                            'valid_until' => $endUtc->modify('+' . $late . ' minutes')->format('Y-m-d H:i:s'),
+                            'valid_until' => $endUtc->modify('+' . $buffer . ' minutes')->format('Y-m-d H:i:s'),
                             'created_at' => Clock::utc(),
                         ]);
                     } catch (\Throwable) {
@@ -495,7 +494,7 @@ final class ReservationService
              INNER JOIN rooms rm ON rm.id = r.room_id
              WHERE r.user_id = :uid AND r.status = 'confirmed'
                AND DATE_SUB(r.starts_at, INTERVAL {$early} MINUTE) <= :now
-               AND r.ends_at >= :now2
+               AND DATE_ADD(r.ends_at, INTERVAL COALESCE(r.buffer_minutes, 0) MINUTE) >= :now2
              ORDER BY r.starts_at ASC LIMIT 1",
             ['uid' => $userId, 'now' => Clock::utc(), 'now2' => Clock::utc()]
         );
@@ -515,7 +514,8 @@ final class ReservationService
         }
         $this->db->query(
             "UPDATE reservations SET status = 'completed'
-             WHERE status = 'confirmed' AND ends_at < :now",
+             WHERE status = 'confirmed'
+               AND DATE_ADD(ends_at, INTERVAL COALESCE(buffer_minutes, 0) MINUTE) < :now",
             ['now' => Clock::utc()]
         );
         $count = count($rows);
@@ -946,7 +946,7 @@ final class ReservationService
         $door = $this->db->fetch('SELECT id FROM doors WHERE room_id = :rid AND is_active = 1 LIMIT 1', ['rid' => (int) $fresh['room_id']]);
         if ($door) {
             $early = $this->settings->int('access.early_minutes', 5);
-            $late = $this->settings->int('access.late_minutes', 5);
+            $buffer = max(0, (int) ($fresh['buffer_minutes'] ?? 0));
             $startUtc = new \DateTimeImmutable($fresh['starts_at'], new \DateTimeZone('UTC'));
             $endUtc = new \DateTimeImmutable($fresh['ends_at'], new \DateTimeZone('UTC'));
             $exists = $this->db->fetch('SELECT id FROM access_permissions WHERE reservation_id = :id', ['id' => (int) $fresh['id']]);
@@ -957,7 +957,7 @@ final class ReservationService
                         'door_id' => (int) $door['id'],
                         'reservation_id' => (int) $fresh['id'],
                         'valid_from' => $startUtc->modify('-' . $early . ' minutes')->format('Y-m-d H:i:s'),
-                        'valid_until' => $endUtc->modify('+' . $late . ' minutes')->format('Y-m-d H:i:s'),
+                        'valid_until' => $endUtc->modify('+' . $buffer . ' minutes')->format('Y-m-d H:i:s'),
                         'created_at' => Clock::utc(),
                     ]);
                 } catch (\Throwable) {

@@ -76,19 +76,30 @@ final class AccessControlService
 
         $permission = $this->db->fetch(
             'SELECT * FROM access_permissions
-             WHERE user_id = :uid AND door_id = :did AND reservation_id = :rid
-               AND valid_from <= :now AND valid_until >= :now2',
+             WHERE user_id = :uid AND door_id = :did AND reservation_id = :rid',
             [
                 'uid' => (int) $user['id'],
                 'did' => (int) $door['id'],
                 'rid' => (int) $reservation['id'],
-                'now' => Clock::utc(),
-                'now2' => Clock::utc(),
             ]
         );
         if (!$permission) {
-            $this->log($user, $reservation, $door, 'denied', 'not_sent', 'no_permission', $ip);
-            throw new HttpException(403, 'Nemáte oprávnění k těmto dveřím.');
+            $early = $this->settings->int('access.early_minutes', 5);
+            $buffer = max(0, (int) ($reservation['buffer_minutes'] ?? 0));
+            $start = new \DateTimeImmutable($reservation['starts_at'], new \DateTimeZone('UTC'));
+            $end = new \DateTimeImmutable($reservation['ends_at'], new \DateTimeZone('UTC'));
+            try {
+                $this->db->insert('access_permissions', [
+                    'user_id' => (int) $user['id'],
+                    'door_id' => (int) $door['id'],
+                    'reservation_id' => (int) $reservation['id'],
+                    'valid_from' => $start->modify('-' . $early . ' minutes')->format('Y-m-d H:i:s'),
+                    'valid_until' => $end->modify('+' . $buffer . ' minutes')->format('Y-m-d H:i:s'),
+                    'created_at' => Clock::utc(),
+                ]);
+            } catch (\Throwable) {
+                // rezervace v okně stačí, chybějící řádek dveře nezamkne
+            }
         }
 
         $limit = (array) config('security.rate_limits.access_open', ['limit' => 8, 'minutes' => 5]);
@@ -196,12 +207,11 @@ final class AccessControlService
     private function currentEligibleReservation(array $user): ?array
     {
         $early = $this->settings->int('access.early_minutes', 5);
-        $late = $this->settings->int('access.late_minutes', 5);
         return $this->db->fetch(
             "SELECT r.* FROM reservations r
              WHERE r.user_id = :uid AND r.status = 'confirmed'
                AND DATE_SUB(r.starts_at, INTERVAL {$early} MINUTE) <= :now
-               AND DATE_ADD(r.ends_at, INTERVAL {$late} MINUTE) >= :now2
+               AND DATE_ADD(r.ends_at, INTERVAL COALESCE(r.buffer_minutes, 0) MINUTE) >= :now2
              ORDER BY r.starts_at ASC LIMIT 1",
             ['uid' => (int) $user['id'], 'now' => Clock::utc(), 'now2' => Clock::utc()]
         );

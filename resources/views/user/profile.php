@@ -5,6 +5,10 @@ $fullName = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''))
 $planName = $membership['plan_name'] ?? 'Bez tarifu';
 $mfaEnabled = !empty($mfaEnabled);
 $mfaRequired = !empty($mfaRequired);
+$old = is_array($old ?? null) ? $old : [];
+$field = static function (string $key, string $fallback = '') use ($old): string {
+    return array_key_exists($key, $old) ? (string) $old[$key] : $fallback;
+};
 $initials = mb_strtoupper(mb_substr((string) ($user['first_name'] ?? ''), 0, 1) . mb_substr((string) ($user['last_name'] ?? ''), 0, 1));
 if ($initials === '') {
     $initials = mb_strtoupper(mb_substr((string) ($user['username'] ?? 'PF'), 0, 2)) ?: 'PF';
@@ -63,41 +67,78 @@ if ($initials === '') {
 <form id="avatar-delete-form" method="post" action="<?= e(url('/user/profil/avatar/smazat')) ?>"><?= csrf_field() ?></form>
 <?php endif; ?>
 
-<form class="card profile-section" method="post" action="<?= e(url('/user/profil')) ?>">
+<form id="profile-edits" method="post" action="<?= e(url('/user/profil')) ?>" data-profile-form>
     <?= csrf_field() ?>
-    <p class="eyebrow">Osobní údaje</p>
-    <h3>O tobě</h3>
-    <div class="field">
-        <label>Uživatelské jméno</label>
-        <input name="username" value="<?= e($user['username']) ?>" autocomplete="username">
-        <span class="field-error"><?= e($errors['username'][0] ?? '') ?></span>
-    </div>
-    <div class="row-2">
-        <div class="field"><label>Jméno</label><input name="first_name" value="<?= e($user['first_name']) ?>" autocomplete="given-name"></div>
-        <div class="field"><label>Příjmení</label><input name="last_name" value="<?= e($user['last_name']) ?>" autocomplete="family-name"></div>
-    </div>
-    <div class="field"><label>Telefon</label><input name="phone" value="<?= e($user['phone'] ?? '') ?>" autocomplete="tel"></div>
-    <button class="btn btn-primary">Uložit změny</button>
+    <section class="card profile-section" data-profile-section>
+        <p class="eyebrow">Osobní údaje</p>
+        <h3>O tobě</h3>
+        <div class="field">
+            <label>Uživatelské jméno</label>
+            <input name="username" value="<?= e($field('username', (string) $user['username'])) ?>" data-original="<?= e((string) $user['username']) ?>" data-track autocomplete="username">
+            <span class="field-error"><?= e($errors['username'][0] ?? '') ?></span>
+        </div>
+        <div class="row-2">
+            <div class="field">
+                <label>Jméno</label>
+                <input name="first_name" value="<?= e($field('first_name', (string) $user['first_name'])) ?>" data-original="<?= e((string) $user['first_name']) ?>" data-track autocomplete="given-name">
+                <span class="field-error"><?= e($errors['first_name'][0] ?? '') ?></span>
+            </div>
+            <div class="field">
+                <label>Příjmení</label>
+                <input name="last_name" value="<?= e($field('last_name', (string) $user['last_name'])) ?>" data-original="<?= e((string) $user['last_name']) ?>" data-track autocomplete="family-name">
+                <span class="field-error"><?= e($errors['last_name'][0] ?? '') ?></span>
+            </div>
+        </div>
+        <div class="field">
+            <label>Telefon</label>
+            <input name="phone" value="<?= e($field('phone', (string) ($user['phone'] ?? ''))) ?>" data-original="<?= e((string) ($user['phone'] ?? '')) ?>" data-track autocomplete="tel">
+            <span class="field-error"><?= e($errors['phone'][0] ?? '') ?></span>
+        </div>
+    </section>
+
+    <section class="card profile-section" data-profile-section>
+        <p class="eyebrow">Přístup</p>
+        <h3>E-mail</h3>
+        <div class="field">
+            <label>E-mail</label>
+            <input type="email" name="email" value="<?= e($field('email', (string) $user['email'])) ?>" data-original="<?= e((string) $user['email']) ?>" data-track autocomplete="email">
+            <span class="field-error"><?= e($errors['email'][0] ?? '') ?></span>
+            <p class="muted">Když adresu změníš, pošleme na ni ověřovací odkaz.</p>
+        </div>
+    </section>
+
+    <section class="card profile-section" data-profile-section>
+        <h3>Heslo</h3>
+        <p class="muted">Vyplň jen tehdy, když chceš heslo změnit.</p>
+        <div class="field">
+            <label>Současné heslo</label>
+            <input type="password" name="current_password" data-original="" data-track autocomplete="current-password">
+            <span class="field-error"><?= e($errors['current_password'][0] ?? '') ?></span>
+        </div>
+        <div class="field">
+            <label>Nové heslo</label>
+            <input name="password" type="password" minlength="12" data-original="" data-track autocomplete="new-password">
+            <span class="field-error"><?= e($errors['password'][0] ?? '') ?></span>
+        </div>
+        <div class="field">
+            <label>Potvrzení</label>
+            <input name="password_confirmation" type="password" minlength="12" data-original="" data-track autocomplete="new-password">
+            <span class="field-error"><?= e($errors['password_confirmation'][0] ?? '') ?></span>
+        </div>
+    </section>
+    <noscript><button class="btn btn-primary" type="submit">Uložit úpravy</button></noscript>
 </form>
 
-<form class="card profile-section" method="post" action="<?= e(url('/user/profil/email')) ?>">
-    <?= csrf_field() ?>
-    <p class="eyebrow">Přístup</p>
-    <h3>E-mail</h3>
-    <p class="profile-current-label">Aktuální e-mail</p>
-    <p class="profile-current"><?= e($user['email']) ?></p>
-    <div class="field"><label>Nový e-mail</label><input type="email" name="email" required autocomplete="email"></div>
-    <button class="btn btn-secondary">Odeslat ověření</button>
-</form>
-
-<form class="card profile-section" method="post" action="<?= e(url('/user/profil/heslo')) ?>">
-    <?= csrf_field() ?>
-    <h3>Heslo</h3>
-    <div class="field"><label>Současné heslo</label><input type="password" name="current_password" required autocomplete="current-password"></div>
-    <div class="field"><label>Nové heslo</label><input name="password" type="password" required minlength="12" autocomplete="new-password"></div>
-    <div class="field"><label>Potvrzení</label><input name="password_confirmation" type="password" required minlength="12" autocomplete="new-password"></div>
-    <button class="btn btn-primary">Změnit heslo</button>
-</form>
+<div class="profile-save" data-profile-save hidden>
+    <div class="profile-save-inner">
+        <p class="profile-save-copy">
+            <strong data-profile-save-count>Úpravy čekají</strong>
+            <span>Změněná pole jsou označená. Uloží se najednou.</span>
+        </p>
+        <button class="btn btn-ghost" type="button" data-profile-reset>Zahodit</button>
+        <button class="btn btn-primary" type="submit" form="profile-edits">Uložit úpravy</button>
+    </div>
+</div>
 
 <section class="card profile-section">
     <p class="eyebrow">Zabezpečení</p>

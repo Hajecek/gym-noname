@@ -348,8 +348,8 @@ final class MobileApiService
         $reservation = $auth['reservation'] ?? null;
         $until = Clock::nowUtc()->modify('+2 minutes');
         if ($reservation) {
-            $late = 10;
-            $until = (new \DateTimeImmutable($reservation['ends_at'], new \DateTimeZone('UTC')))->modify('+' . $late . ' minutes');
+            $buffer = max(0, (int) ($reservation['buffer_minutes'] ?? 0));
+            $until = (new \DateTimeImmutable($reservation['ends_at'], new \DateTimeZone('UTC')))->modify('+' . $buffer . ' minutes');
         }
         $reason = null;
         if (!$auth['allowed']) {

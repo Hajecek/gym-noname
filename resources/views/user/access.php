@@ -4,15 +4,14 @@ $reasons = $state['reasons'] ?? [];
 $visit = is_array($visit ?? null) ? $visit : null;
 $upcoming = is_array($upcoming ?? null) ? $upcoming : null;
 $earlyMinutes = (int) ($earlyMinutes ?? 5);
-$lateMinutes = (int) ($lateMinutes ?? 5);
-$window = static function (array $row) use ($earlyMinutes, $lateMinutes): array {
+$window = static function (array $row) use ($earlyMinutes): array {
     $start = \App\Support\Clock::toLocal((string) $row['starts_at']);
     $trainingEnd = \App\Support\Clock::toLocal((string) $row['ends_at']);
     $shownEnd = $trainingEnd->modify('+' . (int) ($row['buffer_minutes'] ?? 15) . ' minutes');
     return [
         'when' => $start->format('j. n. Y'),
         'span' => $start->format('H:i') . '–' . $shownEnd->format('H:i'),
-        'open' => $start->modify('-' . $earlyMinutes . ' minutes')->format('H:i') . '–' . $trainingEnd->modify('+' . $lateMinutes . ' minutes')->format('H:i'),
+        'open' => $start->modify('-' . $earlyMinutes . ' minutes')->format('H:i') . '–' . $shownEnd->format('H:i'),
         'room' => (string) ($row['room_name'] ?? 'Studio'),
     ];
 };
@@ -34,7 +33,7 @@ if (!$visit && $blocks === []) {
     <div>
         <p class="eyebrow">TVŮJ KLÍČ</p>
         <h1>Vstup</h1>
-        <p class="muted">Dveře se otevřou jen k tvé rezervaci, nejvýše <?= (int) $earlyMinutes ?> minut před začátkem.</p>
+        <p class="muted">Dveře se otevřou jen k tvé rezervaci. Pozdní příchod nevadí, platí celá rezervovaná doba.</p>
     </div>
     <button type="button" class="entry-info" data-entry-info aria-label="Jak vstup funguje">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -106,7 +105,7 @@ if (!$visit && $blocks === []) {
             </li>
             <li>
                 <strong>Jen v okně termínu</strong>
-                Otevřít jde <?= (int) $earlyMinutes ?> min před začátkem a ještě <?= (int) $lateMinutes ?> min po konci tréninku.
+                Otevřít jde <?= (int) $earlyMinutes ?> min před začátkem a potom po celou rezervovanou dobu, i když přijdeš později.
             </li>
             <li>
                 <strong>Kontrola až při stisku</strong>

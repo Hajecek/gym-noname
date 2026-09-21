@@ -7,7 +7,7 @@
 <div class="field"><label>Rezerva na převlečení a umytí (min)</label><input name="reservation.buffer_minutes" value="<?= e((string)setting('reservation.buffer_minutes', 15)) ?>"><p class="muted">Patří do každého bloku (1 h 15 min). Dva nebo tři bloky se drží celé.</p></div>
 <div class="field"><label>Storno (hodiny)</label><input name="reservation.cancellation_hours" value="<?= e((string)setting('reservation.cancellation_hours', 12)) ?>"></div>
 <div class="field"><label>Vstup před začátkem (min)</label><input name="access.early_minutes" value="<?= e((string)setting('access.early_minutes', 5)) ?>"></div>
-<div class="field"><label>Vstup po konci tréninku (min)</label><input name="access.late_minutes" value="<?= e((string)setting('access.late_minutes', 5)) ?>"></div>
+<div class="field"><label>Vstup po konci tréninku (min)</label><input name="access.late_minutes" value="<?= e((string)setting('access.late_minutes', 5)) ?>"><p class="muted">Dveře drží celou rezervaci včetně času na převlečení. Tohle pole se pro zámek už nepoužívá.</p></div>
 <div class="field"><label>Cena za hodinu (Kč)</label><input name="pricing.hourly" value="<?= e((string)setting('pricing.hourly', 150)) ?>"><p class="muted">Použije se u dnů, které nemají vlastní cenu v provozní době.</p></div>
 <button class="btn btn-primary">Uložit</button>
 </form>
