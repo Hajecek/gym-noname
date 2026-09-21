@@ -12,3 +12,4 @@ use App\Controllers\Api\V1\GymController;
 $router = app()->router();
 
 $router->get('/api/v1/gym', [GymController::class, 'gym']);
+$router->get('/api/v1/gyms', [GymController::class, 'gyms']);

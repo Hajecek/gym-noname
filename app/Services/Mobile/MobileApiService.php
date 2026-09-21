@@ -192,9 +192,14 @@ final class MobileApiService
         return $items;
     }
 
-    public function slots(): array
+    public function gyms(): array
     {
-        return $this->reservations->availableSlotsForApp(14);
+        return $this->reservations->gymsForApp();
+    }
+
+    public function slots(string $gymId = ''): array
+    {
+        return $this->reservations->availableSlotsForApp(14, $gymId);
     }
 
     public function quote(array $user, array $slotIds): array

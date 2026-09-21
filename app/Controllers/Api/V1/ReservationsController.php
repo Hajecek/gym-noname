@@ -16,10 +16,14 @@ final class ReservationsController extends Controller
         $this->jsonOk(ReservationService::make($this->app->db())->availability($date));
     }
 
-    public function slots(): never
+    public function slots(Request $request, array $params = []): never
     {
         try {
-            $this->send($this->api()->slots());
+            $gymId = trim((string) $request->query('gymID', ''));
+            if ($gymId === '') {
+                $gymId = trim((string) $request->query('gym_id', ''));
+            }
+            $this->send($this->api()->slots($gymId));
         } catch (HttpException $e) {
             if ($e->status === 404) {
                 $this->send([]);

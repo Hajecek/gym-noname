@@ -749,13 +749,49 @@ final class ReservationService
         return $this->priceForDuration($this->settings->int('reservation.min_minutes', 60), $hourly);
     }
 
-    /** @return list<array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,currencyCode:string}> */
-    public function availableSlotsForApp(int $days = 14): array
+    /** @return list<array{id:string,name:string,address:string,latitude:float,longitude:float}> */
+    public function gymsForApp(): array
     {
         try {
-            $room = $this->room();
-        } catch (HttpException) {
-            return [];
+            $rows = $this->db->fetchAll(
+                'SELECT public_id, name, location, latitude, longitude
+                 FROM rooms WHERE is_active = 1 ORDER BY name ASC, id ASC'
+            );
+        } catch (\Throwable) {
+            $rows = $this->db->fetchAll(
+                'SELECT public_id, name, location
+                 FROM rooms WHERE is_active = 1 ORDER BY name ASC, id ASC'
+            );
+        }
+        $items = [];
+        foreach ($rows as $room) {
+            $latitude = isset($room['latitude']) && is_numeric($room['latitude']) ? (float) $room['latitude'] : 0.0;
+            $longitude = isset($room['longitude']) && is_numeric($room['longitude']) ? (float) $room['longitude'] : 0.0;
+            $items[] = [
+                'id' => (string) $room['public_id'],
+                'name' => (string) $room['name'],
+                'address' => (string) ($room['location'] ?? ''),
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+            ];
+        }
+        return $items;
+    }
+
+    /** @return list<array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,currencyCode:string,gymID:string}> */
+    public function availableSlotsForApp(int $days = 14, string $gymPublicId = ''): array
+    {
+        if ($gymPublicId !== '') {
+            $room = $this->roomByPublicId($gymPublicId);
+            if (!$room) {
+                return [];
+            }
+        } else {
+            try {
+                $room = $this->room();
+            } catch (HttpException) {
+                return [];
+            }
         }
         $out = [];
         $day = Clock::nowLocal()->setTime(0, 0);
@@ -770,7 +806,7 @@ final class ReservationService
                     continue;
                 }
                 $start = new \DateTimeImmutable((string) $slot['start_at'], new \DateTimeZone('UTC'));
-                $out[] = $this->slotAppPayload($room['public_id'] . '_' . $start->format('YmdHis'), $start, (string) $room['name']);
+                $out[] = $this->slotAppPayload($room['public_id'] . '_' . $start->format('YmdHis'), $start, (string) $room['name'], (string) $room['public_id']);
             }
         }
         return $out;
@@ -985,9 +1021,9 @@ final class ReservationService
     }
 
     /**
-     * @return array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,currencyCode:string}
+     * @return array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,currencyCode:string,gymID:string}
      */
-    private function slotAppPayload(string $slotId, \DateTimeImmutable $startUtc, string $roomName): array
+    private function slotAppPayload(string $slotId, \DateTimeImmutable $startUtc, string $roomName, string $gymId = ''): array
     {
         $startUtc = $startUtc->setTimezone(new \DateTimeZone('UTC'));
         $duration = $this->settings->int('reservation.min_minutes', 60);
@@ -1001,6 +1037,7 @@ final class ReservationService
             'bufferMinutes' => $this->bufferMinutes(),
             'price' => $this->slotPrice($local),
             'currencyCode' => 'CZK',
+            'gymID' => $gymId !== '' ? $gymId : $this->roomPublicIdFromSlot($slotId),
         ];
     }
 
