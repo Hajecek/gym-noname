@@ -94,8 +94,8 @@ final class Seeder
                 $this->db->insert('opening_hours', [
                     'room_id' => $id,
                     'weekday' => $d,
-                    'opens_at' => '06:00:00',
-                    'closes_at' => '22:00:00',
+                    'opens_at' => '00:00:00',
+                    'closes_at' => '23:59:00',
                     'is_closed' => 0,
                 ]);
             }

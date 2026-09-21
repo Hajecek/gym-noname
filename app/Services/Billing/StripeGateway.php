@@ -83,6 +83,22 @@ final class StripeGateway
         return $this->request('GET', '/v1/checkout/sessions/' . rawurlencode($sessionId), [], $sessionId . ':get');
     }
 
+    public function refundPayment(string $reference, string $idempotencyKey): void
+    {
+        $reference = trim($reference);
+        $intent = $reference;
+        if (str_starts_with($reference, 'cs_')) {
+            $session = $this->retrieveCheckoutSession($reference);
+            $intent = (string) ($session['payment_intent'] ?? '');
+        }
+        if (!str_starts_with($intent, 'pi_')) {
+            throw new HttpException(422, 'Platbu teď nejde vrátit.');
+        }
+        $this->request('POST', '/v1/refunds', [
+            'payment_intent' => $intent,
+        ], $idempotencyKey);
+    }
+
     /** @return array<string, mixed> */
     public function parseWebhook(string $payload, string $signatureHeader, string $secret): array
     {

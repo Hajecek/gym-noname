@@ -460,6 +460,43 @@ body.side-collapsed .side-menu:focus-within {
   font-size: 1.45rem;
 }
 .done-modal.is-out { opacity: 0; transition: 280ms ease; }
+.cancel-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+.cancel-modal[hidden] { display: none; }
+.cancel-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 10, 9, .72);
+}
+.cancel-modal-panel {
+  position: relative;
+  width: min(460px, 100%);
+  padding: 26px 24px 22px;
+  border-radius: 22px;
+  border: 1px solid #c6f21a55;
+  background: #121a16;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .45);
+}
+.cancel-modal-panel h2 { margin: 8px 0 0; font-size: 1.55rem; }
+.cancel-rule {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #c6f21a44;
+  background: #c6f21a12;
+  color: var(--fog);
+  line-height: 1.5;
+  font-weight: 700;
+}
+.cancel-outcome { margin: 14px 0 0; color: var(--secondary); line-height: 1.45; }
+.cancel-outcome.is-late { color: #ffb4b4; }
+.cancel-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
 .field { display: grid; gap: 6px; margin-bottom: 14px; }
 .field label { font-size: .86rem; color: var(--secondary); font-weight: 600; }

@@ -77,11 +77,9 @@ final class MailService
                 'subject' => $subject,
                 'template' => $row['template'],
             ]);
-            $dir = dirname(__DIR__, 2) . '/storage/logs';
-            file_put_contents(
-                $dir . '/mail-' . gmdate('Y-m-d') . '.log',
-                sprintf("[%s] TO=%s SUBJECT=%s\n%s\n\n", Clock::utc(), $row['recipient'], $subject, $html),
-                FILE_APPEND | LOCK_EX
+            Logger::append(
+                'mail-' . gmdate('Y-m-d') . '.log',
+                sprintf("[%s] TO=%s SUBJECT=%s\n%s\n\n", Clock::utc(), $row['recipient'], $subject, $html)
             );
             return;
         }

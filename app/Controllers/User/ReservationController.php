@@ -139,8 +139,13 @@ final class ReservationController extends Controller
     {
         $user = $this->requireUser();
         try {
-            ReservationService::make($this->app->db())->cancel($user, (string) $params['id']);
-            $this->flashSuccess('Rezervace byla zrušena.');
+            $outcome = ReservationService::make($this->app->db())->cancel($user, (string) $params['id']);
+            $this->flashSuccess(match ($outcome) {
+                'refunded' => 'Rezervace byla zrušena. Peníze se vrací.',
+                'late' => 'Rezervace byla zrušena. Na vrácení peněz už není nárok.',
+                'entry' => 'Rezervace byla zrušena. Vstup se vrátil do členství.',
+                default => 'Rezervace byla zrušena.',
+            });
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
         }
@@ -208,9 +213,21 @@ final class ReservationController extends Controller
                 'items' => $groups[$key],
             ];
         }
+        $paidAt = [];
+        foreach ($this->app->db()->fetchAll(
+            "SELECT reservation_id, paid_at FROM payments WHERE user_id = :uid AND status = 'paid' AND reservation_id IS NOT NULL AND paid_at IS NOT NULL",
+            ['uid' => (int) $user['id']]
+        ) as $payment) {
+            $stamp = new \DateTimeImmutable((string) $payment['paid_at'], new \DateTimeZone('UTC'));
+            $paidAt[(int) $payment['reservation_id']] = $stamp->getTimestamp();
+        }
         $this->view('user/mine', [
             'title' => 'Moje rezervace',
             'filter' => $filter,
+            'paidAt' => $paidAt,
+            'refundSeconds' => ReservationService::REFUND_SECONDS,
+            'nowUnix' => Clock::nowUtc()->getTimestamp(),
+            'pageScripts' => ['js/mine.js'],
             'counts' => [
                 'prehled' => count($groups['naplanovane']) + count($groups['probehle']),
                 'naplanovane' => count($groups['naplanovane']),

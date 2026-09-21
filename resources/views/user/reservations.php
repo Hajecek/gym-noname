@@ -20,7 +20,7 @@ $payload = [
     <div>
         <p class="eyebrow">TVŮJ ČAS</p>
         <h1>Rezervace</h1>
-        <p class="muted">Otevři kalendář, vyber den a klikni na blok. Další hodinu za sebou přidáš kliknutím na následující termín, úklid je až na konci.</p>
+        <p class="muted">Otevři kalendář, vyber den a klikni na blok. Další blok přidáš kliknutím na následující termín. Každý zůstane 1 h 15 min.</p>
     </div>
     <a class="button" href="<?= e(url('/user/moje-rezervace')) ?>">Moje rezervace</a>
 </div>
@@ -80,7 +80,7 @@ $payload = [
         <div class="booker-hours-head">
             <div>
                 <h2>Hodiny</h2>
-                <p class="muted" data-hours-hint>Každý blok je hodina tréninku plus <?= (int) $buffer ?> min úklid. 2 nebo 3 hodiny jdou v kuse, úklid je až na konci.</p>
+                <p class="muted" data-hours-hint>Každý blok je hodina tréninku plus <?= (int) $buffer ?> min úklid. Dva nebo tři bloky se drží celé.</p>
             </div>
             <p class="booker-price"><?= e(money_format_czk($hourly)) ?><span> / hod</span></p>
         </div>
@@ -109,8 +109,8 @@ $payload = [
         <div class="booker-durations" data-durations>
             <span>Délka</span>
             <button type="button" data-hours="1">1 h 15</button>
-            <button type="button" data-hours="2">2 h 15</button>
-            <button type="button" data-hours="3">3 h 15</button>
+            <button type="button" data-hours="2">2 h 30</button>
+            <button type="button" data-hours="3">3 h 45</button>
         </div>
         <div class="booker-guests" data-guests-wrap>
             <span>Osoby</span>

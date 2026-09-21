@@ -52,10 +52,10 @@
 
   const pad = (n) => String(n).padStart(2, "0");
   const money = (n) => Math.round(Number(n) || 0).toLocaleString("cs-CZ") + "\u00a0Kč";
-  const hoursWord = (count) => {
-    if (count === 1) return "1 hodina";
-    if (count >= 2 && count <= 4) return count + " hodiny";
-    return count + " hodin";
+  const blocksWord = (count) => {
+    if (count === 1) return "1 blok";
+    if (count >= 2 && count <= 4) return count + " bloky";
+    return count + " bloků";
   };
   const parseDate = (value) => {
     const [y, m, d] = String(value || "").split("-").map((part) => parseInt(part, 10));
@@ -85,7 +85,8 @@
   const membershipCovers = !!payload.membership_covers;
   const availableFor = (slot) => (slot.available_for || []).map((item) => Number(item));
   const bookableRows = () => (state.availability.slots || []).filter((slot) => slot.kind !== "buffer");
-  const occupyMinutes = (hours) => (hours || state.hours) * step() + buffer();
+  const blockMinutes = () => step() + buffer();
+  const occupyMinutes = (hours) => (hours || state.hours) * blockMinutes();
   const occupyEnd = () => {
     const first = state.selected[0];
     if (!first) return "";
@@ -178,7 +179,7 @@
     if (kind === "past") return "Už bylo";
     if (kind === "busy") return "Obsazeno";
     if (kind === "selected") return "Vybrané";
-    if (kind === "add") return "Přidat hodinu";
+    if (kind === "add") return "Přidat blok";
     if (kind === "buffer") return "Úklid";
     return "Volné";
   };
@@ -195,16 +196,12 @@
     }
     if (hoursEl) {
       hoursEl.hidden = closed || loading || rows.length === 0;
-      const selectedRows = rows.filter((row) => hourState(row) === "selected");
-      const lastSelected = selectedRows.length ? selectedRows[selectedRows.length - 1].start : "";
       hoursEl.innerHTML = rows.map((row) => {
         const kind = hourState(row);
         if (kind === "buffer") return "";
         const selected = kind === "selected";
         const disabled = kind === "busy" || kind === "past";
-        let end = row.end;
-        if (selected && row.start === lastSelected) end = occupyEnd();
-        else if (selected && minutes(row.end) > minutes(occupyEnd())) end = occupyEnd();
+        const end = row.end;
         return (
           '<button type="button" class="hour-row is-' + kind + '"' +
           ' data-hour-start="' + row.start + '"' +
@@ -222,7 +219,7 @@
         hintEl.textContent = "Načítám volné hodiny…";
       } else {
         hintEl.textContent = free
-          ? "Každý blok je 1 h 15 min (hodina tréninku + úklid). 2 nebo 3 hodiny jdou v kuse, 15 min je až na konci."
+          ? "Každý blok je 1 h 15 min. Dva nebo tři bloky zůstanou celé, časy se nepřepočítávají."
           : "Na tenhle den už volný blok nezbývá.";
       }
     }
@@ -241,8 +238,8 @@
     if (barTime) barTime.textContent = first.start + "–" + end;
     if (barMeta) {
       barMeta.textContent = membershipCovers
-        ? hoursWord(count) + " · odečte se 1 vstup"
-        : hoursWord(count) + " · " + money(price);
+        ? blocksWord(count) + " · odečte se 1 vstup"
+        : blocksWord(count) + " · " + money(price);
     }
     if (guestCountEl) guestCountEl.textContent = String(state.guests);
     if (confirmBtn) confirmBtn.textContent = membershipCovers ? "Rezervovat" : "Zaplatit " + money(price);
@@ -448,7 +445,13 @@
         window.location.assign(document.body.dataset.signedOut || "/odhlaseno");
         return;
       }
-      const body = await response.json();
+      const raw = await response.text();
+      let body;
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        throw new Error("Rezervaci se nepodařilo dokončit.");
+      }
       const checkout = body.data?.checkout_url;
       const redirect = body.data?.redirect;
       if (checkout) {

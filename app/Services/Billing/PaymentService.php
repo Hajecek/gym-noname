@@ -122,6 +122,17 @@ final class PaymentService
         }
     }
 
+    public function markRefunded(int $paymentId): void
+    {
+        $this->db->update('payments', [
+            'status' => 'refunded',
+            'updated_at' => Clock::utc(),
+        ], 'id = :id AND status = :paid', [
+            'id' => $paymentId,
+            'paid' => 'paid',
+        ]);
+    }
+
     public function forUser(int $userId): array
     {
         return $this->db->fetchAll(

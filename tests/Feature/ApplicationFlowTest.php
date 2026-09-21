@@ -136,7 +136,7 @@ final class ApplicationFlowTest extends TestCase
         $this->assertSame('confirmed', $next['status']);
     }
 
-    public function testTwoHourBlockIsContinuousAndBufferIsOnlyAfter(): void
+    public function testTwoBlocksKeepTheirFullLength(): void
     {
         $user = $this->createVerifiedUser('twoh');
         $this->grantMembership((int) $user['id']);
@@ -146,7 +146,7 @@ final class ApplicationFlowTest extends TestCase
         $block = $service->create($user, $day->format('Y-m-d H:i'), 120, 1);
         $this->assertSame('confirmed', $block['status']);
         $endLocal = Clock::toLocal($block['ends_at']);
-        $this->assertSame('13:00', $endLocal->format('H:i'));
+        $this->assertSame('13:15', $endLocal->format('H:i'));
 
         $availability = $service->availability($day->format('Y-m-d'));
         $availableStarts = [];
@@ -159,16 +159,16 @@ final class ApplicationFlowTest extends TestCase
         }
         $this->assertNotContains('11:15', $allStarts);
         $this->assertNotContains('11:30', $allStarts);
-        $this->assertNotContains('12:00', $availableStarts);
-        $this->assertContains('13:15', $availableStarts);
+        $this->assertNotContains('12:15', $availableStarts);
+        $this->assertContains('13:30', $availableStarts);
 
         try {
-            $service->create($user, $day->modify('+60 minutes')->format('Y-m-d H:i'), 60, 1);
-            $this->fail('Uprostřed dvouhodinového bloku nesmí jít další rezervace.');
+            $service->create($user, $day->modify('+75 minutes')->format('Y-m-d H:i'), 60, 1);
+            $this->fail('Druhý blok dvoublokové rezervace nesmí jít znovu obsadit.');
         } catch (\App\Core\HttpException $e) {
             $this->assertContains($e->status, [409, 422]);
         }
-        $next = $service->create($user, $day->modify('+135 minutes')->format('Y-m-d H:i'), 60, 1);
+        $next = $service->create($user, $day->modify('+150 minutes')->format('Y-m-d H:i'), 60, 1);
         $this->assertSame('confirmed', $next['status']);
     }
 

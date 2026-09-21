@@ -7,10 +7,14 @@ namespace App\Services;
 use App\Core\Crypto;
 use App\Core\Database;
 use App\Core\HttpException;
+use App\Services\Billing\PaymentService;
+use App\Services\Billing\StripeGateway;
 use App\Support\Clock;
 
 final class ReservationService
 {
+    public const REFUND_SECONDS = 120;
+
     public function __construct(
         private readonly Database $db,
         private readonly SettingsService $settings,
@@ -73,14 +77,15 @@ final class ReservationService
             $fits = [];
             $availableFor = [];
             foreach ($durations as $minutes) {
-                $end = $cursor->modify('+' . $minutes . ' minutes');
-                $until = $end->modify('+' . $buffer . ' minutes');
+                $span = $this->spanMinutes($minutes);
+                $until = $cursor->modify('+' . $span . ' minutes');
                 if ($until > $close) {
                     continue;
                 }
                 $fits[] = $minutes;
+                $trainingEnd = $until->modify('-' . $buffer . ' minutes');
                 $utcStart = Clock::toUtc($cursor);
-                if ($utcStart > Clock::nowUtc() && !$this->overlaps($occupied, $utcStart, Clock::toUtc($end), $buffer)) {
+                if ($utcStart > Clock::nowUtc() && !$this->overlaps($occupied, $utcStart, Clock::toUtc($trainingEnd), $buffer)) {
                     $availableFor[] = $minutes;
                 }
             }
@@ -228,7 +233,7 @@ final class ReservationService
         }
 
         $startLocal = Clock::parseLocal($localStart);
-        $endLocal = $startLocal->modify('+' . $durationMinutes . ' minutes');
+        $endLocal = $startLocal->modify('+' . ($this->spanMinutes($durationMinutes) - $buffer) . ' minutes');
         $startUtc = Clock::toUtc($startLocal);
         $endUtc = Clock::toUtc($endLocal);
 
@@ -353,11 +358,11 @@ final class ReservationService
         }
     }
 
-    public function cancel(array $user, string $publicId, bool $admin = false): void
+    public function cancel(array $user, string $publicId, bool $admin = false): string
     {
         $reservation = $this->owned($user, $publicId, $admin);
         if (($reservation['status'] ?? '') === 'cancelled') {
-            return;
+            return 'unpaid';
         }
         if (!in_array($reservation['status'], ['pending_payment', 'confirmed'], true)) {
             throw new HttpException(422, 'Tuto rezervaci nelze zrušit.');
@@ -366,6 +371,7 @@ final class ReservationService
         if (!$admin && $starts <= Clock::nowUtc()) {
             throw new HttpException(422, 'Termín už začal, nelze ho zrušit.');
         }
+        $money = $this->settleMoney($reservation);
         $this->db->update('reservations', [
             'status' => 'cancelled',
             'cancelled_at' => Clock::utc(),
@@ -399,6 +405,36 @@ final class ReservationService
         } catch (\Throwable) {
             // zrušení platí i bez e-mailu
         }
+        return $money;
+    }
+
+    /** @param array<string, mixed> $reservation */
+    private function settleMoney(array $reservation): string
+    {
+        if ((float) ($reservation['price'] ?? 0) <= 0) {
+            return !empty($reservation['membership_id']) ? 'entry' : 'unpaid';
+        }
+        $payment = $this->db->fetch(
+            "SELECT * FROM payments WHERE reservation_id = :id AND status IN ('paid', 'refunded') ORDER BY id DESC LIMIT 1",
+            ['id' => (int) $reservation['id']]
+        );
+        if ($payment && ($payment['status'] ?? '') === 'refunded') {
+            return 'refunded';
+        }
+        if (!$payment || ($payment['status'] ?? '') !== 'paid' || empty($payment['paid_at'])) {
+            return 'unpaid';
+        }
+        $paidAt = new \DateTimeImmutable((string) $payment['paid_at'], new \DateTimeZone('UTC'));
+        if (Clock::nowUtc()->getTimestamp() > $paidAt->getTimestamp() + self::REFUND_SECONDS) {
+            return 'late';
+        }
+        $reference = trim((string) ($payment['provider_reference'] ?? ''));
+        if ($reference === '' || (($payment['provider'] ?? '') !== 'stripe')) {
+            throw new HttpException(422, 'Peníze se teď nepodařilo vrátit. Termín zůstává.');
+        }
+        StripeGateway::fromConfig()->refundPayment($reference, (string) $payment['public_id'] . ':refund');
+        (new PaymentService($this->db))->markRefunded((int) $payment['id']);
+        return 'refunded';
     }
 
     public function find(string $publicId): ?array
@@ -976,6 +1012,13 @@ final class ReservationService
     private function durationStep(): int
     {
         return 60;
+    }
+
+    /** Kolik celých bloků (1 h + úklid) rezervace zabere. Dva a tři bloky se nesčítají do jednoho úklidu. */
+    private function spanMinutes(int $durationMinutes): int
+    {
+        $blocks = max(1, intdiv($durationMinutes, $this->durationStep()));
+        return $blocks * ($this->durationStep() + $this->bufferMinutes());
     }
 
     /**

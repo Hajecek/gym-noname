@@ -73,7 +73,14 @@ $tones = [
                             <?php if ($canCancel): ?>
                                 <form method="post" action="<?= e(url('/user/rezervace/' . $item['public_id'] . '/zrusit')) ?>">
                                     <?= csrf_field() ?>
-                                    <button class="btn btn-danger button-small">Zrušit</button>
+                                    <button
+                                        class="btn btn-danger button-small"
+                                        data-cancel-open
+                                        data-status="<?= e($status) ?>"
+                                        data-price="<?= e((string) ($item['price'] ?? 0)) ?>"
+                                        data-membership="<?= !empty($item['membership_id']) && (float) ($item['price'] ?? 0) <= 0 ? '1' : '0' ?>"
+                                        data-paid-at="<?= (int) ($paidAt[(int) $item['id']] ?? 0) ?>"
+                                    >Zrušit</button>
                                 </form>
                             <?php endif; ?>
                         </div>
@@ -83,3 +90,17 @@ $tones = [
         <?php endif; ?>
     </section>
 <?php endforeach; ?>
+
+<div class="cancel-modal" data-cancel-modal hidden data-now="<?= (int) ($nowUnix ?? time()) ?>" data-refund-seconds="<?= (int) ($refundSeconds ?? 120) ?>">
+    <div class="cancel-modal-backdrop" data-cancel-close></div>
+    <section class="cancel-modal-panel" role="dialog" aria-modal="true" aria-labelledby="cancel-title">
+        <p class="done-kicker">STORNO</p>
+        <h2 id="cancel-title">Zrušit termín</h2>
+        <p class="cancel-rule">Peníze lze vrátit nejvýše 2 minuty od potvrzení rezervace. Potom už na vrácení peněz není nárok.</p>
+        <p class="cancel-outcome" data-cancel-outcome></p>
+        <div class="cancel-actions">
+            <button type="button" class="btn btn-secondary" data-cancel-close>Nechat termín</button>
+            <button type="button" class="btn btn-danger" data-cancel-confirm>Zrušit termín</button>
+        </div>
+    </section>
+</div>

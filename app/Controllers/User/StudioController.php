@@ -62,8 +62,8 @@ final class StudioController extends Controller
                 [
                     'rid' => (int) $room['id'],
                     'd' => $day,
-                    'o' => '06:00:00',
-                    'c' => '22:00:00',
+                    'o' => '00:00:00',
+                    'c' => '23:59:00',
                     'p' => $hourlyPrice,
                 ]
             );
@@ -117,8 +117,8 @@ final class StudioController extends Controller
             $this->app->db()->insert('opening_hours', [
                 'room_id' => $id,
                 'weekday' => $day,
-                'opens_at' => '06:00:00',
-                'closes_at' => '22:00:00',
+                'opens_at' => '00:00:00',
+                'closes_at' => '23:59:00',
                 'is_closed' => 0,
                 'hourly_price' => null,
             ]);
@@ -153,12 +153,12 @@ final class StudioController extends Controller
         $room = $this->roomFromInput($request);
         $back = $this->roomUrl($room, '/user/studio/doba');
         $sameWeek = (bool) $request->input('same_week');
-        $mondayOpen = (string) $request->input('opens_1', '06:00');
-        $mondayClose = (string) $request->input('closes_1', '22:00');
+        $mondayOpen = (string) $request->input('opens_1', '00:00');
+        $mondayClose = (string) $request->input('closes_1', '23:59');
         $mondayClosed = $request->input('open_1') ? 0 : 1;
         foreach (range(1, 7) as $day) {
-            $open = $sameWeek ? $mondayOpen : (string) $request->input('opens_' . $day, '06:00');
-            $close = $sameWeek ? $mondayClose : (string) $request->input('closes_' . $day, '22:00');
+            $open = $sameWeek ? $mondayOpen : (string) $request->input('opens_' . $day, '00:00');
+            $close = $sameWeek ? $mondayClose : (string) $request->input('closes_' . $day, '23:59');
             $closed = $sameWeek ? $mondayClosed : ($request->input('open_' . $day) ? 0 : 1);
             if ($closed === 0 && $open >= $close) {
                 $this->flashError('Konec musí být později než začátek.');

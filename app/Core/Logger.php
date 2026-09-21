@@ -8,10 +8,6 @@ final class Logger
 {
     public static function log(string $level, string $message, array $context = []): void
     {
-        $dir = dirname(__DIR__, 2) . '/storage/logs';
-        if (!is_dir($dir)) {
-            mkdir($dir, 0750, true);
-        }
         $line = sprintf(
             "[%s] %s: %s %s\n",
             gmdate('Y-m-d H:i:s'),
@@ -19,7 +15,20 @@ final class Logger
             $message,
             $context !== [] ? json_encode(self::redact($context), JSON_UNESCAPED_UNICODE) : ''
         );
-        file_put_contents($dir . '/app-' . gmdate('Y-m-d') . '.log', $line, FILE_APPEND | LOCK_EX);
+        self::append('app-' . gmdate('Y-m-d') . '.log', $line);
+    }
+
+    public static function append(string $filename, string $line): void
+    {
+        $dir = dirname(__DIR__, 2) . '/storage/logs';
+        if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return;
+        }
+        $path = $dir . '/' . ltrim($filename, '/');
+        if (is_file($path) && !is_writable($path)) {
+            return;
+        }
+        @file_put_contents($path, $line, FILE_APPEND | LOCK_EX);
     }
 
     public static function error(string $message, array $context = []): void

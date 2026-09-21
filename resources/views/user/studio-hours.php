@@ -29,7 +29,7 @@ $room = $room ?? null;
             </div>
             <div class="hours-list">
                 <?php foreach ($days as $n => $label):
-                    $h = $map[$n] ?? ['opens_at' => '06:00:00', 'closes_at' => '22:00:00', 'is_closed' => 0];
+                    $h = $map[$n] ?? ['opens_at' => '00:00:00', 'closes_at' => '23:59:00', 'is_closed' => 0];
                     $open = !(int) $h['is_closed'];
                 ?>
                     <div class="hours-row<?= $open ? '' : ' is-closed' ?><?= $n >= 6 ? ' is-weekend' : '' ?>" data-hours-row>
