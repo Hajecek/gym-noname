@@ -18,7 +18,7 @@
 
 <div class="stat-grid">
     <article class="card"><div class="stat-label">Členství</div><div class="stat-value"><?= e($membership['plan_name'] ?? 'Žádné') ?></div></article>
-    <article class="card"><div class="stat-label">Nejbližší rezervace</div><div class="stat-value"><?= $upcoming ? e(format_datetime($upcoming['starts_at'], 'd.m. H:i')) : '—' ?></div></article>
+    <a class="card" href="<?= e(url('/user/moje-rezervace')) ?>"><div class="stat-label">Nejbližší rezervace</div><div class="stat-value"><?= $upcoming ? e(format_datetime($upcoming['starts_at'], 'd.m. H:i')) : '—' ?></div></a>
     <article class="card"><div class="stat-label">Zbývající vstupy</div><div class="stat-value"><?= $remaining === null ? 'Neomezené' : (int) $remaining ?></div></article>
     <article class="card"><div class="stat-label">Fitko</div><div class="stat-value"><?= !empty($occupancy['occupied']) ? 'Obsazeno' : 'Volné' ?></div></article>
 </div>

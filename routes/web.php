@@ -47,6 +47,7 @@ $router->get('/user/overeni', [DashboardController::class, 'verifyNotice'], [Aut
 $router->post('/user/overeni', [DashboardController::class, 'resendVerification'], [AuthMiddleware::class]);
 $router->get('/user/vstup', [DashboardController::class, 'access'], [AuthMiddleware::class]);
 $router->post('/user/vstup', [DashboardController::class, 'openDoor'], [AuthMiddleware::class]);
+$router->get('/user/moje-rezervace', [ReservationController::class, 'mine'], [AuthMiddleware::class]);
 $router->get('/user/rezervace', [ReservationController::class, 'index'], [AuthMiddleware::class]);
 $router->get('/user/rezervace/dostupnost', [ReservationController::class, 'availability'], [AuthMiddleware::class]);
 $router->get('/user/rezervace/kalendar', [ReservationController::class, 'calendar'], [AuthMiddleware::class]);

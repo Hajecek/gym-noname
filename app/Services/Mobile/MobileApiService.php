@@ -106,7 +106,7 @@ final class MobileApiService
     {
         $offers = [];
         foreach ($this->memberships->plans() as $plan) {
-            $price = number_format((float) $plan['price'], 0, ',', ' ') . ' ' . ($plan['currency'] ?? 'Kč');
+            $price = money_format_czk($plan['price']);
             $offers[] = [
                 'id' => $plan['public_id'],
                 'name' => $plan['name'],
@@ -191,23 +191,27 @@ final class MobileApiService
     public function quote(array $user, array $slotIds): array
     {
         $resolved = $this->reservations->resolveSlotIds($slotIds);
-        $localStart = null;
-        if (isset($resolved[0]['start'])) {
-            $startUtc = new \DateTimeImmutable((string) $resolved[0]['start'], new \DateTimeZone('UTC'));
-            $localStart = Clock::toLocal($startUtc->format('Y-m-d H:i:s'));
+        $sum = 0.0;
+        foreach ($resolved as $slot) {
+            $sum += (float) ($slot['price'] ?? 0);
         }
-        $price = $this->reservations->slotPrice($localStart);
         $membership = $this->memberships->activeForUser((int) $user['id']);
         $covered = $membership && (
             $membership['entries_remaining'] === null
             || (int) $membership['entries_remaining'] >= count($resolved)
         );
         if ($covered) {
-            $price = '0.00';
+            $resolved = array_map(static function (array $slot): array {
+                $slot['price'] = '0.00';
+                return $slot;
+            }, $resolved);
+            $sum = 0.0;
         }
+        $count = max(1, count($resolved));
         return [
             'slots' => $resolved,
-            'pricePerSlot' => $price,
+            'pricePerSlot' => number_format($sum / $count, 2, '.', ''),
+            'total' => number_format($sum, 2, '.', ''),
             'currencyCode' => 'CZK',
         ];
     }
@@ -250,7 +254,7 @@ final class MobileApiService
         $quote = $this->quote($user, $slotIds);
         $count = count($quote['slots']);
         $unit = (float) $quote['pricePerSlot'];
-        $total = number_format($unit * $count, 2, '.', '');
+        $total = (string) ($quote['total'] ?? number_format($unit * $count, 2, '.', ''));
         $holds = [];
         try {
             $this->reservations->releasePendingForSlots($user, $slotIds);
@@ -462,6 +466,9 @@ final class MobileApiService
             'end' => Clock::iso($row['ends_at']),
             'room' => (string) $row['room_name'],
             'canCancel' => $canCancel,
+            'bufferMinutes' => (int) ($row['buffer_minutes'] ?? 15),
+            'price' => number_format((float) ($row['price'] ?? 0), 2, '.', ''),
+            'currencyCode' => (string) ($row['currency'] ?? 'CZK'),
         ];
     }
 

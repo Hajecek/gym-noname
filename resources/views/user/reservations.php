@@ -15,14 +15,6 @@ $payload = [
     'availability' => $availability,
     'membership_covers' => !empty($membership_covers),
 ];
-$statusMap = [
-    'pending_payment' => ['Čeká na platbu', 'badge-warn'],
-    'confirmed' => ['Potvrzeno', 'badge-ok'],
-    'cancelled' => ['Zrušeno', 'badge-bad'],
-    'completed' => ['Proběhlo', 'badge-ok'],
-    'expired' => ['Vypršelo', 'badge-bad'],
-    'no_show' => ['Nedorazil', 'badge-bad'],
-];
 ?>
 <div class="page-head">
     <div>
@@ -30,6 +22,7 @@ $statusMap = [
         <h1>Rezervace</h1>
         <p class="muted">Otevři kalendář, vyber den a klikni na blok. Každý blok je 1 h 15 min. Délku 2 nebo 3 hodiny přidáš tlačítky dole.</p>
     </div>
+    <a class="button" href="<?= e(url('/user/moje-rezervace')) ?>">Moje rezervace</a>
 </div>
 
 <div
@@ -128,38 +121,3 @@ $statusMap = [
         <button type="submit" class="btn btn-primary" data-confirm form="book-form">Zaplatit</button>
     </div>
 </div>
-
-<section class="mine">
-    <h2>Moje rezervace</h2>
-    <?php if ($mine === []): ?>
-        <div class="card mine-empty">Zatím nemáš žádnou rezervaci. Vyber den a hodinu výše.</div>
-    <?php else: ?>
-        <div class="mine-list">
-            <?php foreach ($mine as $item):
-                $status = (string) ($item['status'] ?? '');
-                [$statusLabel, $statusClass] = $statusMap[$status] ?? [$status, 'badge-warn'];
-                $canCancel = in_array($status, ['confirmed', 'pending_payment'], true);
-                $startLocal = \App\Support\Clock::toLocal((string) $item['starts_at']);
-                $endShown = \App\Support\Clock::toLocal((string) $item['ends_at'])->modify('+' . (int) ($item['buffer_minutes'] ?? 15) . ' minutes');
-                $whenLabel = $dayNames[(int) $startLocal->format('N')] . ' ' . $startLocal->format('j. n. Y');
-            ?>
-                <article class="mine-card card">
-                    <div>
-                        <p class="mine-when"><?= e($whenLabel) ?></p>
-                        <h3><?= e(format_datetime($item['starts_at'], 'H:i')) ?>–<?= e($endShown->format('H:i')) ?></h3>
-                        <p class="muted"><?= e($item['room_name'] ?? 'Studio') ?> · <?= e(money_format_czk($item['price'] ?? 0)) ?></p>
-                    </div>
-                    <div class="mine-actions">
-                        <span class="badge <?= e($statusClass) ?>"><?= e($statusLabel) ?></span>
-                        <?php if ($canCancel): ?>
-                            <form method="post" action="<?= e(url('/user/rezervace/' . $item['public_id'] . '/zrusit')) ?>">
-                                <?= csrf_field() ?>
-                                <button class="btn btn-danger button-small">Zrušit</button>
-                            </form>
-                        <?php endif; ?>
-                    </div>
-                </article>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-</section>

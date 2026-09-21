@@ -700,7 +700,7 @@ final class ReservationService
         return $this->priceForDuration($this->settings->int('reservation.min_minutes', 60), $hourly);
     }
 
-    /** @return list<array{id:string,start:string,end:string,room:string}> */
+    /** @return list<array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,currencyCode:string}> */
     public function availableSlotsForApp(int $days = 14): array
     {
         try {
@@ -708,7 +708,6 @@ final class ReservationService
         } catch (HttpException) {
             return [];
         }
-        $duration = $this->settings->int('reservation.min_minutes', 60);
         $out = [];
         $day = Clock::nowLocal()->setTime(0, 0);
         for ($i = 0; $i < $days; $i++) {
@@ -722,13 +721,7 @@ final class ReservationService
                     continue;
                 }
                 $start = new \DateTimeImmutable((string) $slot['start_at'], new \DateTimeZone('UTC'));
-                $end = $start->modify('+' . $duration . ' minutes');
-                $out[] = [
-                    'id' => $room['public_id'] . '_' . $start->format('YmdHis'),
-                    'start' => Clock::iso($start->format('Y-m-d H:i:s')),
-                    'end' => Clock::iso($end->format('Y-m-d H:i:s')),
-                    'room' => (string) $room['name'],
-                ];
+                $out[] = $this->slotAppPayload($room['public_id'] . '_' . $start->format('YmdHis'), $start, (string) $room['name']);
             }
         }
         return $out;
@@ -792,13 +785,17 @@ final class ReservationService
             throw new HttpException(422, 'Vyberte alespoň jeden termín.');
         }
         usort($slots, static fn (array $a, array $b): int => strcmp($a['start'], $b['start']));
+        $buffer = $this->bufferMinutes();
         $groups = [];
         $current = null;
         foreach ($slots as $slot) {
-            $start = new \DateTimeImmutable($slot['start'], new \DateTimeZone('UTC'));
-            $end = new \DateTimeImmutable($slot['end'], new \DateTimeZone('UTC'));
-            if ($current !== null && $current['end_utc'] === $start->format('Y-m-d H:i:s')) {
+            $start = (new \DateTimeImmutable($slot['start']))->setTimezone(new \DateTimeZone('UTC'));
+            $end = (new \DateTimeImmutable($slot['end']))->setTimezone(new \DateTimeZone('UTC'));
+            $gap = (int) ($slot['bufferMinutes'] ?? $buffer);
+            $occupiedEnd = $end->modify('+' . $gap . ' minutes');
+            if ($current !== null && $current['occupied_end'] === $start->format('Y-m-d H:i:s')) {
                 $current['end_utc'] = $end->format('Y-m-d H:i:s');
+                $current['occupied_end'] = $occupiedEnd->format('Y-m-d H:i:s');
                 $current['duration'] += (int) (($end->getTimestamp() - $start->getTimestamp()) / 60);
                 $current['slots'][] = $slot;
                 continue;
@@ -810,6 +807,7 @@ final class ReservationService
                 'id' => $slot['id'],
                 'local_start' => Clock::toLocal($start->format('Y-m-d H:i:s'))->format('Y-m-d H:i:s'),
                 'end_utc' => $end->format('Y-m-d H:i:s'),
+                'occupied_end' => $occupiedEnd->format('Y-m-d H:i:s'),
                 'duration' => (int) (($end->getTimestamp() - $start->getTimestamp()) / 60),
                 'slots' => [$slot],
             ];
@@ -917,7 +915,7 @@ final class ReservationService
         $this->releaseOccupancy((int) $reservation['id']);
     }
 
-    /** @return array{id:string,start:string,end:string,room:string} */
+    /** @return array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,currencyCode:string} */
     private function decodeSlotId(string $slotId): array
     {
         if (!preg_match('/^([0-9a-f-]{36})_(\d{14})$/i', $slotId, $match)) {
@@ -931,13 +929,26 @@ final class ReservationService
         if (!$start) {
             throw new HttpException(422, 'Neplatný čas termínu.');
         }
+        return $this->slotAppPayload($slotId, $start, (string) $room['name']);
+    }
+
+    /**
+     * @return array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,currencyCode:string}
+     */
+    private function slotAppPayload(string $slotId, \DateTimeImmutable $startUtc, string $roomName): array
+    {
+        $startUtc = $startUtc->setTimezone(new \DateTimeZone('UTC'));
         $duration = $this->settings->int('reservation.min_minutes', 60);
-        $end = $start->modify('+' . $duration . ' minutes');
+        $end = $startUtc->modify('+' . $duration . ' minutes');
+        $local = Clock::toLocal($startUtc->format('Y-m-d H:i:s'));
         return [
             'id' => $slotId,
-            'start' => Clock::iso($start->format('Y-m-d H:i:s')),
+            'start' => Clock::iso($startUtc->format('Y-m-d H:i:s')),
             'end' => Clock::iso($end->format('Y-m-d H:i:s')),
-            'room' => (string) $room['name'],
+            'room' => $roomName,
+            'bufferMinutes' => $this->bufferMinutes(),
+            'price' => $this->slotPrice($local),
+            'currencyCode' => 'CZK',
         ];
     }
 

@@ -23,38 +23,40 @@ if ($initials === '') {
     <form class="profile-hero-main" method="post" action="<?= e(url('/user/profil/avatar')) ?>" enctype="multipart/form-data" data-avatar-picker>
         <?= csrf_field() ?>
         <input id="profile-avatar-file" data-avatar-input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" hidden>
-        <label class="profile-avatar-edit" for="profile-avatar-file">
-            <span class="profile-avatar-preview<?= $hasAvatar ? ' has-photo' : '' ?>" data-avatar-preview>
-                <span data-avatar-initials<?= $hasAvatar ? ' hidden' : '' ?>><?= e($initials) ?></span>
-                <img data-avatar-preview-img<?= $hasAvatar ? ' src="' . e(avatar_url($user)) . '"' : ' hidden' ?> alt="">
-            </span>
-            <span class="profile-avatar-cam" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 8h2.5l1.6-2.4h6L17.7 8H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><circle cx="12.5" cy="14" r="3.4"/></svg>
-            </span>
-        </label>
-        <div class="profile-hero-copy">
-            <h2><?= e($fullName !== '' ? $fullName : $user['username']) ?></h2>
-            <p class="muted">@<?= e($user['username']) ?> · <?= e(role_label($user['role'] ?? 'user')) ?></p>
-            <dl class="profile-facts">
-                <div>
-                    <dt>Člen od</dt>
-                    <dd><?= e(format_datetime($user['created_at'], 'd. m. Y')) ?></dd>
-                </div>
-                <div class="is-plan">
-                    <dt>Tarif</dt>
-                    <dd><?= e($planName) ?></dd>
-                </div>
-            </dl>
-            <p class="avatar-picker-error" data-avatar-error hidden></p>
-            <div class="profile-hero-actions">
-                <button class="btn btn-primary button-small" type="submit" data-avatar-save hidden>Uložit fotku</button>
-                <label class="btn btn-secondary button-small" for="profile-avatar-file">Změnit fotku</label>
-                <?php if ($hasAvatar): ?>
-                    <button class="btn btn-ghost button-small" type="submit" form="avatar-delete-form">Odstranit</button>
-                <?php endif; ?>
+        <div class="profile-identity">
+            <label class="profile-avatar-edit" for="profile-avatar-file">
+                <span class="profile-avatar-preview<?= $hasAvatar ? ' has-photo' : '' ?>" data-avatar-preview>
+                    <span data-avatar-initials<?= $hasAvatar ? ' hidden' : '' ?>><?= e($initials) ?></span>
+                    <img data-avatar-preview-img<?= $hasAvatar ? ' src="' . e(avatar_url($user)) . '"' : ' hidden' ?> alt="">
+                </span>
+                <span class="profile-avatar-cam" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 8h2.5l1.6-2.4h6L17.7 8H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><circle cx="12.5" cy="14" r="3.4"/></svg>
+                </span>
+            </label>
+            <div class="profile-hero-copy">
+                <h2><?= e($fullName !== '' ? $fullName : $user['username']) ?></h2>
+                <p class="muted">@<?= e($user['username']) ?> · <?= e(role_label($user['role'] ?? 'user')) ?></p>
             </div>
-            <p class="profile-hero-hint">JPEG, PNG nebo WebP do 5 MB. Fotka se ořízne do čtverce.</p>
         </div>
+        <dl class="profile-facts">
+            <div>
+                <dt>Člen od</dt>
+                <dd><?= e(format_datetime($user['created_at'], 'd. m. Y')) ?></dd>
+            </div>
+            <div class="is-plan">
+                <dt>Tarif</dt>
+                <dd><?= e($planName) ?></dd>
+            </div>
+        </dl>
+        <p class="avatar-picker-error" data-avatar-error hidden></p>
+        <div class="profile-hero-actions">
+            <button class="btn btn-primary button-small" type="submit" data-avatar-save hidden>Uložit fotku</button>
+            <label class="btn btn-secondary button-small" for="profile-avatar-file">Změnit fotku</label>
+            <?php if ($hasAvatar): ?>
+                <button class="btn btn-ghost button-small" type="submit" form="avatar-delete-form">Odstranit</button>
+            <?php endif; ?>
+        </div>
+        <p class="profile-hero-hint">JPEG, PNG nebo WebP do 5 MB. Fotka se ořízne do čtverce.</p>
     </form>
 </section>
 <?php if ($hasAvatar): ?>
