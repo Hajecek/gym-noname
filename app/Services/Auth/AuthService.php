@@ -776,13 +776,13 @@ final class AuthService
         $username = preg_replace('/[^a-z0-9._]/', '', $username) ?? $username;
         $prepared = $input;
         $prepared['first_name'] = $first;
-        $prepared['last_name'] = $last !== '' ? $last : ($first !== '' ? $first : 'Člen');
+        $prepared['last_name'] = $last;
         $prepared['username'] = $username;
         $prepared['email'] = (string) ($input['email'] ?? '');
         $prepared['password'] = (string) ($input['password'] ?? '');
-        $prepared['password_confirmation'] = (string) ($input['password_confirmation'] ?? $prepared['password']);
-        $prepared['terms'] = '1';
-        $prepared['privacy'] = '1';
+        $prepared['password_confirmation'] = (string) ($input['password_confirmation'] ?? $input['passwordConfirmation'] ?? '');
+        $prepared['terms'] = $input['terms'] ?? null;
+        $prepared['privacy'] = $input['privacy'] ?? null;
         $user = $this->register($prepared, $request);
         $this->db->update('users', [
             'email_verified_at' => Clock::utc(),

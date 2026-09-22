@@ -67,7 +67,29 @@ final class MobileApiService
             'username' => $user['username'],
             'email' => $user['email'],
             'status' => $status,
+            'avatarURL' => $this->avatarURL($user),
         ];
+    }
+
+    private function avatarURL(array $user): ?string
+    {
+        $stored = (string) ($user['avatar_path'] ?? '');
+        if ($stored === '' || \App\Services\AvatarService::resolveFile($stored) === null) {
+            return null;
+        }
+        $path = '/uploads/avatars/' . rawurlencode(basename($stored));
+        $configured = rtrim((string) config('app.url', ''), '/');
+        if (preg_match('#^(https?://[^/]+)#i', $configured, $match) === 1) {
+            return $match[1] . $path;
+        }
+        $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        $host = preg_replace('/:\d+$/', '', $host) ?? '';
+        if ($host === '') {
+            return $path;
+        }
+        $forwarded = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+        $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $forwarded === 'https';
+        return ($https ? 'https://' : 'http://') . $host . $path;
     }
 
     public function issueSession(array $user, Request $request): array
