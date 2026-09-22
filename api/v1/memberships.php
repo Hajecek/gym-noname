@@ -14,3 +14,4 @@ $router = app()->router();
 
 $router->get('/api/v1/memberships/plans', [MembershipsController::class, 'plans']);
 $router->get('/api/v1/memberships/me', [MembershipsController::class, 'me'], [AuthMiddleware::class]);
+$router->get('/api/v1/memberships/me/pass', [MembershipsController::class, 'pass'], [AuthMiddleware::class]);

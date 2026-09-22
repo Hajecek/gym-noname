@@ -160,6 +160,11 @@ final class MobileApiService
         ];
     }
 
+    public function membershipPass(array $user): string
+    {
+        return WalletPassBuilder::fromEnvironment()->build($user, $this->membership($user));
+    }
+
     public function reservations(array $user): array
     {
         $items = [];
