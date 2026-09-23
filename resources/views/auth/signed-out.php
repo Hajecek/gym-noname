@@ -1,7 +1,7 @@
 <?php
 $reason = (string) ($logout_reason ?? 'idle');
 $message = trim((string) ($logout_message ?? ''));
-$minutes = (int) ($idle_minutes ?? 1440);
+$minutes = (int) ($idle_minutes ?? 20);
 if ($minutes >= 60 && $minutes % 60 === 0) {
     $hours = intdiv($minutes, 60);
     $span = $hours . ' ' . ($hours === 1 ? 'hodině' : 'hodinách');
@@ -23,7 +23,7 @@ $title = match ($reason) {
 $lead = match ($reason) {
     'blocked' => 'Do PRIVOFIT se teď nepřihlásíš. Pokud to chceš řešit, ozvi se nám.',
     'deleted' => 'Tvůj účet byl trvale odstraněn a už se k němu nejde vrátit.',
-    default => 'Relace skončila po ' . $span . ' bez aktivity. Platí to i když je notebook zavřený.',
+    default => 'Relace skončila po ' . $span . ' bez aktivity — i když je notebook zavřený nebo záložka jen běží na pozadí.',
 };
 if ($message === '') {
     $message = match ($reason) {

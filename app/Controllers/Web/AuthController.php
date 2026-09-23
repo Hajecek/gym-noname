@@ -244,7 +244,7 @@ final class AuthController extends Controller
 
     public function signedOut(): never
     {
-        $minutes = max(5, (int) config('security.session.idle_minutes', 1440));
+        $minutes = max(5, (int) config('security.session.idle_minutes', 20));
         $reason = (string) Session::pull('logged_out_reason', 'idle');
         $message = (string) Session::pull('logged_out_message', '');
         $this->view('auth/signed-out', [

@@ -229,7 +229,7 @@ final class ApplicationFlowTest extends TestCase
     public function testIdleSessionIsRevokedEvenWithoutABrowserRequest(): void
     {
         $user = $this->createVerifiedUser('idle');
-        $last = Clock::nowUtc()->modify('-25 hours')->format('Y-m-d H:i:s');
+        $last = Clock::nowUtc()->modify('-25 minutes')->format('Y-m-d H:i:s');
         $sessionId = (int) $this->db->insert('user_sessions', [
             'user_id' => (int) $user['id'],
             'token_hash' => Crypto::hash(bin2hex(random_bytes(8))),

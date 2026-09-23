@@ -33,7 +33,7 @@ final class Auth
         }
 
         $row = $this->db->fetch(
-            'SELECT s.id AS session_row_id, s.last_activity_at, s.expires_at, s.revoked_at, u.*
+            'SELECT s.id AS session_row_id, s.last_activity_at, s.expires_at, s.revoked_at, s.is_remembered, u.*
              FROM user_sessions s
              INNER JOIN users u ON u.id = s.user_id
              WHERE s.id = :sid AND s.user_id = :uid',
@@ -63,13 +63,21 @@ final class Auth
         }
 
         if (!$this->isPresenceCheck($request)) {
+            $lifetimeMinutes = !empty($row['is_remembered'])
+                ? (int) config('security.session.remember_days', 30) * 1440
+                : (int) config('security.session.lifetime', 20160);
+            $lifetimeMinutes = max(5, $lifetimeMinutes);
             $this->db->query(
-                'UPDATE user_sessions SET last_activity_at = :now WHERE id = :id',
-                ['now' => Clock::utc(), 'id' => (int) $row['session_row_id']]
+                'UPDATE user_sessions SET last_activity_at = :now, expires_at = :exp WHERE id = :id',
+                [
+                    'now' => Clock::utc(),
+                    'exp' => Clock::nowUtc()->modify('+' . $lifetimeMinutes . ' minutes')->format('Y-m-d H:i:s'),
+                    'id' => (int) $row['session_row_id'],
+                ]
             );
         }
         $this->sessionRowId = (int) $row['session_row_id'];
-        unset($row['session_row_id'], $row['last_activity_at'], $row['expires_at'], $row['revoked_at']);
+        unset($row['session_row_id'], $row['last_activity_at'], $row['expires_at'], $row['revoked_at'], $row['is_remembered']);
         $this->user = $row;
     }
 
@@ -97,7 +105,7 @@ final class Auth
 
     private function idleExpired(array $row): bool
     {
-        $minutes = max(5, (int) config('security.session.idle_minutes', 1440));
+        $minutes = max(5, (int) config('security.session.idle_minutes', 20));
         $last = new \DateTimeImmutable((string) $row['last_activity_at'], new \DateTimeZone('UTC'));
         return $last->modify('+' . $minutes . ' minutes') <= Clock::nowUtc();
     }
