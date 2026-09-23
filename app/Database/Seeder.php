@@ -117,9 +117,9 @@ final class Seeder
     private function plans(): void
     {
         $plans = [
-            ['slug' => 'single', 'name' => 'Jednorázový vstup', 'description' => 'TESTOVACÍ CENA: jeden vstup do soukromého studia.', 'type' => 'single', 'price' => '249.00', 'entries' => 1, 'duration_days' => null, 'max_guests' => 0, 'sort_order' => 1],
-            ['slug' => 'pack10', 'name' => 'Balíček 10 vstupů', 'description' => 'TESTOVACÍ CENA: deset vstupů.', 'type' => 'pack', 'price' => '1990.00', 'entries' => 10, 'duration_days' => 180, 'max_guests' => 1, 'sort_order' => 2],
-            ['slug' => 'monthly', 'name' => 'Měsíční členství', 'description' => 'TESTOVACÍ CENA: měsíční tarif.', 'type' => 'monthly', 'price' => '2490.00', 'entries' => null, 'duration_days' => 30, 'max_guests' => 1, 'sort_order' => 3],
+            ['slug' => 'single', 'name' => 'Jednorázový vstup', 'description' => 'Jeden vstup za 150 Kč, stejně jako jeden blok.', 'type' => 'single', 'price' => '150.00', 'entries' => 1, 'duration_days' => null, 'max_guests' => 0, 'sort_order' => 1],
+            ['slug' => 'pack10', 'name' => 'Balíček 10 vstupů', 'description' => 'Deset vstupů na 180 dní. 135 Kč za vstup, o 150 Kč méně než deset jednorázových.', 'type' => 'pack', 'price' => '1350.00', 'entries' => 10, 'duration_days' => 180, 'max_guests' => 1, 'sort_order' => 2],
+            ['slug' => 'monthly', 'name' => 'Měsíční členství', 'description' => 'Neomezené vstupy na 30 dní. V ceně je osm vstupů, další už zdarma.', 'type' => 'monthly', 'price' => '1200.00', 'entries' => null, 'duration_days' => 30, 'max_guests' => 1, 'sort_order' => 3],
             ['slug' => 'credit', 'name' => 'Kredit 2000 Kč', 'description' => 'TESTOVACÍ CENA: předplacený kredit.', 'type' => 'credit', 'price' => '2000.00', 'entries' => null, 'duration_days' => 365, 'max_guests' => 0, 'sort_order' => 4],
         ];
         foreach ($plans as $plan) {

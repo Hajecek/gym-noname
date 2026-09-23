@@ -37,7 +37,12 @@ final class AuthMiddleware
             header('Location: ' . $app->url('/odhlaseno'));
             exit;
         }
-        Session::set('intended', $request->path());
+        $intended = $request->path();
+        $query = (string) ($_SERVER['QUERY_STRING'] ?? '');
+        if ($query !== '') {
+            $intended .= '?' . $query;
+        }
+        Session::set('intended', $intended);
         Session::flash('error', 'Pro pokračování se prosím přihlaste.');
         header('Location: ' . $app->url('/prihlaseni'));
         exit;

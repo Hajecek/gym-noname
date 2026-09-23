@@ -31,11 +31,14 @@ return [
     'google' => [
         'client_id' => env_value('GOOGLE_CLIENT_ID', ''),
         'client_secret' => env_value('GOOGLE_CLIENT_SECRET', ''),
+        'ios_client_id' => env_value('GOOGLE_IOS_CLIENT_ID', ''),
+        'ios_redirect_uri' => env_value('GOOGLE_IOS_REDIRECT_URI', ''),
     ],
     'apple' => [
         'client_id' => env_value('APPLE_CLIENT_ID', ''),
         'team_id' => env_value('APPLE_TEAM_ID', ''),
         'key_id' => env_value('APPLE_KEY_ID', ''),
         'private_key' => env_value('APPLE_PRIVATE_KEY', ''),
+        'bundle_id' => env_value('APPLE_BUNDLE_ID', 'cz.privofit.app'),
     ],
 ];

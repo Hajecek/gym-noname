@@ -21,12 +21,14 @@ final class PublicController extends Controller
             'title' => 'PRIVOFIT — Tvůj prostor. Tvoje pravidla.',
             'page' => 'home',
             'description' => 'Objev soukromé fitness PRIVOFIT. Prostor pro tvůj trénink, tvoje tempo a tvoje lepší já.',
+            'plans' => $this->publicPlans(),
+            'hourlyPrice' => (float) $this->app->settings()->get('pricing.hourly', 150),
         ]);
     }
 
     public function pricing(Request $request): never
     {
-        $plans = (new MembershipService($this->app->db()))->plans();
+        $plans = $this->publicPlans();
         $this->publicView('public/pricing', [
             'title' => 'Ceník',
             'plans' => $plans,
@@ -224,6 +226,17 @@ final class PublicController extends Controller
         } catch (\Throwable) {
             $this->sendInitialsSvg('PF');
         }
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function publicPlans(): array
+    {
+        $plans = (new MembershipService($this->app->db()))->plans();
+
+        return array_values(array_filter(
+            $plans,
+            static fn (array $plan): bool => ($plan['type'] ?? '') !== 'credit'
+        ));
     }
 
     private function sendInitialsSvg(string $initials): never

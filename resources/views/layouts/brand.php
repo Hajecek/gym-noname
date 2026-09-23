@@ -25,7 +25,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=25">
+    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=27">
     <link rel="manifest" href="<?= e(url('/manifest.json')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="PRIVOFIT">
@@ -38,6 +38,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     <nav aria-label="Hlavní navigace">
         <a href="<?= e(url('/#prostor')) ?>">Proč PRIVOFIT</a>
         <a href="<?= e(url('/#jak-to-funguje')) ?>">Jak to funguje</a>
+        <a href="<?= e(url('/#cenik')) ?>">Ceník</a>
         <a href="<?= e(url('/#vstup')) ?>">Vstup do fitka</a>
         <a href="<?= e(url('/#otazky')) ?>">Otázky</a>
         <a href="<?= e(url('/zajem')) ?>">Zájem</a>

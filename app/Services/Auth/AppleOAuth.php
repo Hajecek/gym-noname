@@ -116,8 +116,84 @@ final class AppleOAuth
         ];
     }
 
-    /** @return array<string, mixed> */
-    private static function verifiedClaims(string $jwt, string $nonce, bool $requireNonce = true): array
+    public static function bundleId(): string
+    {
+        $id = trim((string) env_value('APPLE_BUNDLE_ID', 'cz.privofit.app'));
+        return $id !== '' ? $id : 'cz.privofit.app';
+    }
+
+    public static function mobileNonce(string $rawNonce): string
+    {
+        return hash('sha256', $rawNonce);
+    }
+
+    /**
+     * Nativní Sign in with Apple. Audience tokenu je bundle ID aplikace.
+     * Nonce v tokenu je SHA-256 hex surového nonce z aplikace.
+     *
+     * @return array{sub:string,email:string,given_name:string,family_name:string,name:string}
+     */
+    public static function profileFromMobile(
+        string $identityToken,
+        string $rawNonce,
+        string $authorizationCode,
+        ?string $givenName,
+        ?string $familyName
+    ): array {
+        $rawNonce = trim($rawNonce);
+        $authorizationCode = trim($authorizationCode);
+        if (
+            strlen($identityToken) < 20
+            || strlen($identityToken) > 8192
+            || strlen($rawNonce) < 16
+            || strlen($rawNonce) > 256
+            || $authorizationCode === ''
+            || strlen($authorizationCode) > 512
+        ) {
+            throw new HttpException(403, 'Apple účet se nepodařilo ověřit.');
+        }
+        $nonce = self::mobileNonce($rawNonce);
+        $claims = self::verifiedClaims($identityToken, $nonce, true, [self::bundleId()]);
+        if (self::canSignClientSecret()) {
+            $token = self::request('https://appleid.apple.com/auth/token', [
+                'client_id' => self::bundleId(),
+                'client_secret' => self::clientSecret(self::bundleId()),
+                'code' => $authorizationCode,
+                'grant_type' => 'authorization_code',
+            ]);
+            $second = self::verifiedClaims((string) ($token['id_token'] ?? ''), $nonce, false, [self::bundleId()]);
+            if (($second['sub'] ?? '') !== ($claims['sub'] ?? '')) {
+                throw new HttpException(403, 'Apple účet se nepodařilo ověřit.');
+            }
+        }
+        $email = mb_strtolower(trim((string) ($claims['email'] ?? '')));
+        $verified = filter_var($claims['email_verified'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($email === '' || !$verified) {
+            throw new HttpException(403, 'Apple neposlal ověřený e-mail. Při souhlasu ho nech sdílet.');
+        }
+        $given = self::personName($givenName);
+        $family = self::personName($familyName);
+
+        return [
+            'sub' => (string) $claims['sub'],
+            'email' => $email,
+            'given_name' => $given,
+            'family_name' => $family,
+            'name' => trim($given . ' ' . $family),
+        ];
+    }
+
+    private static function personName(?string $value): string
+    {
+        $name = trim((string) $value);
+        $name = preg_replace('/\s+/u', ' ', $name) ?? '';
+        return mb_substr($name, 0, 100);
+    }
+
+    /** @param list<string>|null $audiences
+     *  @return array<string, mixed>
+     */
+    private static function verifiedClaims(string $jwt, string $nonce, bool $requireNonce = true, ?array $audiences = null): array
     {
         $parts = explode('.', $jwt);
         if (count($parts) !== 3) {
@@ -139,8 +215,14 @@ final class AppleOAuth
                 : 0,
             default => 0,
         };
+        $allowed = array_values(array_filter(
+            $audiences ?? [self::clientId()],
+            static fn (mixed $item): bool => is_string($item) && $item !== ''
+        ));
         $aud = $claims['aud'] ?? '';
-        $audOk = is_string($aud) ? $aud === self::clientId() : (is_array($aud) && in_array(self::clientId(), $aud, true));
+        $audOk = is_string($aud)
+            ? in_array($aud, $allowed, true)
+            : (is_array($aud) && array_intersect($allowed, $aud) !== []);
         $nonceOk = hash_equals($nonce, (string) ($claims['nonce'] ?? ''));
         if (!$requireNonce && !isset($claims['nonce'])) {
             $nonceOk = true;
@@ -213,8 +295,17 @@ final class AppleOAuth
         return "-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PUBLIC KEY-----\n";
     }
 
-    private static function clientSecret(): string
+    private static function canSignClientSecret(): bool
     {
+        return self::teamId() !== '' && self::keyId() !== '' && is_readable(self::keyPath());
+    }
+
+    private static function clientSecret(?string $subject = null): string
+    {
+        $subject = $subject ?? self::clientId();
+        if ($subject === '') {
+            throw new HttpException(500, 'Přihlášení přes Apple ještě není nastavené.');
+        }
         $header = self::b64url((string) json_encode(['alg' => 'ES256', 'kid' => self::keyId()], JSON_THROW_ON_ERROR));
         $now = time();
         $payload = self::b64url((string) json_encode([
@@ -222,7 +313,7 @@ final class AppleOAuth
             'iat' => $now,
             'exp' => $now + 3600,
             'aud' => 'https://appleid.apple.com',
-            'sub' => self::clientId(),
+            'sub' => $subject,
         ], JSON_THROW_ON_ERROR));
         $data = $header . '.' . $payload;
         $key = openssl_pkey_get_private((string) file_get_contents(self::keyPath()));

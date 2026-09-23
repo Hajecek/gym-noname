@@ -74,6 +74,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/Success"
         "401": { description: Neplatné přihlášení nebo MFA }
+  /auth/google:
+    post:
+      tags: [Auth]
+      summary: Výměna jednorázového kódu z přihlášení přes Google v aplikaci
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ticket]
+              properties:
+                ticket: { type: string }
+                platform: { type: string, enum: [ios, android, web, other] }
+                deviceName: { type: string }
+      responses:
+        "200": { description: Tokens }
+        "422": { description: Účet se nepodařilo ověřit }
+  /auth/apple:
+    post:
+      tags: [Auth]
+      summary: Přihlášení z iOS přes Sign in with Apple
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identityToken, authorizationCode, rawNonce]
+              properties:
+                identityToken: { type: string }
+                authorizationCode: { type: string }
+                rawNonce: { type: string }
+                givenName: { type: string }
+                familyName: { type: string }
+                platform: { type: string, enum: [ios, android, web, other] }
+                deviceName: { type: string }
+      responses:
+        "200": { description: Tokens }
+        "422": { description: Účet se nepodařilo ověřit }
   /auth/refresh:
     post:
       tags: [Auth]

@@ -817,6 +817,93 @@ h2 {
 .circle-link:hover {
   background: var(--lime-deep);
 }
+.pricing {
+  padding-top: 40px;
+  padding-bottom: 110px;
+}
+.pricing .section-heading {
+  display: block;
+}
+.pricing .section-heading h2 span {
+  color: var(--lime);
+}
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.price-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 28px 26px 24px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: #121a16;
+}
+.price-card.is-featured {
+  border-color: #c6f21a66;
+  background: #172016;
+}
+.price-flag {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+.price-card h3 {
+  margin: 0 72px 8px 0;
+  font-size: 22px;
+  letter-spacing: -0.4px;
+}
+.price-amount {
+  margin: 8px 0 0;
+  font-family: var(--display);
+  font-size: 42px;
+  letter-spacing: -1.5px;
+  line-height: 1;
+}
+.price-entries {
+  margin: 10px 0 0;
+  color: var(--lime);
+  font-weight: 600;
+}
+.price-card ul {
+  margin: 18px 0 22px;
+  padding: 0;
+  list-style: none;
+  color: var(--secondary);
+  flex: 1;
+}
+.price-card li {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+}
+.price-card .button,
+.price-card form {
+  margin-top: auto;
+}
+.price-card .button {
+  width: 100%;
+  justify-content: center;
+}
+.price-note {
+  margin: 22px 0 0;
+  color: var(--secondary);
+  font-size: 15px;
+}
+.price-note a {
+  color: var(--lime);
+}
 .faq {
   padding-top: 105px;
   padding-bottom: 95px;
@@ -1381,7 +1468,8 @@ label small {
     gap: 18px;
     margin-bottom: 32px;
   }
-  .benefit-grid {
+  .benefit-grid,
+  .price-grid {
     grid-template-columns: 1fr;
     gap: 16px;
   }
@@ -1616,7 +1704,8 @@ label small {
     font-size: 16px;
     margin-top: 20px;
   }
-  .benefit-grid {
+  .benefit-grid,
+  .price-grid {
     grid-template-columns: 1fr;
     gap: 16px;
   }

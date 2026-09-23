@@ -103,23 +103,31 @@ final class AuthController extends Controller
         $this->redirect(is_string($intended) ? $intended : '/user');
     }
 
-    public function googleStart(): never
+    public function googleStart(Request $request): never
     {
+        $mobile = $request->query('mobile') === '1';
         if (!GoogleOAuth::configured()) {
+            if ($mobile) {
+                $this->redirectMobileError('Přihlášení přes Google ještě není nastavené.');
+            }
             $this->flashError('Přihlášení přes Google ještě není nastavené.');
             $this->redirect('/prihlaseni');
         }
         $state = bin2hex(random_bytes(16));
-        Session::set('oauth_google', ['state' => $state, 'at' => time()]);
+        Session::set('oauth_google', ['state' => $state, 'at' => time(), 'mobile' => $mobile]);
         Response::redirect(GoogleOAuth::authorizationUrl($state, $this->app->absoluteUrl('/prihlaseni/google/callback')));
     }
 
     public function googleCallback(Request $request): never
     {
         $saved = Session::pull('oauth_google');
+        $mobile = is_array($saved) && !empty($saved['mobile']);
         $state = (string) $request->query('state', '');
         $code = (string) $request->query('code', '');
         if ((string) $request->query('error', '') !== '') {
+            if ($mobile) {
+                $this->redirectMobileError('Přihlášení přes Google bylo zrušené.');
+            }
             $this->flashError('Přihlášení přes Google bylo zrušené.');
             $this->redirect('/prihlaseni');
         }
@@ -128,14 +136,25 @@ final class AuthController extends Controller
             && hash_equals((string) $saved['state'], $state)
             && time() - (int) ($saved['at'] ?? 0) <= 600;
         if (!$fresh || $code === '') {
+            if ($mobile) {
+                $this->redirectMobileError('Přihlášení přes Google vypršelo. Zkus to znovu.');
+            }
             $this->flashError('Přihlášení přes Google vypršelo. Zkus to znovu.');
             $this->redirect('/prihlaseni');
         }
         try {
             $profile = GoogleOAuth::profile($code, $this->app->absoluteUrl('/prihlaseni/google/callback'));
+            if ($mobile) {
+                $user = $this->authService()->loginFromAppWithOAuth('google', $profile, $request);
+                $ticket = $this->authService()->issueMobileLoginTicket($user);
+                Response::redirect('privofit://oauth?ticket=' . rawurlencode($ticket));
+            }
             $user = $this->authService()->loginWithGoogle($profile, $request);
             $this->app->auth()->setUser($user, (int) Session::get('auth_session_id'));
         } catch (MfaRequiredException $e) {
+            if ($mobile) {
+                $this->redirectMobileError('Účet má zapnuté ověření kódem. Přihlas se e-mailem a heslem.');
+            }
             Session::set('mfa_pending_user_id', (int) $e->user['id']);
             Session::set('mfa_pending_remember', false);
             $this->view('auth/login', [
@@ -147,11 +166,22 @@ final class AuthController extends Controller
                 'remember' => false,
             ], 'layouts/brand');
         } catch (HttpException $e) {
+            if ($mobile) {
+                $this->redirectMobileError($e->getMessage());
+            }
             $this->flashError($e->getMessage());
             $this->redirect('/prihlaseni');
         }
+        if ($mobile) {
+            $this->redirectMobileError('Přihlášení přes Google se nepovedlo. Zkus to znovu.');
+        }
         $intended = Session::pull('intended', '/user');
         $this->redirect(is_string($intended) ? $intended : '/user');
+    }
+
+    private function redirectMobileError(string $message): never
+    {
+        Response::redirect('privofit://oauth?error=' . rawurlencode($message));
     }
 
     public function appleStart(): never

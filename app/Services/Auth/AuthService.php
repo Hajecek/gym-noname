@@ -323,6 +323,75 @@ final class AuthService
         return $this->findById((int) $user['id']);
     }
 
+    public function assertOAuthAttempt(Request $request): void
+    {
+        $ip = $request->ip();
+        if ($this->limiter->tooMany('oauth-app', $ip, 30, 15)) {
+            throw new HttpException(429, 'Příliš mnoho pokusů o přihlášení. Zkuste to později.');
+        }
+        $this->limiter->hit('oauth-app', $ip);
+    }
+
+    /** @param array{sub:string,email:string,given_name:string,family_name:string,name:string} $profile */
+    public function loginFromAppWithOAuth(string $provider, array $profile, Request $request, ?string $totp = null): array
+    {
+        $user = $this->findOrCreateOAuthUser($provider, $profile);
+        if (in_array($user['status'], ['blocked', 'deleted'], true) || !empty($user['deleted_at'])) {
+            throw new HttpException(403, 'Tento účet je zablokovaný.');
+        }
+        if ((int) $user['mfa_enabled'] === 1) {
+            if ($totp === null || $totp === '') {
+                throw new MfaRequiredException($user);
+            }
+            if (!$this->verifyTotp($user, $totp) && !$this->consumeRecoveryCode($user, $totp)) {
+                throw new HttpException(422, 'Neplatný ověřovací kód.');
+            }
+        }
+        $this->db->update('users', [
+            'last_login_at' => Clock::utc(),
+            'last_login_ip' => $request->ip(),
+        ], 'id = :id', ['id' => (int) $user['id']]);
+        return $this->findById((int) $user['id']);
+    }
+
+    public function issueMobileLoginTicket(array $user): string
+    {
+        $raw = Crypto::token(32);
+        $this->db->insert('oauth_mobile_tickets', [
+            'token_hash' => Crypto::hash($raw),
+            'user_id' => (int) $user['id'],
+            'expires_at' => Clock::nowUtc()->modify('+2 minutes')->format('Y-m-d H:i:s'),
+            'created_at' => Clock::utc(),
+        ]);
+        return $raw;
+    }
+
+    public function consumeMobileLoginTicket(string $ticket): array
+    {
+        $ticket = trim($ticket);
+        if ($ticket === '' || strlen($ticket) > 128) {
+            throw new HttpException(422, 'Přihlášení přes Google vypršelo. Zkus to znovu.');
+        }
+        $row = $this->db->fetch(
+            'SELECT * FROM oauth_mobile_tickets WHERE token_hash = :h',
+            ['h' => Crypto::hash($ticket)]
+        );
+        if (!$row || $row['used_at'] !== null || $row['expires_at'] < Clock::utc()) {
+            throw new HttpException(422, 'Přihlášení přes Google vypršelo. Zkus to znovu.');
+        }
+        $used = $this->db->update('oauth_mobile_tickets', [
+            'used_at' => Clock::utc(),
+        ], 'id = :id AND used_at IS NULL', ['id' => (int) $row['id']]);
+        if ($used !== 1) {
+            throw new HttpException(422, 'Přihlášení přes Google vypršelo. Zkus to znovu.');
+        }
+        $user = $this->findById((int) $row['user_id']);
+        if (in_array($user['status'], ['blocked', 'deleted'], true) || !empty($user['deleted_at'])) {
+            throw new HttpException(403, 'Tento účet je zablokovaný.');
+        }
+        return $user;
+    }
+
     public function verifyCredentials(string $identifier, string $password, Request $request, ?string $totp = null): array
     {
         $identifier = trim($identifier);

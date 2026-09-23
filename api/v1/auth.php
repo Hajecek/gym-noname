@@ -14,6 +14,8 @@ $router = app()->router();
 
 $router->post('/api/v1/auth/register', [AuthController::class, 'register']);
 $router->post('/api/v1/auth/login', [AuthController::class, 'login']);
+$router->post('/api/v1/auth/google', [AuthController::class, 'google']);
+$router->post('/api/v1/auth/apple', [AuthController::class, 'apple']);
 $router->post('/api/v1/auth/logout', [AuthController::class, 'logout'], [AuthMiddleware::class]);
 $router->post('/api/v1/auth/refresh', [AuthController::class, 'refresh']);
 $router->post('/api/v1/auth/forgot-password', [AuthController::class, 'forgot']);

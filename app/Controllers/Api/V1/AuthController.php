@@ -6,6 +6,7 @@ namespace App\Controllers\Api\V1;
 
 use App\Core\HttpException;
 use App\Core\Request;
+use App\Services\Auth\AppleOAuth;
 use App\Services\Auth\MfaRequiredException;
 use App\Services\Auth\ValidationException;
 
@@ -37,6 +38,54 @@ final class AuthController extends Controller
             $this->jsonError('Vyžadován TOTP kód.', 401, ['mfa' => true]);
         } catch (HttpException $e) {
             $this->jsonError($e->getMessage(), $e->status);
+        }
+    }
+
+    public function google(Request $request): never
+    {
+        try {
+            $this->auth()->assertOAuthAttempt($request);
+            $user = $this->auth()->consumeMobileLoginTicket($this->str($request, 'ticket', 'ticket'));
+            $this->send($this->api()->issueSession($user, $request));
+        } catch (HttpException $e) {
+            $status = $e->status === 403 ? 422 : $e->status;
+            $this->jsonError($e->getMessage(), $status);
+        }
+    }
+
+    public function apple(Request $request): never
+    {
+        $this->oauthSession($request, function () use ($request): array {
+            $given = $request->input('givenName', $request->input('given_name'));
+            $family = $request->input('familyName', $request->input('family_name'));
+            return AppleOAuth::profileFromMobile(
+                $this->str($request, 'identityToken', 'identity_token'),
+                $this->str($request, 'rawNonce', 'raw_nonce'),
+                $this->str($request, 'authorizationCode', 'code'),
+                is_string($given) ? $given : null,
+                is_string($family) ? $family : null
+            );
+        }, 'apple');
+    }
+
+    /** @param callable(): array{sub:string,email:string,given_name:string,family_name:string,name:string} $profile */
+    private function oauthSession(Request $request, callable $profile, string $provider): never
+    {
+        try {
+            $this->auth()->assertOAuthAttempt($request);
+            $totp = $request->input('totp');
+            $user = $this->auth()->loginFromAppWithOAuth(
+                $provider,
+                $profile(),
+                $request,
+                is_string($totp) && $totp !== '' ? $totp : null
+            );
+            $this->send($this->api()->issueSession($user, $request));
+        } catch (MfaRequiredException) {
+            $this->jsonError('Vyžadován ověřovací kód.', 422, ['mfa' => true]);
+        } catch (HttpException $e) {
+            $status = $e->status === 403 ? 422 : $e->status;
+            $this->jsonError($e->getMessage(), $status);
         }
     }
 

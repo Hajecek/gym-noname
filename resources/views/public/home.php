@@ -181,6 +181,84 @@
             <a href="<?= e(url('/registrace')) ?>" class="circle-link magnetic" aria-label="Vytvořit účet">↗</a>
         </div>
     </section>
+    <section class="pricing wrapper" id="cenik">
+        <?php
+        $hourly = (float) ($hourlyPrice ?? 150);
+        $singlePrice = $hourly;
+        foreach ($plans ?? [] as $plan) {
+            if (($plan['type'] ?? '') === 'single') {
+                $singlePrice = (float) $plan['price'];
+            }
+        }
+        ?>
+        <div class="section-heading reveal">
+            <div>
+                <div class="eyebrow">04 — CENÍK</div>
+                <h2>Jak často<br><span>chceš přijít?</span></h2>
+            </div>
+        </div>
+        <div class="price-grid">
+            <?php
+            foreach ($plans ?? [] as $plan):
+                $type = (string) ($plan['type'] ?? '');
+                $featured = $type === 'monthly';
+                $price = (float) $plan['price'];
+                $entries = $plan['entries'];
+                if ($entries === null && $type === 'monthly') {
+                    $entriesLabel = 'Neomezené vstupy';
+                } else {
+                    $count = (int) $entries;
+                    $entriesLabel = $count === 1 ? '1 vstup' : ($count > 1 && $count < 5 ? $count . ' vstupy' : $count . ' vstupů');
+                }
+                $lines = ['Den si vybereš po zaplacení'];
+                if ($type === 'single') {
+                    $lines = [
+                        'Jeden vstup do studia',
+                        '1 h 15 min',
+                        'Den si vybereš po zaplacení',
+                    ];
+                } elseif ($type === 'pack' && (int) $entries > 0) {
+                    $unit = $price / (int) $entries;
+                    $saved = max(0, $singlePrice * (int) $entries - $price);
+                    $lines = [
+                        money_format_czk($unit) . ' za vstup',
+                        $saved > 0 ? 'Ušetříš ' . money_format_czk($saved) . ' proti jednorázovým' : 'Levnější než jednorázové vstupy',
+                        'Platí 180 dní',
+                    ];
+                } elseif ($type === 'monthly') {
+                    $included = $singlePrice > 0 ? (int) round($price / $singlePrice) : 0;
+                    $includedLabel = $included === 1 ? '1 vstup v ceně' : ($included > 1 && $included < 5 ? $included . ' vstupy v ceně' : $included . ' vstupů v ceně');
+                    $lines = [
+                        'Neomezené vstupy na 30 dní',
+                        $included > 0 ? $includedLabel . ', další už zdarma' : 'Když chodíš víckrát do týdne',
+                        'Jeden termín = jeden vstup',
+                    ];
+                }
+            ?>
+            <article class="price-card reveal<?= $featured ? ' is-featured' : '' ?>">
+                <?php if ($featured): ?><p class="price-flag">Pravidelně</p><?php endif; ?>
+                <h3><?= e($plan['name']) ?></h3>
+                <p class="price-amount"><?= e(money_format_czk($plan['price'])) ?></p>
+                <p class="price-entries"><?= e($entriesLabel) ?></p>
+                <ul>
+                    <?php foreach ($lines as $line): ?>
+                        <li><?= e($line) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+                <?php if ($user): ?>
+                    <form method="post" action="<?= e(url('/user/clenstvi')) ?>">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="plan" value="<?= e($plan['public_id']) ?>">
+                        <button class="button" type="submit">Zaplatit <span>↗</span></button>
+                    </form>
+                <?php else: ?>
+                    <a class="button" href="<?= e(url('/user/clenstvi')) ?>">Přihlas se a zaplať <span>↗</span></a>
+                <?php endif; ?>
+            </article>
+            <?php endforeach; ?>
+        </div>
+        <p class="price-note reveal">Bez tarifu stojí blok taky <?= e(money_format_czk($hourly)) ?> · 1 h 15 min. Dva bloky <?= e(money_format_czk($hourly * 2)) ?>, tři <?= e(money_format_czk($hourly * 3)) ?>. <a href="<?= e(url('/user/rezervace')) ?>">Rezervace</a> i platba tarifu jdou až z účtu.</p>
+    </section>
     <section class="faq wrapper" id="otazky">
         <div class="section-heading reveal">
             <div>
@@ -204,7 +282,7 @@
             </details>
             <details>
                 <summary>Kde najdu ceny a dostupné termíny?<span>+</span></summary>
-                <p>Ceník, adresa a dostupné časy budou zveřejněné před spuštěním rezervací. Aktuální nabídku najdeš také v <a href="<?= e(url('/cenik')) ?>">ceníku</a>.</p>
+                <p>Jeden vstup stojí <?= e(money_format_czk($singlePrice ?? $hourlyPrice ?? 150)) ?>. Balíček a měsíc vycházejí líp, když chodíš častěji. Ceny jsou v <a href="#cenik">ceníku</a>.</p>
             </details>
         </div>
     </section>
@@ -217,7 +295,7 @@
                     <h2>Ještě neotevíráme.</h2>
                     <p>PRIVOFIT je soukromé fitness — celé studio jen pro tebe, bez cizích lidí a bez front. Teď sbíráme e-maily, abychom věděli, kolik lidí o to stojí.</p>
                     <ul class="interest-points">
-                        <li>Nic se teď neplatí a nic se nerezervuje</li>
+                        <li>Tarif i rezervace se platí až z přihlášeného účtu</li>
                         <li>Až spustíme první termíny, ozveme se ti jako první</li>
                     </ul>
                 </div>
