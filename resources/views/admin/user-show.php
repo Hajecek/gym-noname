@@ -94,19 +94,27 @@ foreach ($plans as $plan) {
         <div>
             <p class="eyebrow"><?= $isLifetime ? 'Rare · Aktivní' : 'Aktivní členství' ?></p>
             <strong><?= e((string) $active['plan_name']) ?></strong>
+            <p class="cust-current-meta">
+                <?php if ($isLifetime || empty($active['ends_at'])): ?>
+                    Bez konce
+                <?php else: ?>
+                    do <?= e(format_datetime((string) $active['ends_at'], 'd. m. Y')) ?>
+                <?php endif; ?>
+                <?php if ($active['entries_remaining'] !== null): ?>
+                    · <?= e($entriesLabel((int) $active['entries_remaining'])) ?>
+                <?php else: ?>
+                    · Neomezené vstupy
+                <?php endif; ?>
+            </p>
         </div>
-        <p class="cust-current-meta">
-            <?php if ($isLifetime || empty($active['ends_at'])): ?>
-                Bez konce
-            <?php else: ?>
-                do <?= e(format_datetime((string) $active['ends_at'], 'd. m. Y')) ?>
-            <?php endif; ?>
-            <?php if ($active['entries_remaining'] !== null): ?>
-                · <?= e($entriesLabel((int) $active['entries_remaining'])) ?>
-            <?php else: ?>
-                · Neomezené vstupy
-            <?php endif; ?>
-        </p>
+        <button
+            type="button"
+            class="btn btn-danger btn-sm"
+            data-cust-open="revoke-membership"
+            data-name="<?= e((string) $active['plan_name']) ?>"
+            data-action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/clenstvi/odebrat')) ?>"
+            data-membership-id="<?= e((string) $active['public_id']) ?>"
+        >Odebrat</button>
     </div>
     <?php else: ?>
     <div class="cust-current is-empty">
@@ -169,15 +177,28 @@ foreach ($plans as $plan) {
 
 <div class="cust-panels">
     <section class="card">
-        <h3>Historie členství</h3>
+        <div class="cust-history-head">
+            <h3>Historie členství</h3>
+            <?php if ($memberships): ?>
+            <button
+                type="button"
+                class="btn btn-danger btn-sm"
+                data-cust-open="reset-membership"
+                data-name="<?= e($fullName !== '' ? $fullName : $customer['username']) ?>"
+                data-action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/clenstvi/reset')) ?>"
+            >Resetovat historii</button>
+            <?php endif; ?>
+        </div>
         <?php if (!$memberships): ?>
         <p class="muted">Zatím bez členství.</p>
         <?php else: ?>
         <div class="table-wrap">
             <table>
-                <thead><tr><th>Tarif</th><th>Stav</th><th>Od</th><th>Do</th></tr></thead>
+                <thead><tr><th>Tarif</th><th>Stav</th><th>Od</th><th>Do</th><th></th></tr></thead>
                 <tbody>
-                <?php foreach ($memberships as $row): ?>
+                <?php foreach ($memberships as $row):
+                    $canRevoke = in_array((string) $row['status'], ['active', 'pending'], true);
+                    ?>
                 <tr>
                     <td>
                         <?= e($row['plan_name']) ?>
@@ -188,6 +209,18 @@ foreach ($plans as $plan) {
                     <td><?= e(status_label((string) $row['status'])) ?></td>
                     <td><?= e(!empty($row['starts_at']) ? format_datetime((string) $row['starts_at'], 'd. m. Y') : '—') ?></td>
                     <td><?= empty($row['ends_at']) ? '∞' : e(format_datetime((string) $row['ends_at'], 'd. m. Y')) ?></td>
+                    <td>
+                        <?php if ($canRevoke): ?>
+                        <button
+                            type="button"
+                            class="btn btn-danger btn-sm"
+                            data-cust-open="revoke-membership"
+                            data-name="<?= e((string) $row['plan_name']) ?>"
+                            data-action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/clenstvi/odebrat')) ?>"
+                            data-membership-id="<?= e((string) $row['public_id']) ?>"
+                        >Odebrat</button>
+                        <?php endif; ?>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -196,35 +229,78 @@ foreach ($plans as $plan) {
         <?php endif; ?>
     </section>
 
-    <section class="card">
+    <section class="card cust-account">
         <h3>Účet</h3>
-        <?php if (($user['role'] ?? '') === 'admin'): ?>
-        <form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/role')) ?>" class="cust-role-form">
-            <?= csrf_field() ?>
-            <div class="field">
-                <label>Role</label>
-                <select name="role">
-                    <?php foreach (['user', 'admin'] as $role): ?>
-                    <option value="<?= $role ?>" <?= $customer['role'] === $role ? 'selected' : '' ?>><?= e(role_label($role)) ?></option>
-                    <?php endforeach; ?>
-                </select>
+        <div class="cust-toggles">
+            <?php if (($user['role'] ?? '') === 'admin'):
+                $isAdminRole = ($customer['role'] ?? '') === 'admin';
+                ?>
+            <div class="cust-toggle-row">
+                <div class="cust-toggle-copy">
+                    <strong>Role</strong>
+                    <span>Administrátor má přístup do správy.</span>
+                </div>
+                <div
+                    class="cust-seg <?= $isAdminRole ? 'is-on' : '' ?>"
+                    data-cust-seg
+                    data-current="<?= $isAdminRole ? 'admin' : 'user' ?>"
+                >
+                    <span class="cust-seg-thumb <?= $isAdminRole ? 'is-right' : 'is-left' ?>" data-cust-seg-thumb aria-hidden="true"></span>
+                    <button
+                        type="button"
+                        class="cust-seg-btn <?= !$isAdminRole ? 'is-active' : '' ?>"
+                        data-cust-seg-target="user"
+                        data-cust-open="role-user"
+                        data-name="<?= e($fullName !== '' ? $fullName : $customer['username']) ?>"
+                        data-action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/role')) ?>"
+                    >Zákazník</button>
+                    <button
+                        type="button"
+                        class="cust-seg-btn <?= $isAdminRole ? 'is-active' : '' ?>"
+                        data-cust-seg-target="admin"
+                        data-cust-open="role-admin"
+                        data-name="<?= e($fullName !== '' ? $fullName : $customer['username']) ?>"
+                        data-action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/role')) ?>"
+                    >Admin</button>
+                </div>
             </div>
-            <button class="btn btn-danger" type="submit">Změnit roli</button>
-        </form>
-        <?php endif; ?>
-        <form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid)) ?>">
-            <?= csrf_field() ?>
-            <div class="field">
-                <label>Stav účtu</label>
-                <select name="status">
-                    <?php foreach (['pending', 'active'] as $st): ?>
-                    <option value="<?= $st ?>" <?= (!$isBlocked && $customer['status'] === $st) || ($isBlocked && $st === 'active') ? 'selected' : '' ?>><?= e(status_label($st)) ?></option>
-                    <?php endforeach; ?>
-                </select>
+            <?php endif; ?>
+
+            <?php
+            $statusKey = $isBlocked ? 'blocked' : (($customer['status'] ?? '') === 'pending' ? 'pending' : 'active');
+            ?>
+            <div class="cust-toggle-row">
+                <div class="cust-toggle-copy">
+                    <strong>Stav účtu</strong>
+                    <span><?= $isBlocked ? 'Teď je zablokovaný — přepínačem nahoře ho odblokuješ.' : 'Čekající ještě nemá plný přístup.' ?></span>
+                </div>
+                <div
+                    class="cust-seg <?= $statusKey === 'active' ? 'is-on' : '' ?><?= $isBlocked ? ' is-disabled' : '' ?>"
+                    data-cust-seg
+                    data-current="<?= $statusKey === 'pending' ? 'pending' : 'active' ?>"
+                >
+                    <span class="cust-seg-thumb <?= $statusKey === 'pending' ? 'is-left' : 'is-right' ?>" data-cust-seg-thumb aria-hidden="true"></span>
+                    <button
+                        type="button"
+                        class="cust-seg-btn <?= $statusKey === 'pending' ? 'is-active' : '' ?>"
+                        data-cust-seg-target="pending"
+                        data-cust-open="status-pending"
+                        data-name="<?= e($fullName !== '' ? $fullName : $customer['username']) ?>"
+                        data-action="<?= e(url('/user/sprava/zakaznici/' . $pid)) ?>"
+                        <?= $isBlocked ? 'disabled' : '' ?>
+                    >Čeká</button>
+                    <button
+                        type="button"
+                        class="cust-seg-btn <?= $statusKey !== 'pending' ? 'is-active' : '' ?>"
+                        data-cust-seg-target="active"
+                        data-cust-open="status-active"
+                        data-name="<?= e($fullName !== '' ? $fullName : $customer['username']) ?>"
+                        data-action="<?= e(url('/user/sprava/zakaznici/' . $pid)) ?>"
+                        <?= $isBlocked ? 'disabled' : '' ?>
+                    >Aktivní</button>
+                </div>
             </div>
-            <p class="muted cust-account-hint">Blokaci ovládej přepínačem nahoře.</p>
-            <button class="btn btn-primary" type="submit">Uložit stav</button>
-        </form>
+        </div>
     </section>
 </div>
 
@@ -249,13 +325,38 @@ foreach ($plans as $plan) {
 </section>
 <?php endif; ?>
 
+<form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/role')) ?>" hidden data-cust-form="role-user">
+    <?= csrf_field() ?>
+    <input type="hidden" name="role" value="user">
+</form>
+<form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/role')) ?>" hidden data-cust-form="role-admin">
+    <?= csrf_field() ?>
+    <input type="hidden" name="role" value="admin">
+</form>
+<form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid)) ?>" hidden data-cust-form="status-pending">
+    <?= csrf_field() ?>
+    <input type="hidden" name="status" value="pending">
+</form>
+<form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid)) ?>" hidden data-cust-form="status-active">
+    <?= csrf_field() ?>
+    <input type="hidden" name="status" value="active">
+</form>
 <form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/blokovat')) ?>" hidden data-cust-form="block">
     <?= csrf_field() ?>
+    <input type="hidden" name="blocked_reason" value="" data-cust-reason-field>
 </form>
 <form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/odblokovat')) ?>" hidden data-cust-form="unblock">
     <?= csrf_field() ?>
 </form>
 <form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/smazat')) ?>" hidden data-cust-form="delete">
+    <?= csrf_field() ?>
+    <input type="hidden" name="delete_reason" value="" data-cust-reason-field>
+</form>
+<form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/clenstvi/odebrat')) ?>" hidden data-cust-form="revoke-membership">
+    <?= csrf_field() ?>
+    <input type="hidden" name="membership_id" value="" data-cust-membership-id>
+</form>
+<form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/clenstvi/reset')) ?>" hidden data-cust-form="reset-membership">
     <?= csrf_field() ?>
 </form>
 
@@ -265,6 +366,10 @@ foreach ($plans as $plan) {
         <p class="eyebrow" data-cust-eyebrow>Potvrzení</p>
         <h2 id="cust-modal-title" data-cust-title>Potvrdit akci</h2>
         <p class="muted" data-cust-body></p>
+        <div class="field" data-cust-reason-wrap hidden>
+            <label for="cust-reason">Zpráva pro uživatele</label>
+            <textarea id="cust-reason" data-cust-reason rows="3" placeholder="Volitelné — jinak se použije výchozí text."></textarea>
+        </div>
         <div class="cancel-actions">
             <button type="button" class="btn btn-secondary" data-cust-close>Zpět</button>
             <button type="button" class="btn btn-danger" data-cust-confirm>Potvrdit</button>

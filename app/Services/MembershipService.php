@@ -306,4 +306,75 @@ final class MembershipService
             ['uid' => $userId]
         );
     }
+
+    public function revokeActive(int $userId, ?int $actorId = null): int
+    {
+        $active = $this->db->fetchAll(
+            "SELECT id FROM memberships WHERE user_id = :uid AND status IN ('active', 'pending')",
+            ['uid' => $userId]
+        );
+        if ($active === []) {
+            return 0;
+        }
+        $now = Clock::utc();
+        $this->db->update(
+            'memberships',
+            ['status' => 'cancelled', 'updated_at' => $now],
+            "user_id = :uid AND status IN ('active', 'pending')",
+            ['uid' => $userId]
+        );
+        foreach ($active as $row) {
+            $this->db->insert('membership_transactions', [
+                'membership_id' => (int) $row['id'],
+                'type' => 'admin_adjust',
+                'entries_delta' => 0,
+                'note' => 'Členství odebráno administrátorem',
+                'created_by' => $actorId,
+                'created_at' => $now,
+            ]);
+        }
+        return count($active);
+    }
+
+    public function revokeMembership(int $userId, string $membershipPublicId, ?int $actorId = null): void
+    {
+        $row = $this->db->fetch(
+            'SELECT * FROM memberships WHERE public_id = :pid AND user_id = :uid',
+            ['pid' => $membershipPublicId, 'uid' => $userId]
+        );
+        if (!$row) {
+            throw new HttpException(404, 'Členství nebylo nalezeno.');
+        }
+        if (!in_array((string) $row['status'], ['active', 'pending'], true)) {
+            throw new HttpException(422, 'Toto členství už není aktivní.');
+        }
+        $now = Clock::utc();
+        $this->db->update(
+            'memberships',
+            ['status' => 'cancelled', 'updated_at' => $now],
+            'id = :id',
+            ['id' => (int) $row['id']]
+        );
+        $this->db->insert('membership_transactions', [
+            'membership_id' => (int) $row['id'],
+            'type' => 'admin_adjust',
+            'entries_delta' => 0,
+            'note' => 'Členství odebráno administrátorem',
+            'created_by' => $actorId,
+            'created_at' => $now,
+        ]);
+    }
+
+    public function clearHistory(int $userId): int
+    {
+        $count = (int) $this->db->fetchColumn(
+            'SELECT COUNT(*) FROM memberships WHERE user_id = :uid',
+            ['uid' => $userId]
+        );
+        if ($count < 1) {
+            return 0;
+        }
+        $this->db->query('DELETE FROM memberships WHERE user_id = :uid', ['uid' => $userId]);
+        return $count;
+    }
 }

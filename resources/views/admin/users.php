@@ -72,6 +72,7 @@
 <form method="post" hidden data-cust-form="block">
     <?= csrf_field() ?>
     <input type="hidden" name="redirect" value="list">
+    <input type="hidden" name="blocked_reason" value="" data-cust-reason-field>
 </form>
 <form method="post" hidden data-cust-form="unblock">
     <?= csrf_field() ?>
@@ -79,6 +80,7 @@
 </form>
 <form method="post" hidden data-cust-form="delete">
     <?= csrf_field() ?>
+    <input type="hidden" name="delete_reason" value="" data-cust-reason-field>
 </form>
 
 <div class="cancel-modal" data-cust-modal hidden>
@@ -87,6 +89,10 @@
         <p class="eyebrow" data-cust-eyebrow>Potvrzení</p>
         <h2 id="cust-modal-title" data-cust-title>Potvrdit akci</h2>
         <p class="muted" data-cust-body></p>
+        <div class="field" data-cust-reason-wrap hidden>
+            <label for="cust-reason">Zpráva pro uživatele</label>
+            <textarea id="cust-reason" data-cust-reason rows="3" placeholder="Volitelné — jinak se použije výchozí text."></textarea>
+        </div>
         <div class="cancel-actions">
             <button type="button" class="btn btn-secondary" data-cust-close>Zpět</button>
             <button type="button" class="btn btn-danger" data-cust-confirm>Potvrdit</button>

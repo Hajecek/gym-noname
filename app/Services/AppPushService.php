@@ -19,19 +19,29 @@ final class AppPushService
         return new self($db);
     }
 
-    public function accountStatusChanged(array $user, string $status): void
+    public function accountStatusChanged(array $user, string $status, ?string $reason = null): void
     {
         $title = match ($status) {
             'blocked' => 'Účet byl zablokován',
             'active' => 'Účet je znovu aktivní',
             default => 'Stav účtu se změnil',
         };
+        $defaultBlocked = 'Tvůj účet byl zablokován administrátorem.';
         $body = match ($status) {
-            'blocked' => 'Přístup do PRIVOFIT je teď pozastavený. Ozvi se nám, pokud to chceš řešit.',
+            'blocked' => (trim((string) $reason) !== '' ? trim((string) $reason) : $defaultBlocked),
             'active' => 'Účet je zase v pořádku. Můžeš rezervovat a otevírat dveře.',
             default => 'Otevři aplikaci, stav tvého účtu se změnil.',
         };
         $this->notify((int) $user['id'], 'account-status', $title, $body, 'account.sync');
+    }
+
+    public function accountDeleted(array $user, ?string $reason = null): void
+    {
+        $body = trim((string) $reason);
+        if ($body === '') {
+            $body = 'Tvůj účet PRIVOFIT byl smazán administrátorem.';
+        }
+        $this->notify((int) $user['id'], 'account-deleted', 'Účet byl smazán', $body, 'account.sync');
     }
 
     public function membershipAssigned(int $userId): void

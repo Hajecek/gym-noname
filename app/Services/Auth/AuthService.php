@@ -1030,13 +1030,18 @@ final class AuthService
         $this->forgotPassword($identifier, $request);
     }
 
-    public function deleteAccount(array $user): void
+    public function deleteAccount(array $user, ?string $reason = null): void
     {
         $id = (int) $user['id'];
+        $message = trim((string) $reason);
+        if ($message === '') {
+            $message = 'Tvůj účet PRIVOFIT byl smazán administrátorem.';
+        }
         $this->logoutAll($id);
         $this->db->update('users', [
             'status' => 'deleted',
             'deleted_at' => Clock::utc(),
+            'blocked_reason' => $message,
             'email' => 'deleted+' . $id . '@invalid.local',
             'username' => 'deleted_' . $id,
             'password_hash' => self::dummyPasswordHash(),

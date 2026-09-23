@@ -129,6 +129,8 @@ function status_label(string $status): string
         'pending' => 'Čeká',
         'blocked' => 'Blokovaný',
         'deleted' => 'Smazaný',
+        'cancelled' => 'Zrušené',
+        'expired' => 'Vypršelo',
         default => $status,
     };
 }
@@ -141,6 +143,34 @@ function status_badge_class(string $status): string
         'blocked', 'deleted' => 'badge-bad',
         default => 'badge-muted',
     };
+}
+
+function is_admin_user(?array $user = null): bool
+{
+    $user ??= current_user();
+    return ($user['role'] ?? '') === 'admin';
+}
+
+function admin_view_mode(): string
+{
+    if (!is_admin_user()) {
+        return 'user';
+    }
+    $mode = \App\Core\Session::get('admin_view_mode', 'admin');
+    return $mode === 'user' ? 'user' : 'admin';
+}
+
+function show_admin_nav(?array $user = null): bool
+{
+    return is_admin_user($user) && admin_view_mode() === 'admin';
+}
+
+function show_user_nav(?array $user = null): bool
+{
+    if (!is_admin_user($user)) {
+        return true;
+    }
+    return admin_view_mode() === 'user';
 }
 
 function device_label(?string $userAgent): string

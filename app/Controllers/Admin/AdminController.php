@@ -21,6 +21,9 @@ final class AdminController extends Controller
 {
     public function dashboard(): never
     {
+        if (is_admin_user() && admin_view_mode() === 'user') {
+            $this->redirect('/user');
+        }
         $db = $this->app->db();
         $todayStart = Clock::toUtc(Clock::nowLocal()->setTime(0, 0))->format('Y-m-d H:i:s');
         $todayEnd = Clock::toUtc(Clock::nowLocal()->setTime(0, 0)->modify('+1 day'))->format('Y-m-d H:i:s');
@@ -116,8 +119,8 @@ final class AdminController extends Controller
         if ((int) $user['id'] === (int) $actor['id']) {
             throw new HttpException(422, 'Nemůžeš zablokovat vlastní účet.');
         }
-        $reason = trim((string) $request->input('blocked_reason', 'Zablokováno administrátorem'));
-        $this->setCustomerStatus($actor, $user, 'blocked', $reason !== '' ? $reason : 'Zablokováno administrátorem', $request->ip());
+        $reason = trim((string) $request->input('blocked_reason', ''));
+        $this->setCustomerStatus($actor, $user, 'blocked', $reason, $request->ip());
         $this->flashSuccess('Účet byl zablokován.');
         $this->redirectCustomerAction($request, $user);
     }
@@ -144,7 +147,12 @@ final class AdminController extends Controller
                 throw new HttpException(422, 'Nelze smazat posledního aktivního administrátora.');
             }
         }
-        AuthService::make($this->app->db())->deleteAccount($user);
+        $reason = trim((string) $request->input('delete_reason', ''));
+        if ($reason === '') {
+            $reason = 'Tvůj účet PRIVOFIT byl smazán administrátorem.';
+        }
+        AuthService::make($this->app->db())->deleteAccount($user, $reason);
+        AppPushService::make($this->app->db())->accountDeleted($user, $reason);
         (new AuditService($this->app->db()))->log((int) $actor['id'], 'user.delete', 'user', $user['id'], $user['status'], 'deleted', $request->ip());
         $this->flashSuccess('Účet byl smazán.');
         $this->redirect('/user/sprava/zakaznici');
@@ -161,6 +169,9 @@ final class AdminController extends Controller
 
     private function setCustomerStatus(array $actor, array $user, string $status, string $reason, string $ip): void
     {
+        if ($status === 'blocked') {
+            $reason = trim($reason) !== '' ? trim($reason) : 'Tvůj účet byl zablokován administrátorem.';
+        }
         $this->app->db()->update('users', [
             'status' => $status,
             'blocked_at' => $status === 'blocked' ? Clock::utc() : null,
@@ -168,7 +179,10 @@ final class AdminController extends Controller
             'updated_at' => Clock::utc(),
         ], 'id = :id', ['id' => (int) $user['id']]);
         (new AuditService($this->app->db()))->log((int) $actor['id'], 'user.status', 'user', $user['id'], $user['status'], $status, $ip);
-        if ($status !== (string) $user['status']) {
+        if ($status === 'blocked') {
+            AuthService::make($this->app->db())->logoutAll((int) $user['id']);
+            AppPushService::make($this->app->db())->accountStatusChanged($user, $status, $reason);
+        } elseif ($status !== (string) $user['status']) {
             AppPushService::make($this->app->db())->accountStatusChanged($user, $status);
         }
     }
@@ -216,6 +230,33 @@ final class AdminController extends Controller
         (new MembershipService($this->app->db()))->assignPlan((int) $user['id'], $planId, 'active', (int) $actor['id']);
         AppPushService::make($this->app->db())->membershipAssigned((int) $user['id']);
         $this->flashSuccess('Členství bylo přiřazeno.');
+        $this->redirect('/user/sprava/zakaznici/' . $user['public_id']);
+    }
+
+    public function revokeMembership(Request $request, array $params): never
+    {
+        $actor = $this->requireUser();
+        $user = $this->findCustomer($params['id']);
+        $membershipId = trim((string) $request->input('membership_id', ''));
+        $service = new MembershipService($this->app->db());
+        if ($membershipId !== '') {
+            $service->revokeMembership((int) $user['id'], $membershipId, (int) $actor['id']);
+            $this->flashSuccess('Členství bylo odebráno.');
+        } else {
+            $count = $service->revokeActive((int) $user['id'], (int) $actor['id']);
+            $this->flashSuccess($count > 0 ? 'Aktivní členství bylo odebráno.' : 'Žádné aktivní členství k odebrání.');
+        }
+        (new AuditService($this->app->db()))->log((int) $actor['id'], 'membership.revoke', 'user', $user['id'], null, $membershipId !== '' ? $membershipId : 'active', $request->ip());
+        $this->redirect('/user/sprava/zakaznici/' . $user['public_id']);
+    }
+
+    public function resetMembershipHistory(Request $request, array $params): never
+    {
+        $actor = $this->requireUser();
+        $user = $this->findCustomer($params['id']);
+        $count = (new MembershipService($this->app->db()))->clearHistory((int) $user['id']);
+        (new AuditService($this->app->db()))->log((int) $actor['id'], 'membership.reset', 'user', $user['id'], (string) $count, '0', $request->ip());
+        $this->flashSuccess($count > 0 ? 'Historie členství byla vymazána.' : 'Historie členství už byla prázdná.');
         $this->redirect('/user/sprava/zakaznici/' . $user['public_id']);
     }
 
@@ -359,7 +400,30 @@ final class AdminController extends Controller
             'signups' => $this->app->db()->fetchAll($sql, $params),
             'q' => $q,
             'total' => (int) $this->app->db()->fetchColumn('SELECT COUNT(*) FROM interest_signups'),
+            'pageScripts' => ['js/customers.js'],
         ]);
+    }
+
+    public function deleteInterest(Request $request, array $params): never
+    {
+        $actor = $this->requireUser();
+        $id = (int) ($params['id'] ?? 0);
+        $row = $this->app->db()->fetch('SELECT * FROM interest_signups WHERE id = :id', ['id' => $id]);
+        if (!$row) {
+            throw new HttpException(404, 'Záznam zájmu nebyl nalezen.');
+        }
+        $this->app->db()->query('DELETE FROM interest_signups WHERE id = :id', ['id' => $id]);
+        (new AuditService($this->app->db()))->log(
+            (int) $actor['id'],
+            'interest.delete',
+            'interest_signup',
+            $id,
+            $row['email'],
+            null,
+            $request->ip()
+        );
+        $this->flashSuccess('E-mail byl ze zájmu odstraněn.');
+        $this->redirect('/user/sprava/zajem');
     }
 
     public function exportInterest(): never

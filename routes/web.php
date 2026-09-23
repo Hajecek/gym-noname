@@ -46,6 +46,7 @@ $router->get('/overeni-emailu', [AuthController::class, 'verifyEmail']);
 $router->get('/potvrzeni-emailu', [AuthController::class, 'confirmEmailChange']);
 
 $router->get('/user', [DashboardController::class, 'index'], [AuthMiddleware::class]);
+$router->post('/user/rezim', [DashboardController::class, 'setViewMode'], [AuthMiddleware::class]);
 $router->get('/user/pritomnost', [DashboardController::class, 'presence'], [AuthMiddleware::class]);
 $router->get('/user/stav-studia', [DashboardController::class, 'studioStatus'], [AuthMiddleware::class]);
 $router->get('/user/overeni', [DashboardController::class, 'verifyNotice'], [AuthMiddleware::class]);
@@ -100,12 +101,15 @@ $router->post('/user/sprava/zakaznici/{id}/odblokovat', [AdminController::class,
 $router->post('/user/sprava/zakaznici/{id}/smazat', [AdminController::class, 'userDelete'], $admin);
 $router->post('/user/sprava/zakaznici/{id}/role', [AdminController::class, 'userRole'], $admin);
 $router->post('/user/sprava/zakaznici/{id}/clenstvi', [AdminController::class, 'assignMembership'], $admin);
+$router->post('/user/sprava/zakaznici/{id}/clenstvi/odebrat', [AdminController::class, 'revokeMembership'], $admin);
+$router->post('/user/sprava/zakaznici/{id}/clenstvi/reset', [AdminController::class, 'resetMembershipHistory'], $admin);
 $router->get('/user/sprava/tarify', [AdminController::class, 'plans'], $admin);
 $router->post('/user/sprava/tarify', [AdminController::class, 'savePlan'], $admin);
 $router->get('/user/sprava/vstup', [AdminController::class, 'access'], $admin);
 $router->post('/user/sprava/vstup/test', [AdminController::class, 'testOpen'], $admin);
 $router->get('/user/sprava/zajem', [AdminController::class, 'interest'], $admin);
 $router->get('/user/sprava/zajem/export', [AdminController::class, 'exportInterest'], $admin);
+$router->post('/user/sprava/zajem/{id}/smazat', [AdminController::class, 'deleteInterest'], $admin);
 $router->get('/user/sprava/nastaveni', [AdminController::class, 'settings'], $admin);
 $router->post('/user/sprava/nastaveni', [AdminController::class, 'saveSettings'], $admin);
 
@@ -119,12 +123,15 @@ $router->post('/admin/zakaznici/{id}/odblokovat', [AdminController::class, 'user
 $router->post('/admin/zakaznici/{id}/smazat', [AdminController::class, 'userDelete'], $admin);
 $router->post('/admin/zakaznici/{id}/role', [AdminController::class, 'userRole'], $admin);
 $router->post('/admin/zakaznici/{id}/clenstvi', [AdminController::class, 'assignMembership'], $admin);
+$router->post('/admin/zakaznici/{id}/clenstvi/odebrat', [AdminController::class, 'revokeMembership'], $admin);
+$router->post('/admin/zakaznici/{id}/clenstvi/reset', [AdminController::class, 'resetMembershipHistory'], $admin);
 $router->get('/admin/clenstvi', [AdminController::class, 'plans'], $admin);
 $router->post('/admin/clenstvi', [AdminController::class, 'savePlan'], $admin);
 $router->get('/admin/vstup', [AdminController::class, 'access'], $admin);
 $router->post('/admin/vstup/test', [AdminController::class, 'testOpen'], $admin);
 $router->get('/admin/zajem', [AdminController::class, 'interest'], $admin);
 $router->get('/admin/zajem/export', [AdminController::class, 'exportInterest'], $admin);
+$router->post('/admin/zajem/{id}/smazat', [AdminController::class, 'deleteInterest'], $admin);
 $router->get('/admin/nastaveni', [AdminController::class, 'settings'], $admin);
 $router->post('/admin/nastaveni', [AdminController::class, 'saveSettings'], $admin);
 

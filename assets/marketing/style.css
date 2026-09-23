@@ -3194,7 +3194,23 @@ body.standalone-login{padding-top:0;background:radial-gradient(ellipse at 21% 47
 }
 body.standalone-signed-out {
   padding-top: 0;
-  background: radial-gradient(ellipse at 21% 47%, #c6f21a09, transparent 50%), var(--night);
+  min-height: 100svh;
+  background:
+    radial-gradient(ellipse at 50% 18%, rgba(198, 242, 26, .1), transparent 48%),
+    radial-gradient(ellipse at 80% 90%, rgba(232, 240, 228, .04), transparent 40%),
+    var(--night);
+}
+body.standalone-signed-out.is-forced-blocked,
+body.standalone-signed-out:has(.signed-out.is-blocked) {
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(214, 69, 69, .16), transparent 46%),
+    radial-gradient(ellipse at 18% 85%, rgba(198, 242, 26, .05), transparent 40%),
+    var(--night);
+}
+body.standalone-signed-out:has(.signed-out.is-deleted) {
+  background:
+    radial-gradient(ellipse at 50% 18%, rgba(232, 240, 228, .08), transparent 48%),
+    var(--night);
 }
 body.standalone-signed-out .header,
 body.standalone-signed-out > footer,
@@ -3203,29 +3219,137 @@ body.standalone-signed-out .scroll-progress { display: none !important; }
   min-height: 100svh;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 28px 20px;
+  animation: signed-out-in 420ms cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes signed-out-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
 }
 .signed-out-card {
-  width: min(440px, 100%);
-  padding: 36px 32px 32px;
-  border-radius: 24px;
+  width: min(460px, 100%);
+  padding: 28px 28px 30px;
+  border-radius: 28px;
   border: 1px solid #e8f0e41c;
-  background: rgba(255, 255, 255, .035);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .02));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .28);
   text-align: center;
 }
-.signed-out-card h1 {
-  margin: 8px 0 12px;
-  font-family: Syne, sans-serif;
-  font-size: clamp(2rem, 4vw, 2.6rem);
-  letter-spacing: -.04em;
+.signed-out.is-blocked .signed-out-card {
+  border-color: #d6454544;
+  background:
+    linear-gradient(180deg, rgba(214, 69, 69, .08), rgba(255, 255, 255, .02));
 }
-.signed-out-card p {
+.signed-out.is-deleted .signed-out-card {
+  border-color: #e8f0e428;
+}
+.signed-out-brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.signed-out-brand .brand-mark { height: 28px; }
+.signed-out-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  border: 1px solid #c6f21a44;
+  background: rgba(198, 242, 26, .1);
+  color: var(--lime);
+}
+.signed-out.is-blocked .signed-out-icon {
+  border-color: #d6454566;
+  background: rgba(214, 69, 69, .12);
+  color: #ff8b8b;
+}
+.signed-out.is-deleted .signed-out-icon {
+  border-color: #e8f0e433;
+  background: rgba(232, 240, 228, .06);
+  color: #c8d2ca;
+}
+.signed-out-icon svg {
+  width: 28px;
+  height: 28px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.signed-out-eyebrow {
+  margin: 0;
+  color: var(--lime);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.signed-out.is-blocked .signed-out-eyebrow { color: #ff8b8b; }
+.signed-out.is-deleted .signed-out-eyebrow { color: var(--secondary); }
+.signed-out-card h1 {
+  margin: 8px 0 10px;
+  font-family: Syne, sans-serif;
+  font-size: clamp(1.85rem, 4.4vw, 2.45rem);
+  letter-spacing: -.04em;
+  line-height: 1.1;
+}
+.signed-out-lead {
+  margin: 0;
   color: var(--secondary);
   line-height: 1.55;
+  font-size: .98rem;
+}
+.signed-out-reason {
+  margin: 20px 0 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #e8f0e422;
+  background: rgba(0, 0, 0, .22);
+  text-align: left;
+}
+.signed-out.is-blocked .signed-out-reason {
+  border-color: #d6454540;
+  background: rgba(214, 69, 69, .08);
+}
+.signed-out-reason span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--secondary);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.signed-out-reason p {
+  margin: 0;
+  color: var(--fog);
+  line-height: 1.5;
+  font-weight: 600;
+}
+.signed-out-actions {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  margin-top: 24px;
 }
 .signed-out-card .button {
   display: inline-flex;
-  margin-top: 22px;
+  margin-top: 0;
+  min-width: 180px;
+  justify-content: center;
+}
+.signed-out-link {
+  color: var(--secondary);
+  font-size: .9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.signed-out-link:hover { color: var(--lime); }
+@media (max-width: 520px) {
+  .signed-out-card { padding: 24px 20px 26px; }
 }
 .flash {
   max-width: 1248px;

@@ -35,13 +35,74 @@
       confirm: "Smazat",
       danger: true,
     },
+    "revoke-membership": {
+      eyebrow: "Členství",
+      title: "Odebrat členství?",
+      body: (name) =>
+        `Tarif ${name} se zruší a zákazník s ním už nebude moct rezervovat zdarma.`,
+      confirm: "Odebrat",
+      danger: true,
+    },
+    "reset-membership": {
+      eyebrow: "Historie",
+      title: "Resetovat historii členství?",
+      body: (name) =>
+        `U zákazníka ${name} se smaže celá historie členství včetně aktivních tarifů. Tohle nejde vrátit.`,
+      confirm: "Resetovat",
+      danger: true,
+    },
+    "role-admin": {
+      eyebrow: "Role",
+      title: "Udělat administrátora?",
+      body: (name) =>
+        `${name} získá přístup do správy studia, zákazníků a nastavení.`,
+      confirm: "Nastavit admina",
+      danger: true,
+    },
+    "role-user": {
+      eyebrow: "Role",
+      title: "Odebrat admin roli?",
+      body: (name) =>
+        `${name} zůstane jen jako běžný zákazník bez přístupu do správy.`,
+      confirm: "Nastavit zákazníka",
+      danger: true,
+    },
+    "status-pending": {
+      eyebrow: "Stav",
+      title: "Nastavit stav Čeká?",
+      body: (name) =>
+        `Účet ${name} bude čekat na aktivaci a nebude mít plný přístup.`,
+      confirm: "Nastavit Čeká",
+      danger: false,
+    },
+    "status-active": {
+      eyebrow: "Stav",
+      title: "Aktivovat účet?",
+      body: (name) => `Účet ${name} bude aktivní a připravený k používání.`,
+      confirm: "Aktivovat",
+      danger: false,
+    },
+    "interest-delete": {
+      eyebrow: "Zájem",
+      title: "Smazat e-mail ze zájmu?",
+      body: (name) =>
+        `${name} se ze seznamu zájmu odstraní. Kdykoli se může znovu přihlásit formulářem.`,
+      confirm: "Smazat",
+      danger: true,
+    },
   };
+
+  const reasonWrap = modal.querySelector("[data-cust-reason-wrap]");
+  const reasonInput = modal.querySelector("[data-cust-reason]");
+  const needsReason = (kind) => kind === "block" || kind === "delete";
 
   const close = () => {
     if (pending?.revert) pending.revert();
     modal.hidden = true;
     pending = null;
     if (confirmBtn) confirmBtn.disabled = false;
+    if (reasonInput) reasonInput.value = "";
+    if (reasonWrap) reasonWrap.hidden = true;
   };
 
   const open = (kind, opts = {}) => {
@@ -55,13 +116,22 @@
       confirmBtn.textContent = cfg.confirm;
       confirmBtn.className = cfg.danger ? "btn btn-danger" : "btn btn-primary";
     }
+    if (reasonWrap) reasonWrap.hidden = !needsReason(kind);
+    if (reasonInput) {
+      reasonInput.value = "";
+      reasonInput.placeholder =
+        kind === "delete"
+          ? "Volitelné — např. důvod smazání účtu."
+          : "Volitelné — důvod blokace uvidí uživatel při odhlášení.";
+    }
     pending = {
       kind,
       form: opts.form || null,
       revert: opts.revert || null,
     };
     modal.hidden = false;
-    modal.querySelector("[data-cust-close]")?.focus();
+    if (needsReason(kind) && reasonInput) reasonInput.focus();
+    else modal.querySelector("[data-cust-close]")?.focus();
   };
 
   const setSwitch = (el, on) => {
@@ -110,18 +180,49 @@
     });
   });
 
+  const setSeg = (seg, target) => {
+    if (!seg) return;
+    const thumb = seg.querySelector("[data-cust-seg-thumb]");
+    const right = target === "admin" || target === "active";
+    seg.classList.toggle("is-on", right);
+    if (thumb) {
+      thumb.classList.toggle("is-right", right);
+      thumb.classList.toggle("is-left", !right);
+    }
+    seg.querySelectorAll(".cust-seg-btn").forEach((btn) => {
+      const active = btn.getAttribute("data-cust-seg-target") === target;
+      btn.classList.toggle("is-active", active);
+    });
+  };
+
   document.querySelectorAll("[data-cust-open]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (button.disabled) return;
       const kind = button.getAttribute("data-cust-open") || "";
+      const target = button.getAttribute("data-cust-seg-target") || "";
+      const seg = button.closest("[data-cust-seg]");
+      if (seg && target && seg.getAttribute("data-current") === target) return;
+
       const action = button.getAttribute("data-action");
-      const form = kind === "delete" ? deleteForm : null;
+      const form = document.querySelector(`[data-cust-form="${kind}"]`) || (kind === "delete" ? deleteForm : null);
       if (!form) return;
       if (action) form.setAttribute("action", action);
+      const membershipInput = form.querySelector("[data-cust-membership-id]");
+      if (membershipInput) {
+        membershipInput.value = button.getAttribute("data-membership-id") || "";
+      }
+
+      const previous = seg?.getAttribute("data-current") || "";
+      if (seg && target) setSeg(seg, target);
+
       open(kind, {
         name: button.getAttribute("data-name") || "tohoto zákazníka",
         form,
+        revert: seg && target
+          ? () => setSeg(seg, previous)
+          : null,
       });
     });
   });
@@ -133,6 +234,10 @@
   confirmBtn?.addEventListener("click", () => {
     if (!pending?.form) return;
     const form = pending.form;
+    const reasonField = form.querySelector("[data-cust-reason-field]");
+    if (reasonField && reasonInput) {
+      reasonField.value = reasonInput.value.trim();
+    }
     pending.revert = null;
     confirmBtn.disabled = true;
     form.submit();

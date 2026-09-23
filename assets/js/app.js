@@ -165,6 +165,88 @@
     window.addEventListener("pageshow", (event) => {
       if (event.persisted) ping();
     });
-    window.setInterval(ping, 45000);
+    window.setInterval(ping, 12000);
+  }
+
+  const ensureViewFx = () => {
+    let fx = document.querySelector("[data-view-fx]");
+    if (fx) return fx;
+    fx = document.createElement("div");
+    fx.className = "view-fx";
+    fx.setAttribute("data-view-fx", "");
+    fx.hidden = true;
+    fx.innerHTML = `
+      <div class="view-fx-shade" aria-hidden="true"></div>
+      <p class="view-fx-label" data-view-fx-label></p>
+    `;
+    document.body.appendChild(fx);
+    return fx;
+  };
+
+  const playViewEnter = () => {
+    const pending = sessionStorage.getItem("privofit-view-switch");
+    if (!pending) return;
+    sessionStorage.removeItem("privofit-view-switch");
+    const fx = ensureViewFx();
+    const label = fx.querySelector("[data-view-fx-label]");
+    fx.dataset.mode = pending;
+    if (label) label.textContent = pending === "admin" ? "Admin" : "Uživatel";
+    fx.hidden = false;
+    fx.classList.add("is-cover");
+    document.body.classList.add("is-view-fx");
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        fx.classList.add("is-reveal");
+        fx.classList.remove("is-cover");
+      });
+    });
+    window.setTimeout(() => {
+      fx.hidden = true;
+      fx.classList.remove("is-reveal", "is-cover");
+      document.body.classList.remove("is-view-fx");
+    }, 700);
+  };
+
+  playViewEnter();
+
+  const viewMode = document.querySelector("[data-view-mode]");
+  if (viewMode) {
+    const thumb = viewMode.querySelector("[data-view-thumb]");
+    const current = viewMode.getAttribute("data-current") || "user";
+    viewMode.querySelectorAll("[data-view-form]").forEach((form) => {
+      form.addEventListener("submit", (event) => {
+        const target = form.getAttribute("data-view-form") || "";
+        if (!target || target === current) {
+          event.preventDefault();
+          return;
+        }
+        event.preventDefault();
+        if (viewMode.classList.contains("is-busy")) return;
+        viewMode.classList.add("is-busy");
+
+        if (thumb) {
+          thumb.classList.toggle("is-admin", target === "admin");
+          thumb.classList.toggle("is-user", target === "user");
+        }
+        viewMode.querySelectorAll(".view-mode-btn").forEach((btn) => {
+          const active = btn.getAttribute("data-view-target") === target;
+          btn.classList.toggle("is-active", active);
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+
+        const fx = ensureViewFx();
+        const label = fx.querySelector("[data-view-fx-label]");
+        fx.dataset.mode = target;
+        if (label) label.textContent = target === "admin" ? "Admin" : "Uživatel";
+        fx.hidden = false;
+        fx.classList.remove("is-reveal", "is-cover");
+        document.body.classList.add("is-view-fx", "is-view-switching");
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => fx.classList.add("is-cover"));
+        });
+        sessionStorage.setItem("privofit-view-switch", target);
+        window.setTimeout(() => form.submit(), 480);
+      });
+    });
   }
 })();

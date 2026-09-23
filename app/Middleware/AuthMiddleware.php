@@ -31,11 +31,17 @@ final class AuthMiddleware
             }
             return;
         }
-        $idle = Session::pull('logged_out_reason') === 'idle';
+        $idle = Session::get('logged_out_reason') === 'idle';
+        $forced = in_array((string) Session::get('logged_out_reason'), ['blocked', 'deleted'], true);
         if ($request->wantsJson()) {
-            throw new HttpException(401, $idle ? 'Odhlásili jsme tě z důvodu bezpečnosti.' : 'Nejste přihlášeni.');
+            $message = match ((string) Session::get('logged_out_reason')) {
+                'blocked', 'deleted' => (string) (Session::get('logged_out_message') ?: 'Účet už není dostupný.'),
+                'idle' => 'Odhlásili jsme tě z důvodu bezpečnosti.',
+                default => 'Nejste přihlášeni.',
+            };
+            throw new HttpException(401, $message);
         }
-        if ($idle) {
+        if ($idle || $forced) {
             header('Location: ' . $app->url('/odhlaseno'));
             exit;
         }

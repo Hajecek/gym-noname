@@ -7,6 +7,7 @@ namespace App\Controllers\User;
 use App\Controllers\Controller;
 use App\Core\HttpException;
 use App\Core\Request;
+use App\Core\Session;
 use App\Services\Access\AccessControlService;
 use App\Services\MembershipService;
 use App\Services\ReservationService;
@@ -17,6 +18,9 @@ final class DashboardController extends Controller
     public function index(): never
     {
         $user = $this->requireUser();
+        if (($user['role'] ?? '') === 'admin' && admin_view_mode() === 'admin') {
+            $this->redirect('/user/sprava');
+        }
         $reservations = ReservationService::make($this->app->db());
         $memberships = new MembershipService($this->app->db());
         $access = AccessControlService::make($this->app->db());
@@ -38,6 +42,20 @@ final class DashboardController extends Controller
             'canOpen' => $canOpen['allowed'],
             'pageScripts' => ['js/dashboard.js'],
         ]);
+    }
+
+    public function setViewMode(Request $request): never
+    {
+        $user = $this->requireUser();
+        if (($user['role'] ?? '') !== 'admin') {
+            throw new HttpException(403, 'Jen administrátor může přepínat zobrazení.');
+        }
+        $mode = (string) $request->input('mode', 'user');
+        if (!in_array($mode, ['admin', 'user'], true)) {
+            throw new HttpException(422, 'Neplatný režim.');
+        }
+        Session::set('admin_view_mode', $mode);
+        $this->redirect($mode === 'admin' ? '/user/sprava' : '/user');
     }
 
     public function studioStatus(): never

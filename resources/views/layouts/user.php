@@ -1,7 +1,8 @@
 <?php
 ob_start();
 $user = $user ?? current_user();
-$role = $user['role'] ?? 'user';
+$adminUi = show_admin_nav($user);
+$userUi = show_user_nav($user);
 if (!function_exists('user_active')) {
     function user_active(string $exact, bool $prefix = false): string {
         $path = app()->request()->path();
@@ -11,15 +12,18 @@ if (!function_exists('user_active')) {
         return $path === $exact ? 'active' : '';
     }
 }
+$homeHref = $adminUi ? url('/user/sprava') : url('/user');
+$homeLabel = $adminUi ? 'PRIVOFIT – správa' : 'PRIVOFIT – přehled';
 ?>
 <button class="menu-toggle" type="button" aria-label="Otevřít menu" aria-expanded="false" aria-controls="side-menu">☰</button>
 <div class="side-backdrop"></div>
 <aside class="side-menu" id="side-menu">
     <div class="side-head">
-        <?php $brandHref = url('/user'); $brandLabel = 'PRIVOFIT – přehled'; require dirname(__DIR__) . '/partials/brand-logo.php'; ?>
+        <?php $brandHref = $homeHref; $brandLabel = $homeLabel; require dirname(__DIR__) . '/partials/brand-logo.php'; ?>
     </div>
     <button class="menu-close" type="button" aria-label="Zavřít menu">✕</button>
-    <nav aria-label="Uživatelská sekce">
+    <nav aria-label="<?= $adminUi ? 'Správa' : 'Uživatelská sekce' ?>">
+        <?php if ($userUi): ?>
         <a class="side-link <?= user_active('/user') ?>" href="<?= e(url('/user')) ?>" title="Domů">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 11 12 4l8 7v9H4z"/></svg>
             <span>Domů</span>
@@ -41,11 +45,9 @@ if (!function_exists('user_active')) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/></svg>
             <span>Členství</span>
         </a>
-        <?php if (in_array($role, ['admin'], true)): ?>
-            <div class="side-split" role="separator" aria-label="Správa">
-                <i class="side-split-bar" aria-hidden="true"></i>
-                <span>Správa</span>
-            </div>
+        <?php endif; ?>
+
+        <?php if ($adminUi): ?>
             <a class="side-link <?= user_active('/user/sprava') ?>" href="<?= e(url('/user/sprava')) ?>" title="Přehled">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 11 12 4l8 7v9H4z"/></svg>
                 <span>Přehled</span>

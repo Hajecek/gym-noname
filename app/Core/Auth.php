@@ -36,14 +36,29 @@ final class Auth
             'SELECT s.id AS session_row_id, s.last_activity_at, s.expires_at, s.revoked_at, u.*
              FROM user_sessions s
              INNER JOIN users u ON u.id = s.user_id
-             WHERE s.id = :sid AND s.user_id = :uid AND u.deleted_at IS NULL',
+             WHERE s.id = :sid AND s.user_id = :uid',
             ['sid' => (int) $sessionId, 'uid' => (int) $userId]
         );
-        if (!$row || $row['revoked_at'] !== null || (string) $row['expires_at'] <= Clock::utc() || $this->idleExpired($row)) {
+
+        $force = $row ? $this->forcedLogout($row) : null;
+        $invalid = !$row
+            || $row['revoked_at'] !== null
+            || (string) $row['expires_at'] <= Clock::utc()
+            || $this->idleExpired($row)
+            || $force !== null;
+
+        if ($invalid) {
             if ($row && $row['revoked_at'] === null) {
                 $this->db->update('user_sessions', ['revoked_at' => Clock::utc()], 'id = :id', ['id' => (int) $row['session_row_id']]);
             }
-            $this->dropWebSession(true);
+            if ($force !== null) {
+                $this->dropWebSession($force['reason'], $force['message']);
+            } elseif ($row && $row['revoked_at'] !== null) {
+                // Session revoked while user still looks active — treat as security logout.
+                $this->dropWebSession('idle');
+            } else {
+                $this->dropWebSession('idle');
+            }
             return;
         }
 
@@ -58,6 +73,28 @@ final class Auth
         $this->user = $row;
     }
 
+    /** @return array{reason: string, message: string}|null */
+    private function forcedLogout(array $row): ?array
+    {
+        $status = (string) ($row['status'] ?? '');
+        $deleted = !empty($row['deleted_at']) || $status === 'deleted';
+        if ($deleted) {
+            $message = trim((string) ($row['blocked_reason'] ?? ''));
+            if ($message === '') {
+                $message = 'Tvůj účet PRIVOFIT byl smazán administrátorem.';
+            }
+            return ['reason' => 'deleted', 'message' => $message];
+        }
+        if ($status === 'blocked') {
+            $message = trim((string) ($row['blocked_reason'] ?? ''));
+            if ($message === '') {
+                $message = 'Tvůj účet byl zablokován administrátorem.';
+            }
+            return ['reason' => 'blocked', 'message' => $message];
+        }
+        return null;
+    }
+
     private function idleExpired(array $row): bool
     {
         $minutes = max(5, (int) config('security.session.idle_minutes', 1440));
@@ -70,12 +107,15 @@ final class Auth
         return $request->path() === '/user/pritomnost';
     }
 
-    private function dropWebSession(bool $security): void
+    private function dropWebSession(string $reason = 'idle', ?string $message = null): void
     {
         Session::forget('user_id');
         Session::forget('auth_session_id');
-        if ($security) {
-            Session::set('logged_out_reason', 'idle');
+        Session::set('logged_out_reason', $reason);
+        if ($message !== null && $message !== '') {
+            Session::set('logged_out_message', $message);
+        } else {
+            Session::forget('logged_out_message');
         }
     }
 
@@ -89,7 +129,7 @@ final class Auth
             'SELECT * FROM users WHERE public_id = :pid AND deleted_at IS NULL',
             ['pid' => (string) $payload['sub']]
         );
-        if ($user) {
+        if ($user && !in_array((string) ($user['status'] ?? ''), ['blocked', 'deleted'], true)) {
             $this->user = $user;
         }
     }

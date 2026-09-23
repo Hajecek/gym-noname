@@ -10,6 +10,11 @@ if ($fullName === '') {
 }
 ?>
 <div class="side-foot">
+    <?php if (is_admin_user($user ?? null)): ?>
+    <div class="side-view-mode">
+        <?php require __DIR__ . '/view-mode-switch.php'; ?>
+    </div>
+    <?php endif; ?>
     <a class="side-profile" href="<?= e(url('/user/profil')) ?>" title="<?= e($fullName . ' · ' . $planName) ?>">
         <img class="side-avatar" src="<?= e(avatar_url($user)) ?>" alt="">
         <span class="side-profile-copy">

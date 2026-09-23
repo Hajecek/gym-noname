@@ -35,7 +35,7 @@ $streakUnit = $streak === 1 ? 'týden' : (($streak >= 2 && $streak <= 4) ? 'týd
     <div>
         <p class="eyebrow">TVŮJ PROSTOR</p>
         <h1>Ahoj, <?= e($user['first_name']) ?>.</h1>
-        <p class="muted">@<?= e($user['username']) ?> · <?= e(role_label($user['role'])) ?></p>
+        <p class="muted">@<?= e($user['username']) ?><?php if (is_admin_user($user)): ?> · uživatelský režim<?php else: ?> · <?= e(role_label($user['role'])) ?><?php endif; ?></p>
     </div>
     <div class="page-head-actions">
         <button
