@@ -23,6 +23,7 @@ final class StudioController extends Controller
             'rooms' => $rooms,
             'room' => $selected,
             'hourly_price' => $this->app->settings()->get('pricing.hourly', 150),
+            'hourly_price_two' => $this->app->settings()->get('pricing.hourly_two', 200),
             'weekday' => (int) Clock::nowLocal()->format('N'),
         ]);
     }
@@ -37,37 +38,58 @@ final class StudioController extends Controller
             'room' => $room,
             'hours' => $hours,
             'hourly_price' => $this->app->settings()->get('pricing.hourly', 150),
+            'hourly_price_two' => $this->app->settings()->get('pricing.hourly_two', 200),
+            'pageScripts' => ['js/studio-prices.js'],
         ]);
     }
 
     public function savePrices(Request $request): never
     {
         $this->requireUser();
-        $room = $this->roomFromInput($request);
-        $back = $this->roomUrl($room, '/user/studio/ceny');
+        $rooms = $this->rooms();
+        $room = $this->selected($rooms, (string) $request->input('room', ''));
+        $back = $room ? $this->roomUrl($room, '/user/studio/ceny') : '/user/studio/ceny';
+
         $defaultPrice = trim((string) $request->input('default_hourly_price', ''));
         $normalized = str_replace(',', '.', $defaultPrice);
         if ($defaultPrice === '' || !is_numeric($normalized) || (float) $normalized < 0) {
-            $this->flashError('Vyplň cenu za hodinu.');
+            $this->flashError('Vyplň cenu za hodinu pro 1 osobu.');
             $this->redirect($back);
         }
-        $this->app->settings()->set('pricing.hourly', number_format((float) $normalized, 2, '.', ''));
-        foreach (range(1, 7) as $day) {
-            $rawPrice = trim((string) $request->input('price_' . $day, ''));
-            $hourlyPrice = $rawPrice === '' ? null : number_format((float) str_replace(',', '.', $rawPrice), 2, '.', '');
-            $this->app->db()->query(
-                'INSERT INTO opening_hours (room_id, weekday, opens_at, closes_at, is_closed, hourly_price)
-                 VALUES (:rid, :d, :o, :c, 0, :p)
-                 ON DUPLICATE KEY UPDATE hourly_price = VALUES(hourly_price)',
-                [
-                    'rid' => (int) $room['id'],
-                    'd' => $day,
-                    'o' => '00:00:00',
-                    'c' => '23:59:00',
-                    'p' => $hourlyPrice,
-                ]
-            );
+
+        $defaultTwo = trim((string) $request->input('default_hourly_price_two', ''));
+        $normalizedTwo = str_replace(',', '.', $defaultTwo);
+        if ($defaultTwo === '' || !is_numeric($normalizedTwo) || (float) $normalizedTwo < 0) {
+            $this->flashError('Vyplň cenu za hodinu pro 2 osoby.');
+            $this->redirect($back);
         }
+        if ((float) $normalizedTwo < (float) $normalized) {
+            $this->flashError('Cena pro 2 osoby nesmí být nižší než pro 1 osobu.');
+            $this->redirect($back);
+        }
+
+        $this->app->settings()->set('pricing.hourly', number_format((float) $normalized, 2, '.', ''));
+        $this->app->settings()->set('pricing.hourly_two', number_format((float) $normalizedTwo, 2, '.', ''));
+
+        if ($room) {
+            foreach (range(1, 7) as $day) {
+                $rawPrice = trim((string) $request->input('price_' . $day, ''));
+                $hourlyPrice = $rawPrice === '' ? null : number_format((float) str_replace(',', '.', $rawPrice), 2, '.', '');
+                $this->app->db()->query(
+                    'INSERT INTO opening_hours (room_id, weekday, opens_at, closes_at, is_closed, hourly_price)
+                     VALUES (:rid, :d, :o, :c, 0, :p)
+                     ON DUPLICATE KEY UPDATE hourly_price = VALUES(hourly_price)',
+                    [
+                        'rid' => (int) $room['id'],
+                        'd' => $day,
+                        'o' => '00:00:00',
+                        'c' => '23:59:00',
+                        'p' => $hourlyPrice,
+                    ]
+                );
+            }
+        }
+
         $this->flashSuccess('Ceny jsou uložené.');
         bump_live();
         $this->redirect($back);
@@ -111,7 +133,7 @@ final class StudioController extends Controller
             'name' => mb_substr($name, 0, 120),
             'location' => mb_substr($location, 0, 190),
             'description' => trim((string) $request->input('description', '')) ?: null,
-            'max_persons' => 3,
+            'max_persons' => 2,
             'is_active' => 1,
         ];
         if ($coordinates = $this->coordinates($request)) {

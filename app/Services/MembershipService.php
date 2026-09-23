@@ -46,7 +46,7 @@ final class MembershipService
             return false;
         }
         if ($membership['entries_remaining'] === null) {
-            return ($membership['plan_type'] ?? '') === 'monthly';
+            return in_array((string) ($membership['plan_type'] ?? ''), ['monthly', 'lifetime'], true);
         }
         return (int) $membership['entries_remaining'] > 0;
     }
@@ -57,7 +57,7 @@ final class MembershipService
             'SELECT * FROM membership_plans WHERE public_id = :pid AND is_active = 1',
             ['pid' => $planPublicId]
         );
-        if (!$plan || ($plan['type'] ?? '') === 'credit') {
+        if (!$plan || in_array((string) ($plan['type'] ?? ''), ['credit', 'lifetime'], true)) {
             throw new HttpException(404, 'Tarif nebyl nalezen.');
         }
         $this->db->update(
@@ -215,6 +215,12 @@ final class MembershipService
         if (!$plan) {
             throw new HttpException(404, 'Tarif nebyl nalezen.');
         }
+        $this->db->update(
+            'memberships',
+            ['status' => 'cancelled', 'updated_at' => Clock::utc()],
+            "user_id = :uid AND status IN ('active', 'pending')",
+            ['uid' => $userId]
+        );
         $starts = Clock::nowUtc();
         $ends = $plan['duration_days'] ? $starts->modify('+' . (int) $plan['duration_days'] . ' days') : null;
         $id = (int) $this->db->insert('memberships', [

@@ -1,6 +1,7 @@
 <?php
 $room = $room ?? null;
 $defaultPrice = (int) (float) ($hourly_price ?? 150);
+$defaultPriceTwo = (int) (float) ($hourly_price_two ?? 200);
 $dayNames = [1 => 'pondělí', 2 => 'úterý', 3 => 'středa', 4 => 'čtvrtek', 5 => 'pátek', 6 => 'sobota', 7 => 'neděle'];
 $todayName = $dayNames[(int) ($weekday ?? 1)] ?? 'dnes';
 ?>
@@ -27,6 +28,7 @@ $todayName = $dayNames[(int) ($weekday ?? 1)] ?? 'dnes';
             $price = ($item['today_price'] ?? '') !== '' && $item['today_price'] !== null
                 ? (int) (float) $item['today_price']
                 : $defaultPrice;
+            $priceTwo = $price + max(0, $defaultPriceTwo - $defaultPrice);
         ?>
             <button
                 class="studio-tile<?= $active ? '' : ' is-hidden' ?>"
@@ -46,7 +48,7 @@ $todayName = $dayNames[(int) ($weekday ?? 1)] ?? 'dnes';
                 <span class="studio-tile-place"><?= e($item['location'] ?: 'Místo není vyplněné') ?></span>
                 <span class="studio-tile-meta">
                     <b><?= $closedToday ? 'Dnes zavřeno' : e(substr((string) $item['today_open'], 0, 5) . ' – ' . substr((string) $item['today_close'], 0, 5)) ?></b>
-                    <b><?= $price ?> Kč/hod</b>
+                    <b><?= $price ?> / <?= $priceTwo ?> Kč</b>
                 </span>
             </button>
         <?php endforeach; ?>

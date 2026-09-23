@@ -4,7 +4,7 @@ $step = (int) ($availability['duration_step_minutes'] ?? 60);
 $min = (int) ($availability['min_minutes'] ?? 60);
 $max = (int) ($availability['max_minutes'] ?? 180);
 $buffer = (int) ($availability['buffer_minutes'] ?? 15);
-$maxPersons = (int) ($availability['max_persons'] ?? 3);
+$maxPersons = (int) ($availability['max_persons'] ?? 2);
 $dayNames = [1 => 'pondělí', 2 => 'úterý', 3 => 'středa', 4 => 'čtvrtek', 5 => 'pátek', 6 => 'sobota', 7 => 'neděle'];
 $monthsGen = [1 => 'ledna', 2 => 'února', 3 => 'března', 4 => 'dubna', 5 => 'května', 6 => 'června', 7 => 'července', 8 => 'srpna', 9 => 'září', 10 => 'října', 11 => 'listopadu', 12 => 'prosince'];
 $localDay = \App\Support\Clock::parseLocal($date . ' 12:00:00');
@@ -86,7 +86,19 @@ $payload = [
         </div>
         <div class="hour-list" data-hour-list></div>
         <p class="booker-empty" data-hours-empty hidden>Pro tento den teď není volná hodina.</p>
-        <p class="booker-empty" data-hours-closed hidden>Tento den je studio zavřené.</p>
+        <div class="booker-closed" data-hours-closed hidden>
+            <div class="booker-closed-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="12" cy="12" r="8"/>
+                    <path d="M12 8v4l2.5 1.5"/>
+                </svg>
+            </div>
+            <div class="booker-closed-copy">
+                <strong data-closed-title>Bohužel je dnes zavřeno</strong>
+                <p data-closed-text>Vyber jiný den v kalendáři a rezervuj si volný termín.</p>
+            </div>
+            <button type="button" class="btn btn-secondary button-small" data-open-cal>Vybrat jiný den</button>
+        </div>
         <p class="booker-empty" data-hours-loading hidden>Načítám volné hodiny…</p>
     </section>
 

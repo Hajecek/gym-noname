@@ -275,7 +275,7 @@ CREATE TABLE IF NOT EXISTS membership_plans (
     slug VARCHAR(80) NOT NULL,
     name VARCHAR(120) NOT NULL,
     description TEXT DEFAULT NULL,
-    type ENUM('single', 'pack', 'monthly', 'credit', 'voucher') NOT NULL,
+    type ENUM('single', 'pack', 'monthly', 'credit', 'voucher', 'lifetime') NOT NULL,
     price DECIMAL(12,2) NOT NULL,
     currency CHAR(3) NOT NULL DEFAULT 'CZK',
     entries INT UNSIGNED DEFAULT NULL,
@@ -337,7 +337,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     name VARCHAR(120) NOT NULL,
     location VARCHAR(190) DEFAULT NULL,
     description TEXT DEFAULT NULL,
-    max_persons TINYINT UNSIGNED NOT NULL DEFAULT 3,
+    max_persons TINYINT UNSIGNED NOT NULL DEFAULT 2,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -401,20 +401,6 @@ CREATE TABLE IF NOT EXISTS reservations (
     CONSTRAINT fk_reservations_user FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT fk_reservations_membership FOREIGN KEY (membership_id) REFERENCES memberships (id) ON DELETE SET NULL,
     CONSTRAINT fk_reservations_cancelled_by FOREIGN KEY (cancelled_by) REFERENCES users (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS blocked_slots (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    room_id BIGINT UNSIGNED NOT NULL,
-    starts_at DATETIME NOT NULL,
-    ends_at DATETIME NOT NULL,
-    reason VARCHAR(255) DEFAULT NULL,
-    created_by BIGINT UNSIGNED DEFAULT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_blocked_slots_room_time (room_id, starts_at, ends_at),
-    CONSTRAINT fk_blocked_slots_room FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE,
-    CONSTRAINT fk_blocked_slots_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS reservation_occupancy (

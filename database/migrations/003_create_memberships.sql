@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS membership_plans (
     slug VARCHAR(80) NOT NULL,
     name VARCHAR(120) NOT NULL,
     description TEXT DEFAULT NULL,
-    type ENUM('single', 'pack', 'monthly', 'credit', 'voucher') NOT NULL,
+    type ENUM('single', 'pack', 'monthly', 'credit', 'voucher', 'lifetime') NOT NULL,
     price DECIMAL(12,2) NOT NULL,
     currency CHAR(3) NOT NULL DEFAULT 'CZK',
     entries INT UNSIGNED DEFAULT NULL,

@@ -1,6 +1,5 @@
 <?php
 $section = $section ?? 'studia';
-$roomQuery = !empty($room['public_id']) ? '?room=' . rawurlencode((string) $room['public_id']) : '';
 $pages = [
     'studia' => '/user/studio',
     'ceny' => '/user/studio/ceny',

@@ -1,4 +1,4 @@
-<div class="page-head"><h1>Vstupní systém</h1></div>
+<div class="page-head"><div><p class="eyebrow">SPRÁVA</p><h1>Dveře</h1><p class="muted">Stav zámku, test režim a logy vstupů.</p></div></div>
 <div class="card">
 <p>Poskytovatel: <?= e($status['provider'] ?? 'n/a') ?></p>
 <p>Režim: <?= !empty($status['test_mode']) ? 'TEST (MockDoorProvider)' : 'Nuki' ?></p>
@@ -7,7 +7,7 @@
 <p>Baterie: <?= e((string)($status['battery_percent'] ?? 'n/a')) ?>%</p>
 <p class="muted">Nuki token se nikdy neposílá do prohlížeče. Ostré otevírání se aktivuje až po konfiguraci zařízení.</p>
 </div>
-<form class="card" method="post" action="<?= e(url('/admin/vstup/test')) ?>" style="margin-top:16px">
+<form class="card" method="post" action="<?= e(url('/user/sprava/vstup/test')) ?>" style="margin-top:16px">
 <?= csrf_field() ?>
 <h3>Kritická akce – opětovné ověření</h3>
 <div class="field"><label>Vaše heslo</label><input type="password" name="password" required></div>

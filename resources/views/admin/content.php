@@ -12,7 +12,7 @@
 <div class="field"><label>Ochrana údajů</label><textarea name="privacy"><?= e($privacy['body_html'] ?? '') ?></textarea></div>
 <button class="btn btn-primary">Uložit obsah</button>
 </form>
-<form method="post" action="<?= e(url('/admin/obsah/faq')) ?>" class="card" style="margin-top:16px">
+<form method="post" action="<?= e(url('/user/sprava/obsah/faq')) ?>" class="card" style="margin-top:16px">
 <?= csrf_field() ?>
 <h3>Nová FAQ</h3>
 <div class="field"><label>Otázka</label><input name="question" required></div>

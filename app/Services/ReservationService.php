@@ -52,6 +52,7 @@ final class ReservationService
             'block_minutes' => $durationStep + $buffer,
             'max_persons' => $maxPersons,
             'hourly_price' => number_format($hourlyPrice, 2, '.', ''),
+            'hourly_price_two' => number_format($this->rateForGuests(2, $hourlyPrice), 2, '.', ''),
         ];
         if ($hours['closed']) {
             return $meta + ['closed' => true, 'slots' => []];
@@ -252,7 +253,7 @@ final class ReservationService
             throw new HttpException(422, 'Termín je mimo provozní dobu.');
         }
 
-        $price = $this->priceForDuration($durationMinutes, $this->hourlyFromHours($hours));
+        $price = $this->priceForDuration($durationMinutes, $this->hourlyFromHours($hours), $guestCount);
         $membership = $this->memberships->activeForUser((int) $user['id']);
         $useMembership = !$paidCheckout && $this->memberships->coversBooking($membership);
 
@@ -639,25 +640,6 @@ final class ReservationService
         return $count;
     }
 
-    public function today(int $roomId): array
-    {
-        $start = Clock::nowLocal()->setTime(0, 0);
-        $end = $start->modify('+1 day');
-        return $this->db->fetchAll(
-            "SELECT r.*, u.first_name, u.last_name, u.username, u.phone
-             FROM reservations r
-             INNER JOIN users u ON u.id = r.user_id
-             WHERE r.room_id = :rid AND r.status IN ('confirmed', 'pending_payment')
-               AND r.starts_at >= :start AND r.starts_at < :end
-             ORDER BY r.starts_at ASC",
-            [
-                'rid' => $roomId,
-                'start' => Clock::toUtc($start)->format('Y-m-d H:i:s'),
-                'end' => Clock::toUtc($end)->format('Y-m-d H:i:s'),
-            ]
-        );
-    }
-
     public function room(?int $roomId = null): array
     {
         $room = $roomId
@@ -841,12 +823,7 @@ final class ReservationService
                AND starts_at < :to AND ends_at > :from",
             ['rid' => $roomId, 'from' => $from, 'to' => $to]
         );
-        $blocks = $this->db->fetchAll(
-            'SELECT starts_at, ends_at, 0 AS buffer_minutes FROM blocked_slots
-             WHERE room_id = :rid AND starts_at < :to AND ends_at > :from',
-            ['rid' => $roomId, 'from' => $from, 'to' => $to]
-        );
-        return array_merge($reservations, $blocks);
+        return $reservations;
     }
 
     private function overlaps(array $occupied, \DateTimeImmutable $start, \DateTimeImmutable $end, int $buffer): bool
@@ -1319,11 +1296,23 @@ final class ReservationService
         return (float) $this->settings->get('pricing.hourly', 150);
     }
 
-    private function priceForDuration(int $minutes, ?float $hourlyOverride = null): string
+    /** 1 osoba = základní hodinovka, 2 osoby = základní + příplatek (výchozí 150 → 200). */
+    private function rateForGuests(int $guestCount, float $hourlyOne): float
     {
-        $hourly = $hourlyOverride ?? (float) $this->settings->get('pricing.hourly', 150);
+        if ($guestCount < 2) {
+            return $hourlyOne;
+        }
+        $one = (float) $this->settings->get('pricing.hourly', 150);
+        $two = (float) $this->settings->get('pricing.hourly_two', 200);
+        return $hourlyOne + max(0.0, $two - $one);
+    }
+
+    private function priceForDuration(int $minutes, ?float $hourlyOverride = null, int $guestCount = 1): string
+    {
+        $hourlyOne = $hourlyOverride ?? (float) $this->settings->get('pricing.hourly', 150);
+        $rate = $this->rateForGuests($guestCount, $hourlyOne);
         $hours = max(1, (int) ceil($minutes / 60));
-        return number_format($hourly * $hours, 2, '.', '');
+        return number_format($rate * $hours, 2, '.', '');
     }
 
     private function touchLive(): void

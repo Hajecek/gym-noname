@@ -1,9 +1,9 @@
 <div class="page-head">
     <div>
-        <h1>Předobjednávky</h1>
+        <p class="eyebrow">SPRÁVA</p><h1>Zájem</h1>
         <p class="muted">Celkem <?= (int) $total ?> e-mailů. Tady je zájem ještě před spuštěním.</p>
     </div>
-    <a class="btn btn-secondary" href="<?= e(url('/admin/zajem/export')) ?>">Stáhnout CSV</a>
+    <a class="btn btn-secondary" href="<?= e(url('/user/sprava/zajem/export')) ?>">Stáhnout CSV</a>
 </div>
 <form method="get" class="card" style="margin-bottom:16px">
     <div class="field"><label>Hledat e-mail</label><input name="q" value="<?= e($q) ?>" placeholder="cast@emailu.cz"></div>

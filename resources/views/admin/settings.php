@@ -1,4 +1,4 @@
-<div class="page-head"><h1>Nastavení systému</h1></div>
+<div class="page-head"><div><p class="eyebrow">SPRÁVA</p><h1>Nastavení</h1><p class="muted">Sloty, buffer, storno a přístupové limity.</p></div></div>
 <form method="post" class="card">
 <?= csrf_field() ?>
 <div class="field"><label>Krok začátku (min)</label><input name="reservation.slot_minutes" value="<?= e((string)setting('reservation.slot_minutes', 15)) ?>"><p class="muted">Interní krok obsazenosti. Zákazník vidí bloky 1 h + rezerva na úklid.</p></div>
@@ -8,7 +8,6 @@
 <div class="field"><label>Storno (hodiny)</label><input name="reservation.cancellation_hours" value="<?= e((string)setting('reservation.cancellation_hours', 12)) ?>"></div>
 <div class="field"><label>Vstup před začátkem (min)</label><input name="access.early_minutes" value="<?= e((string)setting('access.early_minutes', 5)) ?>"></div>
 <div class="field"><label>Vstup po konci tréninku (min)</label><input name="access.late_minutes" value="<?= e((string)setting('access.late_minutes', 5)) ?>"><p class="muted">Dveře drží celou rezervaci včetně času na převlečení. Tohle pole se pro zámek už nepoužívá.</p></div>
-<div class="field"><label>Cena za hodinu (Kč)</label><input name="pricing.hourly" value="<?= e((string)setting('pricing.hourly', 150)) ?>"><p class="muted">Použije se u dnů, které nemají vlastní cenu v provozní době.</p></div>
 <button class="btn btn-primary">Uložit</button>
 </form>
 <div class="table-wrap card" style="margin-top:16px">

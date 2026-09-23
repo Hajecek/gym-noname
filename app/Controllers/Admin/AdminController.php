@@ -38,66 +38,148 @@ final class AdminController extends Controller
             $stats['interest'] = (int) $db->fetchColumn('SELECT COUNT(*) FROM interest_signups');
         } catch (\PDOException) {
         }
-        $this->view('admin/dashboard', ['title' => 'Administrace', 'stats' => $stats], 'layouts/admin');
+        $this->view('admin/dashboard', ['title' => 'Přehled správy', 'stats' => $stats]);
     }
 
     public function users(Request $request): never
     {
         $q = trim((string) $request->query('q', ''));
-        $sql = 'SELECT * FROM users WHERE deleted_at IS NULL';
+        $sql = "SELECT u.*,
+                       m.status AS membership_status,
+                       p.name AS membership_name,
+                       p.type AS membership_type
+                FROM users u
+                LEFT JOIN memberships m ON m.id = (
+                    SELECT m2.id FROM memberships m2
+                    WHERE m2.user_id = u.id AND m2.status = 'active'
+                      AND (m2.ends_at IS NULL OR m2.ends_at > UTC_TIMESTAMP())
+                    ORDER BY m2.ends_at IS NULL DESC, m2.ends_at DESC
+                    LIMIT 1
+                )
+                LEFT JOIN membership_plans p ON p.id = m.plan_id
+                WHERE u.deleted_at IS NULL";
         $params = [];
         if ($q !== '') {
-            $sql .= ' AND (email LIKE :q OR username LIKE :q2 OR first_name LIKE :q3 OR last_name LIKE :q4)';
+            $sql .= ' AND (u.email LIKE :q OR u.username LIKE :q2 OR u.first_name LIKE :q3 OR u.last_name LIKE :q4)';
             $like = '%' . $q . '%';
             $params = ['q' => $like, 'q2' => $like, 'q3' => $like, 'q4' => $like];
         }
-        $sql .= ' ORDER BY created_at DESC LIMIT 200';
+        $sql .= ' ORDER BY u.created_at DESC LIMIT 200';
         $this->view('admin/users', [
             'title' => 'Zákazníci',
             'users' => $this->app->db()->fetchAll($sql, $params),
             'q' => $q,
-        ], 'layouts/admin');
+            'pageScripts' => ['js/customers.js'],
+        ]);
     }
 
     public function userShow(Request $request, array $params): never
     {
-        $user = $this->app->db()->fetch('SELECT * FROM users WHERE public_id = :id', ['id' => $params['id']]);
+        $user = $this->app->db()->fetch('SELECT * FROM users WHERE public_id = :id AND deleted_at IS NULL', ['id' => $params['id']]);
         if (!$user) {
             throw new HttpException(404, 'Uživatel nebyl nalezen.');
         }
+        $memberships = new MembershipService($this->app->db());
         $this->view('admin/user-show', [
             'title' => $user['first_name'] . ' ' . $user['last_name'],
             'customer' => $user,
-            'memberships' => (new MembershipService($this->app->db()))->history((int) $user['id']),
+            'activeMembership' => $memberships->activeForUser((int) $user['id']),
+            'memberships' => $memberships->history((int) $user['id']),
             'reservations' => ReservationService::make($this->app->db())->forUser((int) $user['id']),
-            'payments' => $this->app->db()->fetchAll('SELECT * FROM payments WHERE user_id = :id ORDER BY created_at DESC', ['id' => (int) $user['id']]),
+            'payments' => $this->app->db()->fetchAll('SELECT * FROM payments WHERE user_id = :id ORDER BY created_at DESC LIMIT 30', ['id' => (int) $user['id']]),
             'access' => $this->app->db()->fetchAll('SELECT * FROM access_logs WHERE user_id = :id ORDER BY created_at DESC LIMIT 50', ['id' => (int) $user['id']]),
-            'plans' => (new MembershipService($this->app->db()))->plans(false),
-        ], 'layouts/admin');
+            'plans' => array_values(array_filter(
+                $memberships->plans(true),
+                static fn (array $plan): bool => ($plan['type'] ?? '') !== 'credit'
+            )),
+            'pageScripts' => ['js/customers.js'],
+        ]);
     }
 
     public function userUpdate(Request $request, array $params): never
     {
         $actor = $this->requireUser();
-        $user = $this->app->db()->fetch('SELECT * FROM users WHERE public_id = :id', ['id' => $params['id']]);
-        if (!$user) {
-            throw new HttpException(404);
-        }
+        $user = $this->findCustomer($params['id']);
         $status = (string) $request->input('status', $user['status']);
         if (!in_array($status, ['pending', 'active', 'blocked'], true)) {
             throw new HttpException(422, 'Neplatný stav.');
         }
+        $this->setCustomerStatus($actor, $user, $status, (string) $request->input('blocked_reason', ''), $request->ip());
+        $this->flashSuccess('Stav účtu byl uložen.');
+        $this->redirect('/user/sprava/zakaznici/' . $user['public_id']);
+    }
+
+    public function userBlock(Request $request, array $params): never
+    {
+        $actor = $this->requireUser();
+        $user = $this->findCustomer($params['id']);
+        if ((int) $user['id'] === (int) $actor['id']) {
+            throw new HttpException(422, 'Nemůžeš zablokovat vlastní účet.');
+        }
+        $reason = trim((string) $request->input('blocked_reason', 'Zablokováno administrátorem'));
+        $this->setCustomerStatus($actor, $user, 'blocked', $reason !== '' ? $reason : 'Zablokováno administrátorem', $request->ip());
+        $this->flashSuccess('Účet byl zablokován.');
+        $this->redirectCustomerAction($request, $user);
+    }
+
+    public function userUnblock(Request $request, array $params): never
+    {
+        $actor = $this->requireUser();
+        $user = $this->findCustomer($params['id']);
+        $this->setCustomerStatus($actor, $user, 'active', '', $request->ip());
+        $this->flashSuccess('Účet byl odblokován.');
+        $this->redirectCustomerAction($request, $user);
+    }
+
+    public function userDelete(Request $request, array $params): never
+    {
+        $actor = $this->requireUser();
+        $user = $this->findCustomer($params['id']);
+        if ((int) $user['id'] === (int) $actor['id']) {
+            throw new HttpException(422, 'Nemůžeš smazat vlastní účet.');
+        }
+        if ($user['role'] === 'admin') {
+            $admins = (int) $this->app->db()->fetchColumn("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active' AND deleted_at IS NULL");
+            if ($admins <= 1) {
+                throw new HttpException(422, 'Nelze smazat posledního aktivního administrátora.');
+            }
+        }
+        AuthService::make($this->app->db())->deleteAccount($user);
+        (new AuditService($this->app->db()))->log((int) $actor['id'], 'user.delete', 'user', $user['id'], $user['status'], 'deleted', $request->ip());
+        $this->flashSuccess('Účet byl smazán.');
+        $this->redirect('/user/sprava/zakaznici');
+    }
+
+    private function findCustomer(string $publicId): array
+    {
+        $user = $this->app->db()->fetch('SELECT * FROM users WHERE public_id = :id AND deleted_at IS NULL', ['id' => $publicId]);
+        if (!$user) {
+            throw new HttpException(404, 'Uživatel nebyl nalezen.');
+        }
+        return $user;
+    }
+
+    private function setCustomerStatus(array $actor, array $user, string $status, string $reason, string $ip): void
+    {
         $this->app->db()->update('users', [
             'status' => $status,
             'blocked_at' => $status === 'blocked' ? Clock::utc() : null,
-            'blocked_reason' => $status === 'blocked' ? (string) $request->input('blocked_reason', '') : null,
+            'blocked_reason' => $status === 'blocked' ? $reason : null,
+            'updated_at' => Clock::utc(),
         ], 'id = :id', ['id' => (int) $user['id']]);
-        (new AuditService($this->app->db()))->log((int) $actor['id'], 'user.status', 'user', $user['id'], $user['status'], $status, $request->ip());
+        (new AuditService($this->app->db()))->log((int) $actor['id'], 'user.status', 'user', $user['id'], $user['status'], $status, $ip);
         if ($status !== (string) $user['status']) {
             AppPushService::make($this->app->db())->accountStatusChanged($user, $status);
         }
-        $this->flashSuccess('Stav účtu byl uložen.');
-        $this->redirect('/admin/zakaznici/' . $user['public_id']);
+    }
+
+    private function redirectCustomerAction(Request $request, array $user): never
+    {
+        $back = (string) $request->input('redirect', '');
+        if ($back === 'list') {
+            $this->redirect('/user/sprava/zakaznici');
+        }
+        $this->redirect('/user/sprava/zakaznici/' . $user['public_id']);
     }
 
     public function userRole(Request $request, array $params): never
@@ -106,9 +188,9 @@ final class AdminController extends Controller
         if ($actor['role'] !== 'admin') {
             throw new HttpException(403, 'Role smí měnit pouze administrátor.');
         }
-        $user = $this->app->db()->fetch('SELECT * FROM users WHERE public_id = :id', ['id' => $params['id']]);
+        $user = $this->findCustomer($params['id']);
         $role = (string) $request->input('role');
-        if (!in_array($role, ['user', 'admin'], true) || !$user) {
+        if (!in_array($role, ['user', 'admin'], true)) {
             throw new HttpException(422, 'Neplatná role.');
         }
         if ($user['role'] === 'admin' && $role !== 'admin') {
@@ -120,124 +202,21 @@ final class AdminController extends Controller
         $this->app->db()->update('users', ['role' => $role], 'id = :id', ['id' => (int) $user['id']]);
         (new AuditService($this->app->db()))->log((int) $actor['id'], 'user.role', 'user', $user['id'], $user['role'], $role, $request->ip());
         $this->flashSuccess('Role byla změněna.');
-        $this->redirect('/admin/zakaznici/' . $user['public_id']);
+        $this->redirect('/user/sprava/zakaznici/' . $user['public_id']);
     }
 
     public function assignMembership(Request $request, array $params): never
     {
         $actor = $this->requireUser();
-        $user = $this->app->db()->fetch('SELECT * FROM users WHERE public_id = :id', ['id' => $params['id']]);
-        (new MembershipService($this->app->db()))->assignPlan((int) $user['id'], (int) $request->input('plan_id'), 'active', (int) $actor['id']);
+        $user = $this->findCustomer($params['id']);
+        $planId = (int) $request->input('plan_id');
+        if ($planId <= 0) {
+            throw new HttpException(422, 'Vyber tarif.');
+        }
+        (new MembershipService($this->app->db()))->assignPlan((int) $user['id'], $planId, 'active', (int) $actor['id']);
         AppPushService::make($this->app->db())->membershipAssigned((int) $user['id']);
         $this->flashSuccess('Členství bylo přiřazeno.');
-        $this->redirect('/admin/zakaznici/' . $user['public_id']);
-    }
-
-    public function reservations(Request $request): never
-    {
-        $date = (string) $request->query('date', Clock::nowLocal()->format('Y-m-d'));
-        $service = ReservationService::make($this->app->db());
-        $room = $service->room();
-        $this->view('admin/reservations', [
-            'title' => 'Rezervace',
-            'date' => $date,
-            'availability' => $service->availability($date),
-            'today' => $service->today((int) $room['id']),
-            'hours' => $this->app->db()->fetchAll('SELECT * FROM opening_hours WHERE room_id = :id ORDER BY weekday', ['id' => (int) $room['id']]),
-            'exceptions' => $this->app->db()->fetchAll('SELECT * FROM opening_hour_exceptions WHERE room_id = :id ORDER BY exception_date DESC LIMIT 40', ['id' => (int) $room['id']]),
-            'hourly_price' => $this->app->settings()->get('pricing.hourly', 150),
-            'buffer_minutes' => $this->app->settings()->int('reservation.buffer_minutes', 15),
-        ], 'layouts/admin');
-    }
-
-    public function createReservation(Request $request): never
-    {
-        $email = trim((string) $request->input('email', ''));
-        $user = $this->app->db()->fetch('SELECT * FROM users WHERE email = :e', ['e' => mb_strtolower($email)]);
-        if (!$user) {
-            $this->flashError('Zákazník s tímto e-mailem neexistuje.');
-            $this->redirect('/admin/rezervace');
-        }
-        try {
-            ReservationService::make($this->app->db())->create($user, (string) $request->input('start'), (int) $request->input('duration', 60), (int) $request->input('guests', 1));
-            $this->flashSuccess('Rezervace byla vytvořena.');
-        } catch (HttpException $e) {
-            $this->flashError($e->getMessage());
-        }
-        $this->redirect('/admin/rezervace');
-    }
-
-    public function blockSlot(Request $request): never
-    {
-        $service = ReservationService::make($this->app->db());
-        $room = $service->room();
-        $start = Clock::toUtc(Clock::parseLocal((string) $request->input('start')));
-        $end = Clock::toUtc(Clock::parseLocal((string) $request->input('end')));
-        $this->app->db()->insert('blocked_slots', [
-            'room_id' => (int) $room['id'],
-            'starts_at' => $start->format('Y-m-d H:i:s'),
-            'ends_at' => $end->format('Y-m-d H:i:s'),
-            'reason' => (string) $request->input('reason', 'Blokace termínu'),
-            'created_by' => $this->app->auth()->id(),
-            'created_at' => Clock::utc(),
-        ]);
-        $this->flashSuccess('Termín byl zablokován.');
-        bump_live();
-        $this->redirect('/admin/rezervace');
-    }
-
-    public function openingHours(Request $request): never
-    {
-        $room = ReservationService::make($this->app->db())->room();
-        $defaultPrice = trim((string) $request->input('default_hourly_price', ''));
-        if ($defaultPrice !== '') {
-            $this->app->settings()->set('pricing.hourly', number_format((float) str_replace(',', '.', $defaultPrice), 2, '.', ''));
-        }
-        foreach (range(1, 7) as $day) {
-            $open = (string) $request->input('opens_' . $day, '06:00');
-            $close = (string) $request->input('closes_' . $day, '22:00');
-            $closed = $request->input('closed_' . $day) ? 1 : 0;
-            $rawPrice = trim((string) $request->input('price_' . $day, ''));
-            $hourlyPrice = $rawPrice === '' ? null : number_format((float) str_replace(',', '.', $rawPrice), 2, '.', '');
-            $this->app->db()->query(
-                'INSERT INTO opening_hours (room_id, weekday, opens_at, closes_at, is_closed, hourly_price)
-                 VALUES (:rid, :d, :o, :c, :x, :p)
-                 ON DUPLICATE KEY UPDATE opens_at = VALUES(opens_at), closes_at = VALUES(closes_at), is_closed = VALUES(is_closed), hourly_price = VALUES(hourly_price)',
-                [
-                    'rid' => (int) $room['id'],
-                    'd' => $day,
-                    'o' => strlen($open) === 5 ? $open . ':00' : $open,
-                    'c' => strlen($close) === 5 ? $close . ':00' : $close,
-                    'x' => $closed,
-                    'p' => $hourlyPrice,
-                ]
-            );
-        }
-        $this->flashSuccess('Provozní doba byla uložena.');
-        bump_live();
-        $this->redirect('/admin/rezervace');
-    }
-
-    public function exception(Request $request): never
-    {
-        $room = ReservationService::make($this->app->db())->room();
-        $this->app->db()->query(
-            'INSERT INTO opening_hour_exceptions (room_id, exception_date, opens_at, closes_at, is_closed, note, created_at)
-             VALUES (:rid, :d, :o, :c, :x, :n, :now)
-             ON DUPLICATE KEY UPDATE opens_at = VALUES(opens_at), closes_at = VALUES(closes_at), is_closed = VALUES(is_closed), note = VALUES(note)',
-            [
-                'rid' => (int) $room['id'],
-                'd' => (string) $request->input('date'),
-                'o' => $request->input('opens') ? $request->input('opens') . ':00' : null,
-                'c' => $request->input('closes') ? $request->input('closes') . ':00' : null,
-                'x' => $request->input('closed') ? 1 : 0,
-                'n' => (string) $request->input('note', ''),
-                'now' => Clock::utc(),
-            ]
-        );
-        $this->flashSuccess('Výjimka byla uložena.');
-        bump_live();
-        $this->redirect('/admin/rezervace');
+        $this->redirect('/user/sprava/zakaznici/' . $user['public_id']);
     }
 
     public function content(): never
@@ -250,7 +229,7 @@ final class AdminController extends Controller
             'privacy' => $content->page('ochrana-udaju'),
             'faqs' => $content->allFaqs(),
             'contact' => $content->contact(),
-        ], 'layouts/admin');
+        ]);
     }
 
     public function saveContent(Request $request): never
@@ -266,7 +245,7 @@ final class AdminController extends Controller
         $this->app->settings()->set('contact.map_embed', (string) $request->input('map_embed'));
         $this->flashSuccess('Obsah byl uložen.');
         bump_live();
-        $this->redirect('/admin/obsah');
+        $this->redirect('/user/sprava/obsah');
     }
 
     public function saveFaq(Request $request): never
@@ -279,7 +258,7 @@ final class AdminController extends Controller
         ]);
         $this->flashSuccess('FAQ položka byla přidána.');
         bump_live();
-        $this->redirect('/admin/obsah');
+        $this->redirect('/user/sprava/obsah');
     }
 
     public function plans(): never
@@ -287,7 +266,7 @@ final class AdminController extends Controller
         $this->view('admin/plans', [
             'title' => 'Členství a ceník',
             'plans' => (new MembershipService($this->app->db()))->plans(false),
-        ], 'layouts/admin');
+        ]);
     }
 
     public function savePlan(Request $request): never
@@ -315,7 +294,7 @@ final class AdminController extends Controller
         }
         $this->flashSuccess('Tarif byl uložen.');
         bump_live();
-        $this->redirect('/admin/clenstvi');
+        $this->redirect('/user/sprava/tarify');
     }
 
     public function access(): never
@@ -325,7 +304,7 @@ final class AdminController extends Controller
             'status' => AccessControlService::make($this->app->db())->doorStatus(),
             'doors' => $this->app->db()->fetchAll('SELECT * FROM doors'),
             'logs' => $this->app->db()->fetchAll('SELECT l.*, u.username FROM access_logs l LEFT JOIN users u ON u.id = l.user_id ORDER BY l.created_at DESC LIMIT 80'),
-        ], 'layouts/admin');
+        ]);
     }
 
     public function testOpen(Request $request): never
@@ -334,10 +313,10 @@ final class AdminController extends Controller
         $password = (string) $request->input('password', '');
         if (!AuthService::make($this->app->db()) || !\App\Core\Crypto::verifyPassword($password, (string) $actor['password_hash'])) {
             $this->flashError('Opětovné ověření selhalo.');
-            $this->redirect('/admin/vstup');
+            $this->redirect('/user/sprava/vstup');
         }
         $this->flashSuccess('Testovací režim je aktivní. Ostré otevření se spustí až po konfiguraci Nuki.');
-        $this->redirect('/admin/vstup');
+        $this->redirect('/user/sprava/vstup');
     }
 
     public function settings(): never
@@ -348,7 +327,7 @@ final class AdminController extends Controller
         $this->view('admin/settings', [
             'title' => 'Nastavení systému',
             'audit' => $this->app->db()->fetchAll('SELECT a.*, u.username FROM admin_audit_logs a LEFT JOIN users u ON u.id = a.actor_id ORDER BY a.created_at DESC LIMIT 100'),
-        ], 'layouts/admin');
+        ]);
     }
 
     public function saveSettings(Request $request): never
@@ -356,13 +335,13 @@ final class AdminController extends Controller
         if (!$this->app->auth()->hasRole('admin')) {
             throw new HttpException(403);
         }
-        foreach (['reservation.slot_minutes', 'reservation.min_minutes', 'reservation.max_minutes', 'reservation.buffer_minutes', 'reservation.cancellation_hours', 'access.early_minutes', 'access.late_minutes', 'pricing.hourly'] as $key) {
+        foreach (['reservation.slot_minutes', 'reservation.min_minutes', 'reservation.max_minutes', 'reservation.buffer_minutes', 'reservation.cancellation_hours', 'access.early_minutes', 'access.late_minutes'] as $key) {
             $this->app->settings()->set($key, $request->input($key));
         }
         (new AuditService($this->app->db()))->log($this->app->auth()->id(), 'settings.update', 'app_settings', null, null, $request->all(), $request->ip());
         $this->flashSuccess('Nastavení bylo uloženo.');
         bump_live();
-        $this->redirect('/admin/nastaveni');
+        $this->redirect('/user/sprava/nastaveni');
     }
 
     public function interest(Request $request): never
@@ -380,7 +359,7 @@ final class AdminController extends Controller
             'signups' => $this->app->db()->fetchAll($sql, $params),
             'q' => $q,
             'total' => (int) $this->app->db()->fetchColumn('SELECT COUNT(*) FROM interest_signups'),
-        ], 'layouts/admin');
+        ]);
     }
 
     public function exportInterest(): never

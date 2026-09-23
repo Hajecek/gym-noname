@@ -122,6 +122,27 @@ function role_label(string $role): string
     };
 }
 
+function status_label(string $status): string
+{
+    return match ($status) {
+        'active' => 'Aktivní',
+        'pending' => 'Čeká',
+        'blocked' => 'Blokovaný',
+        'deleted' => 'Smazaný',
+        default => $status,
+    };
+}
+
+function status_badge_class(string $status): string
+{
+    return match ($status) {
+        'active' => 'badge-ok',
+        'pending' => 'badge-warn',
+        'blocked', 'deleted' => 'badge-bad',
+        default => 'badge-muted',
+    };
+}
+
 function device_label(?string $userAgent): string
 {
     $ua = (string) $userAgent;

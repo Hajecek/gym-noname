@@ -53,7 +53,7 @@ $daysLabel = static function (array $plan): string {
 
 <div class="plan-grid">
     <?php foreach ($plans as $plan):
-        if (($plan['type'] ?? '') === 'credit') {
+        if (($plan['type'] ?? '') === 'credit' || ($plan['type'] ?? '') === 'lifetime') {
             continue;
         }
         $featured = ($plan['type'] ?? '') === 'monthly';

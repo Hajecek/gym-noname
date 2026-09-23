@@ -10,6 +10,9 @@
   const hoursEl = root.querySelector("[data-hour-list]");
   const emptyEl = root.querySelector("[data-hours-empty]");
   const closedEl = root.querySelector("[data-hours-closed]");
+  const closedTitleEl = root.querySelector("[data-closed-title]");
+  const closedTextEl = root.querySelector("[data-closed-text]");
+  const hoursCard = root.querySelector(".booker-hours");
   const loadingEl = root.querySelector("[data-hours-loading]");
   const hintEl = root.querySelector("[data-hours-hint]");
   const dateLabelEl = root.querySelector("[data-date-label]");
@@ -24,7 +27,8 @@
   const guestCountEl = bar?.querySelector("[data-guest-count]");
   const calendar = root.querySelector("[data-calendar]");
   const calModal = root.querySelector("[data-cal-modal]");
-  const openCalBtn = root.querySelector("[data-open-cal]");
+  const openCalBtns = [...root.querySelectorAll("[data-open-cal]")];
+  const openCalBtn = openCalBtns[0] || null;
   const calGrid = calendar?.querySelector("[data-cal-grid]");
   const calTitle = calendar?.querySelector("[data-cal-title]");
 
@@ -46,8 +50,10 @@
   const minMinutes = () => Number(state.availability.min_minutes || 60);
   const maxMinutes = () => Number(state.availability.max_minutes || 180);
   const maxHours = () => Math.max(1, Math.floor(maxMinutes() / step()));
-  const maxPersons = () => Number(state.availability.max_persons || 3);
+  const maxPersons = () => Number(state.availability.max_persons || 2);
   const hourly = () => Number(state.availability.hourly_price || 150);
+  const hourlyTwo = () => Number(state.availability.hourly_price_two || 200);
+  const rate = () => (state.guests >= 2 ? hourlyTwo() : hourly());
   const buffer = () => Number(state.availability.buffer_minutes || 15);
 
   const pad = (n) => String(n).padStart(2, "0");
@@ -184,38 +190,80 @@
     return "Volné";
   };
 
+  const hourButton = (row) => {
+    const kind = hourState(row);
+    if (kind === "buffer") return "";
+    const selected = kind === "selected";
+    const disabled = kind === "busy" || kind === "past";
+    return (
+      '<button type="button" class="hour-row is-' + kind + '"' +
+      ' data-hour-start="' + row.start + '"' +
+      (disabled ? " disabled" : "") +
+      ' aria-pressed="' + (selected ? "true" : "false") + '">' +
+      '<span class="hour-time">' + row.start + "<small>" + row.end + "</small></span>" +
+      '<span class="hour-meta">' + hourMeta(kind) + (kind === "free" || kind === "selected" || kind === "add" ? " · " + money(rate()) : "") + "</span>" +
+      "</button>"
+    );
+  };
+
+  const periodOf = (start) => {
+    const hour = parseInt(String(start || "0").slice(0, 2), 10) || 0;
+    if (hour < 12) return "morning";
+    if (hour < 17) return "afternoon";
+    return "evening";
+  };
+
   const renderHours = () => {
     const closed = !!state.availability.closed;
     const loading = !!(loadingEl && !loadingEl.hidden);
     const rows = closed || loading ? [] : (state.availability.slots || []);
     const free = rows.filter((row) => row.available).length;
+    const isToday = state.date === state.today;
     if (closedEl) closedEl.hidden = !closed;
+    if (hoursCard) hoursCard.classList.toggle("is-closed-day", closed);
+    if (closed && closedTitleEl) {
+      closedTitleEl.textContent = isToday
+        ? "Bohužel je dnes zavřeno"
+        : "Bohužel je v tento den zavřeno";
+    }
+    if (closed && closedTextEl) {
+      closedTextEl.textContent = isToday
+        ? "Dnes studio neotevírá. Vyber jiný den a rezervuj si volný termín."
+        : "Studio " + dateLabel(state.date) + " neotevírá. Zkus jiný den v kalendáři.";
+    }
     if (emptyEl) {
       emptyEl.hidden = closed || loading || rows.length > 0;
       emptyEl.textContent = state.error || "Pro tento den teď není volná hodina.";
     }
     if (hoursEl) {
       hoursEl.hidden = closed || loading || rows.length === 0;
-      hoursEl.innerHTML = rows.map((row) => {
-        const kind = hourState(row);
-        if (kind === "buffer") return "";
-        const selected = kind === "selected";
-        const disabled = kind === "busy" || kind === "past";
-        const end = row.end;
+      const groups = { morning: [], afternoon: [], evening: [] };
+      rows.forEach((row) => {
+        if (hourState(row) === "buffer") return;
+        groups[periodOf(row.start)].push(row);
+      });
+      const columns = [
+        ["morning", "Dopoledne", groups.morning],
+        ["afternoon", "Odpoledne", groups.afternoon],
+        ["evening", "Večer", groups.evening],
+      ];
+      hoursEl.innerHTML = columns.map(([key, title, items]) => {
+        const body = items.length
+          ? items.map(hourButton).join("")
+          : '<p class="hour-col-empty">Žádný termín</p>';
         return (
-          '<button type="button" class="hour-row is-' + kind + '"' +
-          ' data-hour-start="' + row.start + '"' +
-          (disabled ? " disabled" : "") +
-          ' aria-pressed="' + (selected ? "true" : "false") + '">' +
-          '<span class="hour-time">' + row.start + "<small>" + end + "</small></span>" +
-          '<span class="hour-meta">' + hourMeta(kind) + (kind === "free" || kind === "selected" || kind === "add" ? " · " + money(hourly()) : "") + "</span>" +
-          "</button>"
+          '<div class="hour-col" data-period="' + key + '">' +
+          "<h3>" + title + "</h3>" +
+          '<div class="hour-col-list">' + body + "</div>" +
+          "</div>"
         );
       }).join("");
     }
     if (dateLabelEl) dateLabelEl.textContent = dateLabel(state.date);
-    if (hintEl && !closed) {
-      if (loading) {
+    if (hintEl) {
+      if (closed) {
+        hintEl.textContent = isToday ? "Dnes je zavřeno." : "Tento den je zavřeno.";
+      } else if (loading) {
         hintEl.textContent = "Načítám volné hodiny…";
       } else {
         hintEl.textContent = free
@@ -234,7 +282,7 @@
     const first = state.selected[0];
     const end = occupyEnd();
     const count = state.hours;
-    const price = hourly() * count;
+    const price = rate() * count;
     if (barTime) barTime.textContent = first.start + "–" + end;
     if (barMeta) {
       barMeta.textContent = membershipCovers
@@ -283,6 +331,7 @@
     try {
       const data = await fetchJson(root.getAttribute("data-availability-url") + "?date=" + encodeURIComponent(date) + roomParam());
       state.availability = data;
+      state.guests = Math.min(Math.max(1, state.guests), maxPersons());
       if (pushUrl !== false) {
         const page = root.getAttribute("data-page-url") || "";
         history.replaceState({}, "", page + "?date=" + encodeURIComponent(date) + roomParam());
@@ -379,9 +428,11 @@
     if (row) clickHour(row);
   });
 
-  openCalBtn?.addEventListener("click", () => {
-    if (isCalOpen()) closeCalendar();
-    else openCalendar();
+  openCalBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (isCalOpen()) closeCalendar();
+      else openCalendar();
+    });
   });
   calModal?.querySelectorAll("[data-cal-close]")?.forEach((btn) => {
     btn.addEventListener("click", closeCalendar);
@@ -420,11 +471,13 @@
   bar?.querySelector("[data-guest-minus]")?.addEventListener("click", () => {
     state.guests = Math.max(1, state.guests - 1);
     updateForm();
+    renderHours();
     renderBar();
   });
   bar?.querySelector("[data-guest-plus]")?.addEventListener("click", () => {
     state.guests = Math.min(maxPersons(), state.guests + 1);
     updateForm();
+    renderHours();
     renderBar();
   });
   form?.addEventListener("submit", async (event) => {

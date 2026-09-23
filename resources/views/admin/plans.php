@@ -1,4 +1,4 @@
-<div class="page-head"><h1>Členství a ceník</h1></div>
+<div class="page-head"><div><p class="eyebrow">SPRÁVA</p><h1>Tarify</h1><p class="muted">Uprav ceník členství a vstupů.</p></div></div>
 <?php foreach ($plans as $plan): ?>
 <form class="card" method="post" style="margin-bottom:12px">
 <?= csrf_field() ?>
@@ -10,7 +10,7 @@
 <div class="field"><label>Popis</label><textarea name="description"><?= e($plan['description'] ?? '') ?></textarea></div>
 <div class="row-2">
 <div class="field"><label>Typ</label>
-<select name="type"><?php foreach (['single','pack','monthly','credit','voucher'] as $t): ?><option value="<?= $t ?>" <?= $plan['type']===$t?'selected':'' ?>><?= $t ?></option><?php endforeach; ?></select>
+<select name="type"><?php foreach (['single','pack','monthly','credit','voucher','lifetime'] as $t): ?><option value="<?= $t ?>" <?= $plan['type']===$t?'selected':'' ?>><?= $t ?></option><?php endforeach; ?></select>
 </div>
 <div class="field"><label>Vstupy</label><input name="entries" value="<?= e((string)($plan['entries'] ?? '')) ?>"></div>
 </div>

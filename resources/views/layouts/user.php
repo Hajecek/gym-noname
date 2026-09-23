@@ -42,7 +42,18 @@ if (!function_exists('user_active')) {
             <span>Členství</span>
         </a>
         <?php if (in_array($role, ['admin'], true)): ?>
-            <div class="side-split" role="separator"><span>Správa</span></div>
+            <div class="side-split" role="separator" aria-label="Správa">
+                <i class="side-split-bar" aria-hidden="true"></i>
+                <span>Správa</span>
+            </div>
+            <a class="side-link <?= user_active('/user/sprava') ?>" href="<?= e(url('/user/sprava')) ?>" title="Přehled">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 11 12 4l8 7v9H4z"/></svg>
+                <span>Přehled</span>
+            </a>
+            <a class="side-link <?= user_active('/user/sprava/zakaznici', true) ?>" href="<?= e(url('/user/sprava/zakaznici')) ?>" title="Zákazníci">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="16" cy="9" r="2.5"/><path d="M3 19c1.2-3.2 10.8-3.2 12 0M14 19c.4-2 5.6-2.4 7 0"/></svg>
+                <span>Zákazníci</span>
+            </a>
             <a class="side-link <?= user_active('/user/studio') ?>" href="<?= e(url('/user/studio')) ?>" title="Studia">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 10 12 4l8 6v9H4z"/><path d="M9 19v-6h6v6"/></svg>
                 <span>Studia</span>
@@ -54,6 +65,22 @@ if (!function_exists('user_active')) {
             <a class="side-link <?= user_active('/user/studio/doba', true) ?>" href="<?= e(url('/user/studio/doba')) ?>" title="Otevírací doba">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/></svg>
                 <span>Otevírací doba</span>
+            </a>
+            <a class="side-link <?= user_active('/user/sprava/tarify', true) ?>" href="<?= e(url('/user/sprava/tarify')) ?>" title="Tarify">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7h14v10H5z"/><path d="M8 7V5h8v2M9 12h6"/></svg>
+                <span>Tarify</span>
+            </a>
+            <a class="side-link <?= user_active('/user/sprava/vstup', true) ?>" href="<?= e(url('/user/sprava/vstup')) ?>" title="Dveře">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                <span>Dveře</span>
+            </a>
+            <a class="side-link <?= user_active('/user/sprava/zajem', true) ?>" href="<?= e(url('/user/sprava/zajem')) ?>" title="Zájem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg>
+                <span>Zájem</span>
+            </a>
+            <a class="side-link <?= user_active('/user/sprava/nastaveni', true) ?>" href="<?= e(url('/user/sprava/nastaveni')) ?>" title="Nastavení">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4"/></svg>
+                <span>Nastavení</span>
             </a>
         <?php endif; ?>
     </nav>
