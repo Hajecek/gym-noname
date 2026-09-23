@@ -25,7 +25,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=34">
+    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=36">
     <link rel="manifest" href="<?= e(url('/manifest.json')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="PRIVOFIT">
@@ -62,8 +62,36 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     <button class="menu-toggle" aria-label="Otevřít menu" aria-expanded="false">☰</button>
 </header>
 <?php if (!in_array(($page ?? ''), ['login', 'register'], true)): ?>
-<?php if ($msg = flash('success')): ?><div class="flash flash-success wrapper" role="status"><?= e($msg) ?></div><?php endif; ?>
-<?php if ($msg = flash('error')): ?><div class="flash flash-error wrapper" role="alert"><?= e($msg) ?></div><?php endif; ?>
+<?php if ($msg = flash('success')): ?>
+<div class="toast toast-success" role="status" data-toast>
+    <span class="toast-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M20 7 10.2 17 4 11.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </span>
+    <div class="toast-copy">
+        <span class="toast-label">Hotovo</span>
+        <p><?= e($msg) ?></p>
+    </div>
+    <button type="button" class="toast-close" data-toast-close aria-label="Zavřít hlášku">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <span class="toast-progress" aria-hidden="true"></span>
+</div>
+<?php endif; ?>
+<?php if ($msg = flash('error')): ?>
+<div class="toast toast-error" role="alert" data-toast>
+    <span class="toast-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5.5M12 16.5h.01M12 3.5l9.2 16H2.8L12 3.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </span>
+    <div class="toast-copy">
+        <span class="toast-label">Chyba</span>
+        <p><?= e($msg) ?></p>
+    </div>
+    <button type="button" class="toast-close" data-toast-close aria-label="Zavřít hlášku">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <span class="toast-progress" aria-hidden="true"></span>
+</div>
+<?php endif; ?>
 <?php endif; ?>
 <div id="main">
 <?= $content ?? '' ?>
@@ -79,7 +107,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
         <span>MADE FOR YOUR NEXT MOVE.</span>
     </div>
 </footer>
-<script nonce="<?= e($cspNonce) ?>" src="<?= e(url('/assets/marketing/app.js')) ?>?v=12"></script>
+<script nonce="<?= e($cspNonce) ?>" src="<?= e(url('/assets/marketing/app.js')) ?>?v=13"></script>
 <script type="module" nonce="<?= e($cspNonce) ?>">
 const sceneUrl = <?= json_encode(url('/assets/marketing/scene.js') . '?v=8', JSON_UNESCAPED_SLASHES) ?>;
 const decorUrl = <?= json_encode(url('/assets/marketing/decor.js') . '?v=9', JSON_UNESCAPED_SLASHES) ?>;

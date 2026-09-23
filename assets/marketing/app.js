@@ -492,3 +492,15 @@ if (matchMedia("(hover: hover) and (pointer: fine)").matches) {
     );
   });
 }
+
+(() => {
+  const hide = (node) => {
+    if (!node || node.classList.contains("is-out")) return;
+    node.classList.add("is-out");
+    window.setTimeout(() => node.remove(), 300);
+  };
+  document.querySelectorAll("[data-toast]").forEach((toast) => {
+    toast.querySelector("[data-toast-close]")?.addEventListener("click", () => hide(toast));
+    window.setTimeout(() => hide(toast), 3600);
+  });
+})();

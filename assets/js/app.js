@@ -126,15 +126,13 @@
   });
 
   const hide = (node) => {
+    if (!node || node.classList.contains("is-out")) return;
     node.classList.add("is-out");
-    window.setTimeout(() => node.remove(), 280);
+    window.setTimeout(() => node.remove(), 300);
   };
   document.querySelectorAll("[data-toast]").forEach((toast) => {
     toast.querySelector("[data-toast-close]")?.addEventListener("click", () => hide(toast));
-    window.setTimeout(() => hide(toast), 7000);
-  });
-  document.querySelectorAll("[data-done-modal]").forEach((modal) => {
-    window.setTimeout(() => hide(modal), 2600);
+    window.setTimeout(() => hide(toast), 3600);
   });
 
   const presenceUrl = document.body.dataset.presence;
