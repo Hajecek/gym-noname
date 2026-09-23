@@ -47,6 +47,7 @@ $router->get('/potvrzeni-emailu', [AuthController::class, 'confirmEmailChange'])
 
 $router->get('/user', [DashboardController::class, 'index'], [AuthMiddleware::class]);
 $router->get('/user/pritomnost', [DashboardController::class, 'presence'], [AuthMiddleware::class]);
+$router->get('/user/stav-studia', [DashboardController::class, 'studioStatus'], [AuthMiddleware::class]);
 $router->get('/user/overeni', [DashboardController::class, 'verifyNotice'], [AuthMiddleware::class]);
 $router->post('/user/overeni', [DashboardController::class, 'resendVerification'], [AuthMiddleware::class]);
 $router->get('/user/vstup', [DashboardController::class, 'access'], [AuthMiddleware::class]);

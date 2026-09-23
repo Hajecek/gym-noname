@@ -593,6 +593,98 @@ final class ReservationService
         ];
     }
 
+    /**
+     * @return array{state:string,label:string,detail:string,dot:string,room:string,opens_at:?string,closes_at:?string,next_at:?string}
+     */
+    public function studioStatus(int $soonMinutes = 60): array
+    {
+        $room = $this->room();
+        $local = Clock::nowLocal();
+        $hours = $this->hoursForDate($room, $local);
+        $roomName = (string) ($room['name'] ?? 'Studio');
+
+        $base = [
+            'room' => $roomName,
+            'opens_at' => null,
+            'closes_at' => null,
+            'next_at' => null,
+        ];
+
+        if (!empty($hours['closed'])) {
+            return array_merge($base, [
+                'state' => 'closed',
+                'dot' => 'red',
+                'label' => 'Uzavřené',
+                'detail' => $roomName . ' má dnes zavřeno. Nový termín si můžeš vybrat na jindy.',
+            ]);
+        }
+
+        $opensAt = (string) ($hours['opens_at'] ?? '00:00:00');
+        $closesAt = (string) ($hours['closes_at'] ?? '23:59:00');
+        $openLocal = Clock::parseLocal($local->format('Y-m-d') . ' ' . $opensAt);
+        $closeLocal = Clock::parseLocal($local->format('Y-m-d') . ' ' . $closesAt);
+        $base['opens_at'] = substr($opensAt, 0, 5);
+        $base['closes_at'] = substr($closesAt, 0, 5);
+
+        if ($local < $openLocal || $local >= $closeLocal) {
+            $when = $local < $openLocal
+                ? 'Otevře se dnes v ' . $base['opens_at'] . '.'
+                : 'Dnes už je po otevírací době. Zítra od ' . $base['opens_at'] . '.';
+            return array_merge($base, [
+                'state' => 'closed',
+                'dot' => 'red',
+                'label' => 'Uzavřené',
+                'detail' => $roomName . ' je teď zavřené. ' . $when,
+            ]);
+        }
+
+        $now = Clock::utc();
+        $current = $this->db->fetch(
+            "SELECT r.starts_at, r.ends_at, r.buffer_minutes
+             FROM reservations r
+             WHERE r.room_id = :rid AND r.status = 'confirmed' AND r.starts_at <= :now AND r.ends_at >= :now2
+             LIMIT 1",
+            ['rid' => (int) $room['id'], 'now' => $now, 'now2' => $now]
+        );
+        if ($current) {
+            $until = Clock::format((string) $current['ends_at'], 'H:i');
+            return array_merge($base, [
+                'state' => 'soon',
+                'dot' => 'orange',
+                'label' => 'Probíhá termín',
+                'detail' => $roomName . ' je právě obsazené. Trénink končí v ' . $until . '.',
+                'next_at' => $until,
+            ]);
+        }
+
+        $horizon = Clock::nowUtc()->modify('+' . max(1, $soonMinutes) . ' minutes')->format('Y-m-d H:i:s');
+        $next = $this->db->fetch(
+            "SELECT starts_at, ends_at
+             FROM reservations
+             WHERE room_id = :rid AND status = 'confirmed' AND starts_at > :now AND starts_at <= :until
+             ORDER BY starts_at ASC
+             LIMIT 1",
+            ['rid' => (int) $room['id'], 'now' => $now, 'until' => $horizon]
+        );
+        if ($next) {
+            $start = Clock::format((string) $next['starts_at'], 'H:i');
+            return array_merge($base, [
+                'state' => 'soon',
+                'dot' => 'orange',
+                'label' => 'Blíží se termín',
+                'detail' => 'Další rezervace začíná v ' . $start . '. Do té doby je prostor ještě volný.',
+                'next_at' => $start,
+            ]);
+        }
+
+        return array_merge($base, [
+            'state' => 'open',
+            'dot' => 'green',
+            'label' => 'Volné',
+            'detail' => $roomName . ' je teď volné. Otevřeno do ' . $base['closes_at'] . '.',
+        ]);
+    }
+
     private function hoursForDate(array $room, \DateTimeImmutable $localDay): array
     {
         $date = $localDay->format('Y-m-d');

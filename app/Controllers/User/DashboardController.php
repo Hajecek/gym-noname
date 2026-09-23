@@ -23,17 +23,26 @@ final class DashboardController extends Controller
         $current = $reservations->current((int) $user['id']);
         $canOpen = $access->canAttempt($user);
 
+        $studio = $reservations->studioStatus();
+
         $this->view('user/dashboard', [
             'title' => 'Domů',
             'membership' => $memberships->activeForUser((int) $user['id']),
             'upcoming' => $reservations->upcoming((int) $user['id']),
             'remaining' => $memberships->remainingEntries((int) $user['id']),
-            'occupancy' => $reservations->occupancyNow(),
+            'studio' => $studio,
             'historyCount' => count($reservations->forUser((int) $user['id'])),
             'current' => $current,
             'canOpen' => $canOpen['allowed'],
             'plans' => $memberships->plans(),
+            'pageScripts' => ['js/dashboard.js'],
         ]);
+    }
+
+    public function studioStatus(): never
+    {
+        $this->requireUser();
+        $this->jsonOk(ReservationService::make($this->app->db())->studioStatus());
     }
 
     public function presence(): never

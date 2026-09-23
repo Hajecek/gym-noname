@@ -25,7 +25,7 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=27">
+    <link rel="stylesheet" href="<?= e(url('/assets/marketing/style.css')) ?>?v=33">
     <link rel="manifest" href="<?= e(url('/manifest.json')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="PRIVOFIT">
@@ -44,9 +44,16 @@ $hideChrome = $hideChrome ?? str_contains((string) $bodyClass, 'standalone-');
         <a href="<?= e(url('/zajem')) ?>">Zájem</a>
     </nav>
     <div class="nav-actions">
-        <?php if ($user): ?>
-            <a href="<?= e(url('/user')) ?>" class="login-link">Aplikace</a>
-            <a href="<?= e(url('/user')) ?>" class="button button-small">Pokračovat <span>↗</span></a>
+        <?php if ($user):
+            $avatarName = trim((string) (($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')));
+            if ($avatarName === '') {
+                $avatarName = (string) ($user['username'] ?? 'Profil');
+            }
+        ?>
+            <a href="<?= e(url('/user')) ?>" class="nav-account" title="Otevřít dashboard" aria-label="Otevřít dashboard">
+                <img class="nav-avatar" src="<?= e(avatar_url($user)) ?>" alt="<?= e($avatarName) ?>" width="40" height="40">
+                <span><?= e((string) ($user['username'] ?? $avatarName)) ?></span>
+            </a>
         <?php else: ?>
             <a href="<?= e(url('/prihlaseni')) ?>" class="login-link">Přihlášení</a>
             <a href="<?= e(url('/registrace')) ?>" class="button button-small">Začít po svém <span>↗</span></a>

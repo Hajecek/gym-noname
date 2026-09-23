@@ -41,10 +41,6 @@ if (!function_exists('user_active')) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/></svg>
             <span>Členství</span>
         </a>
-        <a class="side-link <?= user_active('/user/profil', true) ?> <?= user_active('/user/zabezpeceni', true) ?>" href="<?= e(url('/user/profil')) ?>" title="Profil">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5 20c1.5-4 12.5-4 14 0"/></svg>
-            <span>Profil</span>
-        </a>
         <?php if (in_array($role, ['admin'], true)): ?>
             <div class="side-split" role="separator"><span>Správa</span></div>
             <a class="side-link <?= user_active('/user/studio') ?>" href="<?= e(url('/user/studio')) ?>" title="Studia">
