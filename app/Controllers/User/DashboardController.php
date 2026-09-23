@@ -24,17 +24,18 @@ final class DashboardController extends Controller
         $canOpen = $access->canAttempt($user);
 
         $studio = $reservations->studioStatus();
+        $stats = $reservations->trainingStats((int) $user['id']);
 
         $this->view('user/dashboard', [
             'title' => 'Domů',
             'membership' => $memberships->activeForUser((int) $user['id']),
             'upcoming' => $reservations->upcoming((int) $user['id']),
+            'upcomingList' => $reservations->upcomingList((int) $user['id'], 4),
             'remaining' => $memberships->remainingEntries((int) $user['id']),
             'studio' => $studio,
-            'historyCount' => count($reservations->forUser((int) $user['id'])),
+            'stats' => $stats,
             'current' => $current,
             'canOpen' => $canOpen['allowed'],
-            'plans' => $memberships->plans(),
             'pageScripts' => ['js/dashboard.js'],
         ]);
     }

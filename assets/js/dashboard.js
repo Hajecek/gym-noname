@@ -1,6 +1,27 @@
 (() => {
   const pulse = document.querySelector("[data-studio-pulse]");
   const modal = document.querySelector("[data-studio-modal]");
+  const streakOpen = document.querySelector("[data-streak-open]");
+  const streakModal = document.querySelector("[data-streak-modal]");
+
+  if (streakOpen && streakModal) {
+    const openStreak = () => {
+      streakModal.hidden = false;
+      streakModal.querySelector("[data-streak-close].btn")?.focus();
+    };
+    const closeStreak = () => {
+      streakModal.hidden = true;
+      streakOpen.focus();
+    };
+    streakOpen.addEventListener("click", openStreak);
+    streakModal.querySelectorAll("[data-streak-close]").forEach((node) => {
+      node.addEventListener("click", closeStreak);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !streakModal.hidden) closeStreak();
+    });
+  }
+
   if (!pulse || !modal) return;
 
   const label = pulse.querySelector("[data-studio-label]");

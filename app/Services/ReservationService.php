@@ -485,6 +485,120 @@ final class ReservationService
         );
     }
 
+    /** @return list<array<string, mixed>> */
+    public function upcomingList(int $userId, int $limit = 4): array
+    {
+        $limit = max(1, min(10, $limit));
+        return $this->db->fetchAll(
+            "SELECT r.*, rm.name AS room_name
+             FROM reservations r
+             INNER JOIN rooms rm ON rm.id = r.room_id
+             WHERE r.user_id = :uid AND r.status IN ('confirmed', 'pending_payment') AND r.ends_at >= :now
+             ORDER BY r.starts_at ASC
+             LIMIT {$limit}",
+            ['uid' => $userId, 'now' => Clock::utc()]
+        );
+    }
+
+    /**
+     * Streak = po sobě jdoucí týdny (Po–Ne) s alespoň jedním dokončeným tréninkem.
+     * Aktuální týden bez tréninku streak nepřeruší — počítá se od minulého.
+     *
+     * @return array{
+     *   streak:int,
+     *   best_streak:int,
+     *   month_count:int,
+     *   total_count:int,
+     *   year_count:int,
+     *   history:list<array{label:string,count:int,active:bool}>
+     * }
+     */
+    public function trainingStats(int $userId): array
+    {
+        $rows = $this->db->fetchAll(
+            "SELECT starts_at
+             FROM reservations
+             WHERE user_id = :uid AND status = 'confirmed' AND ends_at < :now
+             ORDER BY starts_at DESC",
+            ['uid' => $userId, 'now' => Clock::utc()]
+        );
+
+        $tz = new \DateTimeZone(Clock::displayTimezone());
+        $weeks = [];
+        $weekCounts = [];
+        $days = [];
+        foreach ($rows as $row) {
+            $local = Clock::toLocal((string) $row['starts_at']);
+            $day = $local->format('Y-m-d');
+            $days[$day] = true;
+            $monday = $local->modify('-' . ((int) $local->format('N') - 1) . ' days')->setTime(0, 0);
+            $weekKey = $monday->format('Y-m-d');
+            $weeks[$weekKey] = true;
+            $weekCounts[$weekKey] = ($weekCounts[$weekKey] ?? 0) + 1;
+        }
+
+        $now = Clock::nowLocal();
+        $monthPrefix = $now->format('Y-m');
+        $yearPrefix = $now->format('Y');
+        $monthCount = 0;
+        $yearCount = 0;
+        foreach (array_keys($days) as $day) {
+            if (str_starts_with($day, $monthPrefix)) {
+                $monthCount++;
+            }
+            if (str_starts_with($day, $yearPrefix)) {
+                $yearCount++;
+            }
+        }
+
+        $cursor = $now->modify('-' . ((int) $now->format('N') - 1) . ' days')->setTime(0, 0);
+        if (!isset($weeks[$cursor->format('Y-m-d')])) {
+            $cursor = $cursor->modify('-7 days');
+        }
+        $streak = 0;
+        while (isset($weeks[$cursor->format('Y-m-d')])) {
+            $streak++;
+            $cursor = $cursor->modify('-7 days');
+        }
+
+        $best = 0;
+        $run = 0;
+        $sorted = array_keys($weeks);
+        sort($sorted);
+        $prev = null;
+        foreach ($sorted as $monday) {
+            if ($prev !== null) {
+                $expected = (new \DateTimeImmutable($prev, $tz))->modify('+7 days')->format('Y-m-d');
+                $run = $monday === $expected ? $run + 1 : 1;
+            } else {
+                $run = 1;
+            }
+            $best = max($best, $run);
+            $prev = $monday;
+        }
+
+        $history = [];
+        $thisMonday = $now->modify('-' . ((int) $now->format('N') - 1) . ' days')->setTime(0, 0);
+        for ($i = 11; $i >= 0; $i--) {
+            $monday = $thisMonday->modify('-' . ($i * 7) . ' days');
+            $key = $monday->format('Y-m-d');
+            $history[] = [
+                'label' => $monday->format('j.n.'),
+                'count' => (int) ($weekCounts[$key] ?? 0),
+                'active' => isset($weeks[$key]),
+            ];
+        }
+
+        return [
+            'streak' => $streak,
+            'best_streak' => max($best, $streak),
+            'month_count' => $monthCount,
+            'year_count' => $yearCount,
+            'total_count' => count($days),
+            'history' => $history,
+        ];
+    }
+
     public function current(int $userId): ?array
     {
         $early = $this->settings->int('access.early_minutes', 5);
