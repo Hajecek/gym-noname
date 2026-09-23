@@ -31,6 +31,10 @@ $router->get('/uploads/avatars/{file}', [PublicController::class, 'uploadedAvata
 $router->get('/registrace', [AuthController::class, 'showRegister'], [GuestMiddleware::class]);
 $router->post('/registrace', [AuthController::class, 'register'], [GuestMiddleware::class]);
 $router->get('/prihlaseni', [AuthController::class, 'showLogin'], [GuestMiddleware::class]);
+$router->get('/prihlaseni/google', [AuthController::class, 'googleStart'], [GuestMiddleware::class]);
+$router->get('/prihlaseni/google/callback', [AuthController::class, 'googleCallback'], [GuestMiddleware::class]);
+$router->get('/prihlaseni/apple', [AuthController::class, 'appleStart'], [GuestMiddleware::class]);
+$router->post('/prihlaseni/apple/callback', [AuthController::class, 'appleCallback'], [GuestMiddleware::class]);
 $router->post('/prihlaseni', [AuthController::class, 'login'], [GuestMiddleware::class]);
 $router->post('/odhlaseni', [AuthController::class, 'logout'], [AuthMiddleware::class]);
 $router->get('/odhlaseno', [AuthController::class, 'signedOut']);

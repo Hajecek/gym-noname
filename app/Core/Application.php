@@ -91,7 +91,7 @@ final class Application
         try {
             $this->auth->hydrate($request);
 
-            if (!$request->isApi() && $request->path() !== '/platba/stripe') {
+            if (!$request->isApi() && !in_array($request->path(), ['/platba/stripe', '/prihlaseni/apple/callback'], true)) {
                 if (!Csrf::verifyRequest($request)) {
                     if ($request->wantsJson()) {
                         Response::error('Neplatný bezpečnostní token. Obnovte stránku a zkuste to znovu.', 419);

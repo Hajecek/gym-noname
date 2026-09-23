@@ -158,6 +158,160 @@ final class AuthService
         return $sessionUser;
     }
 
+    /** @param array{sub:string,email:string,given_name:string,family_name:string,name:string} $profile */
+    public function loginWithGoogle(array $profile, Request $request): array
+    {
+        return $this->finishOAuthLogin('google', $profile, $request);
+    }
+
+    /** @param array{sub:string,email:string,given_name:string,family_name:string,name:string} $profile */
+    public function loginWithApple(array $profile, Request $request): array
+    {
+        return $this->finishOAuthLogin('apple', $profile, $request);
+    }
+
+    /** @param array{sub:string,email:string,given_name:string,family_name:string,name:string} $profile */
+    private function finishOAuthLogin(string $provider, array $profile, Request $request): array
+    {
+        $user = $this->findOrCreateOAuthUser($provider, $profile);
+        if (in_array($user['status'], ['blocked', 'deleted'], true) || !empty($user['deleted_at'])) {
+            throw new HttpException(403, 'Tento účet je zablokovaný.');
+        }
+        if ((int) $user['mfa_enabled'] === 1 && !$this->browserIsTrusted((int) $user['id'])) {
+            throw new MfaRequiredException($user);
+        }
+        return $this->establishWebSession($user, $request, false);
+    }
+
+    /** @param array{sub:string,email:string,given_name:string,family_name:string,name:string} $profile */
+    private function findOrCreateOAuthUser(string $provider, array $profile): array
+    {
+        $email = $this->normalizeEmail($profile['email']);
+        $sub = $profile['sub'];
+        $other = $provider === 'google' ? 'apple' : 'google';
+        $linked = $this->db->fetch(
+            'SELECT * FROM users WHERE oauth_provider = :p AND oauth_uid = :u AND deleted_at IS NULL',
+            ['p' => $provider, 'u' => $sub]
+        );
+        if ($linked) {
+            return $linked;
+        }
+        if ($email === '') {
+            throw new HttpException(403, 'Účet neposlal e-mail. Při souhlasu ho nech sdílet.');
+        }
+
+        $existing = $this->db->fetch('SELECT * FROM users WHERE email = :e', ['e' => $email]);
+        if ($existing) {
+            if (!empty($existing['deleted_at']) || in_array($existing['status'], ['blocked', 'deleted'], true)) {
+                throw new HttpException(403, 'Tento e-mail nelze použít.');
+            }
+            if (($existing['oauth_provider'] ?? null) === $other) {
+                throw new HttpException(409, $other === 'apple'
+                    ? 'Tento e-mail už používá přihlášení přes Apple.'
+                    : 'Tento e-mail už používá přihlášení přes Google.');
+            }
+            if (($existing['oauth_provider'] ?? null) === $provider && (string) $existing['oauth_uid'] !== $sub) {
+                throw new HttpException(409, 'Tento e-mail je propojený s jiným účtem.');
+            }
+            $now = Clock::utc();
+            $this->db->update('users', [
+                'oauth_provider' => $provider,
+                'oauth_uid' => $sub,
+                'email_verified_at' => $existing['email_verified_at'] ?: $now,
+                'status' => $existing['status'] === 'pending' ? 'active' : $existing['status'],
+                'updated_at' => $now,
+            ], 'id = :id', ['id' => (int) $existing['id']]);
+            return $this->findById((int) $existing['id']);
+        }
+
+        [$first, $last] = $this->googleNames($profile);
+        $now = Clock::utc();
+        $userId = (int) $this->db->insert('users', [
+            'public_id' => Crypto::uuid(),
+            'email' => $email,
+            'username' => $this->uniqueUsername(strstr($email, '@', true) ?: 'clen'),
+            'first_name' => $first,
+            'last_name' => $last,
+            'oauth_provider' => $provider,
+            'oauth_uid' => $sub,
+            'role' => 'user',
+            'plan' => 'free',
+            'status' => 'active',
+            'locale' => 'cs-CZ',
+            'timezone' => 'Europe/Prague',
+            'default_currency' => 'CZK',
+            'email_verified_at' => $now,
+            'terms_accepted_at' => $now,
+            'privacy_accepted_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $role = $this->db->fetch('SELECT id FROM roles WHERE slug = :s', ['s' => 'user']);
+        if ($role) {
+            $this->db->insert('user_roles', [
+                'user_id' => $userId,
+                'role_id' => (int) $role['id'],
+                'assigned_at' => $now,
+            ]);
+        }
+        $this->db->insert('notification_preferences', [
+            'user_id' => $userId,
+            'email_marketing' => 0,
+        ]);
+        $user = $this->findById($userId);
+        try {
+            $this->mail->queue('welcome', $email, [
+                'subject' => 'Vítejte v PRIVOFIT',
+                'first_name' => $user['first_name'],
+            ], $userId);
+        } catch (\Throwable) {
+        }
+        return $user;
+    }
+
+    /** @param array{given_name:string,family_name:string,name:string} $profile
+     *  @return array{0:string,1:string}
+     */
+    private function googleNames(array $profile): array
+    {
+        $first = $profile['given_name'];
+        $last = $profile['family_name'];
+        if ($first === '' && $profile['name'] !== '') {
+            $parts = preg_split('/\s+/u', $profile['name']) ?: [];
+            $first = (string) array_shift($parts);
+            $last = trim(implode(' ', $parts));
+        }
+        if ($first === '') {
+            $first = 'Člen';
+        }
+        if ($last === '') {
+            $last = '–';
+        }
+        return [mb_substr($first, 0, 100), mb_substr($last, 0, 100)];
+    }
+
+    private function uniqueUsername(string $seed): string
+    {
+        $base = preg_replace('/[^a-z0-9._]/', '', $this->normalizeUsername($seed)) ?? '';
+        $base = trim($base, '._');
+        if (strlen($base) < 3) {
+            $base = 'clen';
+        }
+        $base = substr($base, 0, 24);
+        $reserved = (array) config('app.reserved_usernames', []);
+        for ($i = 0; $i < 40; $i++) {
+            $suffix = $i === 0 ? '' : (string) $i;
+            $candidate = substr($base, 0, 30 - strlen($suffix)) . $suffix;
+            if (in_array($candidate, $reserved, true)) {
+                continue;
+            }
+            if (!$this->db->fetch('SELECT id FROM users WHERE username = :u', ['u' => $candidate])) {
+                return $candidate;
+            }
+        }
+        return substr($base, 0, 22) . bin2hex(random_bytes(4));
+    }
+
     public function loginFromApp(string $identifier, string $password, Request $request, ?string $totp = null): array
     {
         $this->issueMfaTrust = false;

@@ -28,4 +28,14 @@ return [
         'stripe_webhook_secret' => env_value('STRIPE_WEBHOOK_SECRET', ''),
     ],
     'cron_token' => env_value('CRON_TOKEN', ''),
+    'google' => [
+        'client_id' => env_value('GOOGLE_CLIENT_ID', ''),
+        'client_secret' => env_value('GOOGLE_CLIENT_SECRET', ''),
+    ],
+    'apple' => [
+        'client_id' => env_value('APPLE_CLIENT_ID', ''),
+        'team_id' => env_value('APPLE_TEAM_ID', ''),
+        'key_id' => env_value('APPLE_KEY_ID', ''),
+        'private_key' => env_value('APPLE_PRIVATE_KEY', ''),
+    ],
 ];

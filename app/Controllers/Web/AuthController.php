@@ -8,7 +8,10 @@ use App\Controllers\Controller;
 use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Session;
+use App\Core\Response;
+use App\Services\Auth\AppleOAuth;
 use App\Services\Auth\AuthService;
+use App\Services\Auth\GoogleOAuth;
 use App\Services\Auth\MfaRequiredException;
 use App\Services\Auth\MfaSetupRequiredException;
 use App\Services\Auth\ValidationException;
@@ -92,6 +95,115 @@ final class AuthController extends Controller
             ], 'layouts/brand');
         } catch (MfaSetupRequiredException) {
             $this->redirect('/user/zabezpeceni/mfa');
+        } catch (HttpException $e) {
+            $this->flashError($e->getMessage());
+            $this->redirect('/prihlaseni');
+        }
+        $intended = Session::pull('intended', '/user');
+        $this->redirect(is_string($intended) ? $intended : '/user');
+    }
+
+    public function googleStart(): never
+    {
+        if (!GoogleOAuth::configured()) {
+            $this->flashError('Přihlášení přes Google ještě není nastavené.');
+            $this->redirect('/prihlaseni');
+        }
+        $state = bin2hex(random_bytes(16));
+        Session::set('oauth_google', ['state' => $state, 'at' => time()]);
+        Response::redirect(GoogleOAuth::authorizationUrl($state, $this->app->absoluteUrl('/prihlaseni/google/callback')));
+    }
+
+    public function googleCallback(Request $request): never
+    {
+        $saved = Session::pull('oauth_google');
+        $state = (string) $request->query('state', '');
+        $code = (string) $request->query('code', '');
+        if ((string) $request->query('error', '') !== '') {
+            $this->flashError('Přihlášení přes Google bylo zrušené.');
+            $this->redirect('/prihlaseni');
+        }
+        $fresh = is_array($saved)
+            && isset($saved['state'])
+            && hash_equals((string) $saved['state'], $state)
+            && time() - (int) ($saved['at'] ?? 0) <= 600;
+        if (!$fresh || $code === '') {
+            $this->flashError('Přihlášení přes Google vypršelo. Zkus to znovu.');
+            $this->redirect('/prihlaseni');
+        }
+        try {
+            $profile = GoogleOAuth::profile($code, $this->app->absoluteUrl('/prihlaseni/google/callback'));
+            $user = $this->authService()->loginWithGoogle($profile, $request);
+            $this->app->auth()->setUser($user, (int) Session::get('auth_session_id'));
+        } catch (MfaRequiredException $e) {
+            Session::set('mfa_pending_user_id', (int) $e->user['id']);
+            Session::set('mfa_pending_remember', false);
+            $this->view('auth/login', [
+                'title' => 'Ověření přihlášení | PRIVOFIT',
+                'page' => 'login',
+                'bodyClass' => 'standalone-login',
+                'mfa' => true,
+                'email' => $e->user['email'],
+                'remember' => false,
+            ], 'layouts/brand');
+        } catch (HttpException $e) {
+            $this->flashError($e->getMessage());
+            $this->redirect('/prihlaseni');
+        }
+        $intended = Session::pull('intended', '/user');
+        $this->redirect(is_string($intended) ? $intended : '/user');
+    }
+
+    public function appleStart(): never
+    {
+        if (!AppleOAuth::configured()) {
+            $this->flashError('Přihlášení přes Apple ještě není nastavené.');
+            $this->redirect('/prihlaseni');
+        }
+        $issued = AppleOAuth::issueState();
+        Response::redirect(AppleOAuth::authorizationUrl(
+            $issued['state'],
+            $issued['nonce'],
+            $this->app->absoluteUrl('/prihlaseni/apple/callback')
+        ));
+    }
+
+    public function appleCallback(Request $request): never
+    {
+        if ((string) $request->input('error', '') !== '') {
+            $this->flashError('Přihlášení přes Apple bylo zrušené.');
+            $this->redirect('/prihlaseni');
+        }
+        $state = (string) $request->input('state', '');
+        $code = (string) $request->input('code', '');
+        $idToken = (string) $request->input('id_token', '');
+        $nonce = AppleOAuth::consumeNonce($state);
+        if ($nonce === null || $code === '' || $idToken === '') {
+            $this->flashError('Přihlášení přes Apple vypršelo. Zkus to znovu.');
+            $this->redirect('/prihlaseni');
+        }
+        $userJson = $request->input('user');
+        try {
+            $profile = AppleOAuth::profile(
+                $code,
+                $idToken,
+                $this->app->absoluteUrl('/prihlaseni/apple/callback'),
+                $nonce,
+                is_string($userJson) ? $userJson : null
+            );
+            $user = $this->authService()->loginWithApple($profile, $request);
+            $this->app->auth()->setUser($user, (int) Session::get('auth_session_id'));
+        } catch (MfaRequiredException $e) {
+            Session::set('mfa_pending_user_id', (int) $e->user['id']);
+            Session::set('mfa_pending_remember', false);
+            $this->view('auth/login', [
+                'title' => 'Ověření přihlášení | PRIVOFIT',
+                'page' => 'login',
+                'bodyClass' => 'standalone-login',
+                'mfa' => true,
+                'email' => $e->user['email'],
+                'remember' => false,
+            ], 'layouts/brand');
         } catch (HttpException $e) {
             $this->flashError($e->getMessage());
             $this->redirect('/prihlaseni');

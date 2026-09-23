@@ -101,7 +101,9 @@ if (isLogin || isRegister) {
     password.removeAttribute("minlength");
   }
   document.querySelectorAll("[data-provider]").forEach((button) =>
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      if (button.tagName === "A") return;
+      event.preventDefault();
       const message = document.getElementById("social-status");
       if (!message) return;
       message.hidden = false;
