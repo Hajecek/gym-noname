@@ -4,6 +4,9 @@ $isBlocked = ($customer['status'] ?? '') === 'blocked';
 $active = $activeMembership ?? null;
 $isLifetime = $active && ($active['plan_type'] ?? '') === 'lifetime';
 $fullName = trim(($customer['first_name'] ?? '') . ' ' . ($customer['last_name'] ?? ''));
+$isSelf = (int) ($customer['id'] ?? 0) === (int) (($user['id'] ?? 0));
+$isAdminTarget = ($customer['role'] ?? '') === 'admin';
+$canDelete = !$isSelf && !$isAdminTarget;
 
 $entriesLabel = static function (?int $entries): string {
     if ($entries === null) {
@@ -45,11 +48,14 @@ foreach ($plans as $plan) {
             data-block="<?= e(url('/user/sprava/zakaznici/' . $pid . '/blokovat')) ?>"
             data-unblock="<?= e(url('/user/sprava/zakaznici/' . $pid . '/odblokovat')) ?>"
             title="Blokace účtu"
+            <?= $isSelf ? 'disabled' : '' ?>
         >
             <span class="cust-switch-track" aria-hidden="true"><span class="cust-switch-knob"></span></span>
             <span class="cust-switch-text" data-cust-switch-label><?= $isBlocked ? 'Blokováno' : 'Aktivní' ?></span>
         </button>
+        <?php if ($canDelete): ?>
         <button type="button" class="btn btn-danger" data-cust-open="delete" data-name="<?= e($fullName !== '' ? $fullName : $customer['username']) ?>">Smazat</button>
+        <?php endif; ?>
     </div>
 </div>
 

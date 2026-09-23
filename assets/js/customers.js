@@ -145,6 +145,7 @@
     sw.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (sw.disabled) return;
       const blocked = sw.getAttribute("aria-checked") === "true";
       const name = sw.getAttribute("data-name") || "tohoto zákazníka";
       const redirect = sw.getAttribute("data-redirect") || "";

@@ -137,6 +137,9 @@ final class MobileApiService
     {
         $offers = [];
         foreach ($this->memberships->plans() as $plan) {
+            if (in_array((string) ($plan['type'] ?? ''), ['credit', 'lifetime'], true)) {
+                continue;
+            }
             $price = money_format_czk($plan['price']);
             $offers[] = [
                 'id' => $plan['public_id'],

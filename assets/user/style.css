@@ -1920,6 +1920,12 @@ a.card:hover { color: inherit; border-color: #c6f21a88; }
   text-align: left;
 }
 .cust-switch:hover { border-color: #c6f21a55; }
+.cust-switch:disabled,
+.cust-switch[disabled] {
+  opacity: .45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .cust-switch:focus-visible {
   outline: 2px solid var(--lime);
   outline-offset: 2px;

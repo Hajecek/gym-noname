@@ -235,7 +235,7 @@ final class PublicController extends Controller
 
         return array_values(array_filter(
             $plans,
-            static fn (array $plan): bool => ($plan['type'] ?? '') !== 'credit'
+            static fn (array $plan): bool => !in_array((string) ($plan['type'] ?? ''), ['credit', 'lifetime'], true)
         ));
     }
 

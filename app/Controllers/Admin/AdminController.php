@@ -141,11 +141,8 @@ final class AdminController extends Controller
         if ((int) $user['id'] === (int) $actor['id']) {
             throw new HttpException(422, 'Nemůžeš smazat vlastní účet.');
         }
-        if ($user['role'] === 'admin') {
-            $admins = (int) $this->app->db()->fetchColumn("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active' AND deleted_at IS NULL");
-            if ($admins <= 1) {
-                throw new HttpException(422, 'Nelze smazat posledního aktivního administrátora.');
-            }
+        if (($user['role'] ?? '') === 'admin') {
+            throw new HttpException(422, 'Administrátorský účet nelze smazat.');
         }
         $reason = trim((string) $request->input('delete_reason', ''));
         if ($reason === '') {

@@ -24,6 +24,9 @@
     $isLifetime = ($row['membership_type'] ?? '') === 'lifetime';
     $profileUrl = url('/user/sprava/zakaznici/' . $row['public_id']);
     $label = $name !== '' ? $name : $row['username'];
+    $isSelf = (int) ($row['id'] ?? 0) === (int) (($user['id'] ?? 0));
+    $isAdminTarget = ($row['role'] ?? '') === 'admin';
+    $canDelete = !$isSelf && !$isAdminTarget;
     ?>
     <article class="card cust-row <?= $isBlocked ? 'is-blocked' : '' ?>" data-href="<?= e($profileUrl) ?>" tabindex="0" role="link">
         <div class="cust-row-main">
@@ -56,13 +59,16 @@
                 data-block="<?= e(url('/user/sprava/zakaznici/' . $row['public_id'] . '/blokovat')) ?>"
                 data-unblock="<?= e(url('/user/sprava/zakaznici/' . $row['public_id'] . '/odblokovat')) ?>"
                 title="Blokace účtu"
+                <?= $isSelf ? 'disabled' : '' ?>
             >
                 <span class="cust-switch-track" aria-hidden="true"><span class="cust-switch-knob"></span></span>
                 <span class="cust-switch-text" data-cust-switch-label><?= $isBlocked ? 'Blokováno' : 'Aktivní' ?></span>
             </button>
+            <?php if ($canDelete): ?>
             <button type="button" class="btn btn-danger btn-sm" data-cust-open="delete"
                 data-name="<?= e($label) ?>"
                 data-action="<?= e(url('/user/sprava/zakaznici/' . $row['public_id'] . '/smazat')) ?>">Smazat</button>
+            <?php endif; ?>
         </div>
     </article>
 <?php endforeach; ?>
