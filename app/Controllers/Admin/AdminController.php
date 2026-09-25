@@ -148,9 +148,9 @@ final class AdminController extends Controller
         if ($reason === '') {
             $reason = 'Tvůj účet PRIVOFIT byl smazán administrátorem.';
         }
-        AuthService::make($this->app->db())->deleteAccount($user, $reason);
         AppPushService::make($this->app->db())->accountDeleted($user, $reason);
         (new AuditService($this->app->db()))->log((int) $actor['id'], 'user.delete', 'user', $user['id'], $user['status'], 'deleted', $request->ip());
+        AuthService::make($this->app->db())->deleteAccount($user, $reason);
         $this->flashSuccess('Účet byl smazán.');
         $this->redirect('/user/sprava/zakaznici');
     }

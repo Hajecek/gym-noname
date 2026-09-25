@@ -4,7 +4,7 @@ SET NAMES utf8mb4;
 CREATE TABLE IF NOT EXISTS payments (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     public_id CHAR(36) NOT NULL,
-    user_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED DEFAULT NULL,
     reservation_id BIGINT UNSIGNED DEFAULT NULL,
     membership_id BIGINT UNSIGNED DEFAULT NULL,
     provider VARCHAR(40) NOT NULL DEFAULT 'manual',
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS payments (
     KEY idx_payments_user (user_id),
     KEY idx_payments_status (status),
     KEY idx_payments_provider_ref (provider, provider_reference),
-    CONSTRAINT fk_payments_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_payments_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL,
     CONSTRAINT fk_payments_reservation FOREIGN KEY (reservation_id) REFERENCES reservations (id) ON DELETE SET NULL,
     CONSTRAINT fk_payments_membership FOREIGN KEY (membership_id) REFERENCES memberships (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

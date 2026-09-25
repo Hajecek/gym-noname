@@ -200,9 +200,9 @@ final class AuthService
             throw new HttpException(403, 'Účet neposlal e-mail. Při souhlasu ho nech sdílet.');
         }
 
-        $existing = $this->db->fetch('SELECT * FROM users WHERE email = :e', ['e' => $email]);
+        $existing = $this->db->fetch('SELECT * FROM users WHERE email = :e AND deleted_at IS NULL', ['e' => $email]);
         if ($existing) {
-            if (!empty($existing['deleted_at']) || in_array($existing['status'], ['blocked', 'deleted'], true)) {
+            if (in_array($existing['status'], ['blocked', 'deleted'], true)) {
                 throw new HttpException(403, 'Tento e-mail nelze použít.');
             }
             if (($existing['oauth_provider'] ?? null) === $other) {
@@ -305,7 +305,7 @@ final class AuthService
             if (in_array($candidate, $reserved, true)) {
                 continue;
             }
-            if (!$this->db->fetch('SELECT id FROM users WHERE username = :u', ['u' => $candidate])) {
+            if (!$this->db->fetch('SELECT id FROM users WHERE username = :u AND deleted_at IS NULL', ['u' => $candidate])) {
                 return $candidate;
             }
         }
@@ -634,7 +634,7 @@ final class AuthService
         if (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
             throw new ValidationException(['email' => ['Zadejte platnou e-mailovou adresu.']], 'Zadejte platnou e-mailovou adresu.');
         }
-        if ($this->db->fetch('SELECT id FROM users WHERE email = :e AND id != :id', ['e' => $newEmail, 'id' => (int) $user['id']])) {
+        if ($this->db->fetch('SELECT id FROM users WHERE email = :e AND id != :id AND deleted_at IS NULL', ['e' => $newEmail, 'id' => (int) $user['id']])) {
             throw new ValidationException(['email' => ['Tento e-mail nelze použít.']], 'Tento e-mail nelze použít.');
         }
         $raw = Crypto::token(32);
@@ -1033,25 +1033,28 @@ final class AuthService
     public function deleteAccount(array $user, ?string $reason = null): void
     {
         $id = (int) $user['id'];
-        $message = trim((string) $reason);
-        if ($message === '') {
-            $message = 'Tvůj účet PRIVOFIT byl smazán administrátorem.';
-        }
         $this->logoutAll($id);
-        $this->db->update('users', [
-            'status' => 'deleted',
-            'deleted_at' => Clock::utc(),
-            'blocked_reason' => $message,
-            'email' => 'deleted+' . $id . '@invalid.local',
-            'username' => 'deleted_' . $id,
-            'password_hash' => self::dummyPasswordHash(),
-            'updated_at' => Clock::utc(),
-        ], 'id = :id', ['id' => $id]);
-    }
+        $this->avatars->delete($user);
 
-    private static function dummyPasswordHash(): string
-    {
-        return Crypto::hashPassword(Crypto::token(24));
+        $this->db->transaction(function () use ($id): void {
+            $now = Clock::utc();
+            $this->db->query(
+                "UPDATE reservations
+                 SET status = 'cancelled',
+                     cancelled_at = :now,
+                     cancellation_reason = :reason,
+                     updated_at = :now
+                 WHERE user_id = :uid
+                   AND status IN ('pending_payment', 'confirmed')
+                   AND starts_at > :now",
+                [
+                    'uid' => $id,
+                    'now' => $now,
+                    'reason' => 'Účet byl smazán.',
+                ]
+            );
+            $this->db->query('DELETE FROM users WHERE id = :id', ['id' => $id]);
+        });
     }
 
     public function normalizeEmail(string $email): string

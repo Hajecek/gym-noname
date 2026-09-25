@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS reservations (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     public_id CHAR(36) NOT NULL,
     room_id BIGINT UNSIGNED NOT NULL,
-    user_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED DEFAULT NULL,
     membership_id BIGINT UNSIGNED DEFAULT NULL,
     status ENUM('pending_payment', 'confirmed', 'cancelled', 'completed', 'expired', 'no_show') NOT NULL DEFAULT 'pending_payment',
     starts_at DATETIME NOT NULL,
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS reservations (
     KEY idx_reservations_room_time (room_id, starts_at, ends_at),
     KEY idx_reservations_status (status),
     CONSTRAINT fk_reservations_room FOREIGN KEY (room_id) REFERENCES rooms (id),
-    CONSTRAINT fk_reservations_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_reservations_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL,
     CONSTRAINT fk_reservations_membership FOREIGN KEY (membership_id) REFERENCES memberships (id) ON DELETE SET NULL,
     CONSTRAINT fk_reservations_cancelled_by FOREIGN KEY (cancelled_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
