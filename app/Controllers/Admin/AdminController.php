@@ -27,21 +27,84 @@ final class AdminController extends Controller
         $db = $this->app->db();
         $todayStart = Clock::toUtc(Clock::nowLocal()->setTime(0, 0))->format('Y-m-d H:i:s');
         $todayEnd = Clock::toUtc(Clock::nowLocal()->setTime(0, 0)->modify('+1 day'))->format('Y-m-d H:i:s');
+        $now = Clock::utc();
+
+        $todayReservations = $db->fetchAll(
+            "SELECT r.id, r.public_id, r.starts_at, r.ends_at, r.status, r.guest_count,
+                    u.first_name, u.last_name, u.username, u.public_id AS user_public_id,
+                    rm.name AS room_name
+             FROM reservations r
+             INNER JOIN users u ON u.id = r.user_id
+             LEFT JOIN rooms rm ON rm.id = r.room_id
+             WHERE r.starts_at >= :a AND r.starts_at < :b
+               AND r.status IN ('confirmed', 'pending_payment')
+             ORDER BY r.starts_at ASC
+             LIMIT 20",
+            ['a' => $todayStart, 'b' => $todayEnd]
+        );
+
+        $recentDenied = $db->fetchAll(
+            "SELECT l.created_at, l.denial_reason, l.authorization_result, u.username, u.first_name, u.last_name, u.public_id
+             FROM access_logs l
+             LEFT JOIN users u ON u.id = l.user_id
+             WHERE l.authorization_result = 'denied' AND l.created_at >= :a
+             ORDER BY l.created_at DESC
+             LIMIT 8",
+            ['a' => $todayStart]
+        );
+
+        $next = $db->fetch(
+            "SELECT r.starts_at, r.ends_at, u.first_name, u.last_name, rm.name AS room_name
+             FROM reservations r
+             INNER JOIN users u ON u.id = r.user_id
+             LEFT JOIN rooms rm ON rm.id = r.room_id
+             WHERE r.status = 'confirmed' AND r.starts_at > :now
+             ORDER BY r.starts_at ASC
+             LIMIT 1",
+            ['now' => $now]
+        );
+
         $stats = [
             'active_members' => (int) $db->fetchColumn("SELECT COUNT(*) FROM memberships WHERE status = 'active'"),
-            'today_reservations' => (int) $db->fetchColumn("SELECT COUNT(*) FROM reservations WHERE starts_at >= :a AND starts_at < :b AND status IN ('confirmed','pending_payment')", ['a' => $todayStart, 'b' => $todayEnd]),
+            'today_reservations' => count($todayReservations),
             'current' => ReservationService::make($db)->occupancyNow(),
-            'revenue' => (string) $db->fetchColumn("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'paid' AND paid_at >= :a", ['a' => Clock::nowUtc()->modify('-30 days')->format('Y-m-d H:i:s')]),
+            'next' => $next,
+            'today_list' => $todayReservations,
+            'denied_list' => $recentDenied,
+            'revenue' => (string) $db->fetchColumn("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'paid' AND paid_at >= :a AND paid_at < :b", [
+                'a' => Clock::toUtc(Clock::nowLocal()->modify('-30 days')->setTime(0, 0))->format('Y-m-d H:i:s'),
+                'b' => Clock::toUtc(Clock::nowLocal()->setTime(0, 0)->modify('+1 day'))->format('Y-m-d H:i:s'),
+            ]),
+            'revenue_today' => (string) $db->fetchColumn("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'paid' AND paid_at >= :a AND paid_at < :b", ['a' => $todayStart, 'b' => $todayEnd]),
+            'revenue_yesterday' => (string) $db->fetchColumn("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'paid' AND paid_at >= :a AND paid_at < :b", [
+                'a' => Clock::toUtc(Clock::nowLocal()->modify('-1 day')->setTime(0, 0))->format('Y-m-d H:i:s'),
+                'b' => $todayStart,
+            ]),
+            'revenue_count_30' => (int) $db->fetchColumn("SELECT COUNT(*) FROM payments WHERE status = 'paid' AND paid_at >= :a AND paid_at < :b", [
+                'a' => Clock::toUtc(Clock::nowLocal()->modify('-30 days')->setTime(0, 0))->format('Y-m-d H:i:s'),
+                'b' => Clock::toUtc(Clock::nowLocal()->setTime(0, 0)->modify('+1 day'))->format('Y-m-d H:i:s'),
+            ]),
             'entries' => (int) $db->fetchColumn("SELECT COUNT(*) FROM access_logs WHERE authorization_result = 'granted' AND created_at >= :a", ['a' => $todayStart]),
             'failed_access' => (int) $db->fetchColumn("SELECT COUNT(*) FROM access_logs WHERE authorization_result = 'denied' AND created_at >= :a", ['a' => $todayStart]),
             'door' => AccessControlService::make($db)->doorStatus(),
             'interest' => 0,
+            'customers' => (int) $db->fetchColumn('SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND role = \'user\''),
         ];
         try {
             $stats['interest'] = (int) $db->fetchColumn('SELECT COUNT(*) FROM interest_signups');
         } catch (\PDOException) {
         }
-        $this->view('admin/dashboard', ['title' => 'Přehled správy', 'stats' => $stats]);
+
+        $chartFrom = Clock::nowLocal()->modify('-29 days')->setTime(0, 0);
+        $chartTo = Clock::nowLocal()->setTime(0, 0)->modify('+1 day');
+        $chart = $this->revenueAnalytics($chartFrom, $chartTo);
+
+        $this->view('admin/dashboard', [
+            'title' => 'Přehled správy',
+            'stats' => $stats,
+            'chart' => $chart,
+            'pageScripts' => ['js/rev-charts.js', 'js/admin-dash.js'],
+        ]);
     }
 
     public function users(Request $request): never
@@ -425,6 +488,249 @@ final class AdminController extends Controller
         );
         $this->flashSuccess('E-mail byl ze zájmu odstraněn.');
         $this->redirect('/user/sprava/zajem');
+    }
+
+    public function revenue(Request $request): never
+    {
+        $period = $this->resolveRevenuePeriod($request);
+        $db = $this->app->db();
+
+        $payments = $db->fetchAll(
+            "SELECT p.*,
+                    u.first_name, u.last_name, u.username, u.public_id AS user_public_id,
+                    r.public_id AS reservation_public_id,
+                    m.id AS membership_row_id
+             FROM payments p
+             LEFT JOIN users u ON u.id = p.user_id
+             LEFT JOIN reservations r ON r.id = p.reservation_id
+             LEFT JOIN memberships m ON m.id = p.membership_id
+             WHERE p.status = 'paid'
+               AND p.paid_at >= :from
+               AND p.paid_at < :to
+             ORDER BY p.paid_at DESC
+             LIMIT 500",
+            ['from' => $period['from'], 'to' => $period['to']]
+        );
+
+        $total = 0.0;
+        $reservationTotal = 0.0;
+        $membershipTotal = 0.0;
+        $otherTotal = 0.0;
+        foreach ($payments as $payment) {
+            $amount = (float) ($payment['amount'] ?? 0);
+            $total += $amount;
+            if (!empty($payment['reservation_id'])) {
+                $reservationTotal += $amount;
+            } elseif (!empty($payment['membership_id'])) {
+                $membershipTotal += $amount;
+            } else {
+                $otherTotal += $amount;
+            }
+        }
+
+        $count = count($payments);
+        $average = $count > 0 ? $total / $count : 0.0;
+
+        $analytics = $this->revenueAnalytics(
+            Clock::parseLocal($period['start_day'] . ' 00:00:00'),
+            Clock::parseLocal($period['end_day'] . ' 00:00:00')->modify('+1 day')
+        );
+
+        $this->view('admin/revenue', [
+            'title' => 'Tržby',
+            'period' => $period,
+            'payments' => $payments,
+            'summary' => [
+                'total' => $total,
+                'count' => $count,
+                'average' => $average,
+                'reservations' => $reservationTotal,
+                'memberships' => $membershipTotal,
+                'other' => $otherTotal,
+            ],
+            'chart' => $analytics,
+            'pageScripts' => ['js/rev-charts.js', 'js/revenue.js'],
+        ]);
+    }
+
+    /**
+     * @return array{days:list<array{date:string,label:string,amount:float,count:int}>,breakdown:array{reservations:float,memberships:float,other:float},total:float,count:int}
+     */
+    private function revenueAnalytics(\DateTimeImmutable $fromLocal, \DateTimeImmutable $toExclusiveLocal): array
+    {
+        $days = [];
+        for ($cursor = $fromLocal; $cursor < $toExclusiveLocal; $cursor = $cursor->modify('+1 day')) {
+            $key = $cursor->format('Y-m-d');
+            $days[$key] = [
+                'date' => $key,
+                'label' => $cursor->format('j.n.'),
+                'amount' => 0.0,
+                'count' => 0,
+            ];
+        }
+
+        $rows = $this->app->db()->fetchAll(
+            "SELECT amount, paid_at, reservation_id, membership_id
+             FROM payments
+             WHERE status = 'paid' AND paid_at >= :a AND paid_at < :b",
+            [
+                'a' => Clock::toUtc($fromLocal)->format('Y-m-d H:i:s'),
+                'b' => Clock::toUtc($toExclusiveLocal)->format('Y-m-d H:i:s'),
+            ]
+        );
+
+        $breakdown = ['reservations' => 0.0, 'memberships' => 0.0, 'other' => 0.0];
+        $total = 0.0;
+        foreach ($rows as $row) {
+            $amount = (float) ($row['amount'] ?? 0);
+            $total += $amount;
+            $dayKey = Clock::toLocal((string) $row['paid_at'])->format('Y-m-d');
+            if (isset($days[$dayKey])) {
+                $days[$dayKey]['amount'] += $amount;
+                $days[$dayKey]['count']++;
+            }
+            if (!empty($row['reservation_id'])) {
+                $breakdown['reservations'] += $amount;
+            } elseif (!empty($row['membership_id'])) {
+                $breakdown['memberships'] += $amount;
+            } else {
+                $breakdown['other'] += $amount;
+            }
+        }
+
+        return [
+            'days' => array_values($days),
+            'breakdown' => $breakdown,
+            'total' => $total,
+            'count' => count($rows),
+        ];
+    }
+
+    /**
+     * @return array{key:string,label:string,from:string,to:string,date:?string,from_date:?string,to_date:?string,start_day:string,end_day:string}
+     */
+    private function resolveRevenuePeriod(Request $request): array
+    {
+        $key = strtolower(trim((string) $request->query('obdobi', 'dnes')));
+        $allowed = ['dnes', 'vcera', '7d', '30d', 'mesic', 'den', 'rozsah'];
+        if (!in_array($key, $allowed, true)) {
+            $key = 'dnes';
+        }
+
+        $today = Clock::nowLocal()->setTime(0, 0);
+        $date = trim((string) $request->query('datum', ''));
+        $fromDate = trim((string) $request->query('od', ''));
+        $toDate = trim((string) $request->query('do', ''));
+
+        $fromLocal = $today;
+        $toLocal = $today->modify('+1 day');
+        $label = 'Dnes';
+        $startDay = $today->format('Y-m-d');
+        $endDay = $today->format('Y-m-d');
+
+        switch ($key) {
+            case 'vcera':
+                $fromLocal = $today->modify('-1 day');
+                $toLocal = $today;
+                $label = 'Včera';
+                $startDay = $fromLocal->format('Y-m-d');
+                $endDay = $fromLocal->format('Y-m-d');
+                break;
+            case '7d':
+                $fromLocal = $today->modify('-6 days');
+                $toLocal = $today->modify('+1 day');
+                $label = 'Posledních 7 dní';
+                $startDay = $fromLocal->format('Y-m-d');
+                $endDay = $today->format('Y-m-d');
+                break;
+            case '30d':
+                $fromLocal = $today->modify('-29 days');
+                $toLocal = $today->modify('+1 day');
+                $label = 'Posledních 30 dní';
+                $startDay = $fromLocal->format('Y-m-d');
+                $endDay = $today->format('Y-m-d');
+                break;
+            case 'mesic':
+                $fromLocal = $today->modify('first day of this month')->setTime(0, 0);
+                $toLocal = $fromLocal->modify('first day of next month');
+                $label = 'Tento měsíc';
+                $startDay = $fromLocal->format('Y-m-d');
+                $endDay = $toLocal->modify('-1 day')->format('Y-m-d');
+                break;
+            case 'den':
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1) {
+                    try {
+                        $fromLocal = Clock::parseLocal($date . ' 00:00:00');
+                        $toLocal = $fromLocal->modify('+1 day');
+                        $label = 'Den ' . $fromLocal->format('j. n. Y');
+                        $startDay = $fromLocal->format('Y-m-d');
+                        $endDay = $startDay;
+                    } catch (\Exception) {
+                        $key = 'dnes';
+                        $fromLocal = $today;
+                        $toLocal = $today->modify('+1 day');
+                        $label = 'Dnes';
+                        $date = '';
+                        $startDay = $today->format('Y-m-d');
+                        $endDay = $startDay;
+                    }
+                } else {
+                    $key = 'dnes';
+                    $date = '';
+                    $label = 'Dnes';
+                }
+                break;
+            case 'rozsah':
+                if (
+                    preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate) === 1
+                    && preg_match('/^\d{4}-\d{2}-\d{2}$/', $toDate) === 1
+                ) {
+                    try {
+                        $fromLocal = Clock::parseLocal($fromDate . ' 00:00:00');
+                        $endLocal = Clock::parseLocal($toDate . ' 00:00:00');
+                        if ($endLocal < $fromLocal) {
+                            [$fromLocal, $endLocal] = [$endLocal, $fromLocal];
+                            $fromDate = $fromLocal->format('Y-m-d');
+                            $toDate = $endLocal->format('Y-m-d');
+                        }
+                        $toLocal = $endLocal->modify('+1 day');
+                        $label = $fromLocal->format('j. n. Y') . ' – ' . $endLocal->format('j. n. Y');
+                        $startDay = $fromLocal->format('Y-m-d');
+                        $endDay = $endLocal->format('Y-m-d');
+                    } catch (\Exception) {
+                        $key = 'dnes';
+                        $fromLocal = $today;
+                        $toLocal = $today->modify('+1 day');
+                        $fromDate = '';
+                        $toDate = '';
+                        $label = 'Dnes';
+                        $startDay = $today->format('Y-m-d');
+                        $endDay = $startDay;
+                    }
+                } else {
+                    $key = 'dnes';
+                    $fromDate = '';
+                    $toDate = '';
+                    $label = 'Dnes';
+                }
+                break;
+            default:
+                $key = 'dnes';
+                $label = 'Dnes';
+                break;
+        }
+
+        return [
+            'key' => $key,
+            'label' => $label,
+            'from' => Clock::toUtc($fromLocal)->format('Y-m-d H:i:s'),
+            'to' => Clock::toUtc($toLocal)->format('Y-m-d H:i:s'),
+            'date' => $date !== '' ? $date : null,
+            'from_date' => $fromDate !== '' ? $fromDate : null,
+            'to_date' => $toDate !== '' ? $toDate : null,
+            'start_day' => $startDay,
+            'end_day' => $endDay,
+        ];
     }
 
     public function exportInterest(): never

@@ -93,6 +93,7 @@ $router->get('/user/zabezpeceni/mfa/kody', [ProfileController::class, 'recoveryC
 
 $admin = [AuthMiddleware::class, AdminMiddleware::class];
 $router->get('/user/sprava', [AdminController::class, 'dashboard'], $admin);
+$router->get('/user/sprava/trzby', [AdminController::class, 'revenue'], $admin);
 $router->get('/user/sprava/zakaznici', [AdminController::class, 'users'], $admin);
 $router->get('/user/sprava/zakaznici/{id}', [AdminController::class, 'userShow'], $admin);
 $router->post('/user/sprava/zakaznici/{id}', [AdminController::class, 'userUpdate'], $admin);
@@ -115,6 +116,7 @@ $router->post('/user/sprava/nastaveni', [AdminController::class, 'saveSettings']
 
 // Kompatibilita starých /admin URL
 $router->get('/admin', [AdminController::class, 'dashboard'], $admin);
+$router->get('/admin/trzby', [AdminController::class, 'revenue'], $admin);
 $router->get('/admin/zakaznici', [AdminController::class, 'users'], $admin);
 $router->get('/admin/zakaznici/{id}', [AdminController::class, 'userShow'], $admin);
 $router->post('/admin/zakaznici/{id}', [AdminController::class, 'userUpdate'], $admin);
