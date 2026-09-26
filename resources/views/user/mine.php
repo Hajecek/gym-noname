@@ -67,6 +67,9 @@ $tones = [
                             <p class="res-when"><?= e($whenLabel) ?></p>
                             <h3><?= e(format_datetime($item['starts_at'], 'H:i')) ?>–<?= e($endShown->format('H:i')) ?></h3>
                             <p class="muted"><?= e($item['room_name'] ?? 'Studio') ?> · <?= e(money_format_czk($item['price'] ?? 0)) ?><?= e($guestLabel) ?></p>
+                            <?php if ($status === 'cancelled' && trim((string) ($item['cancellation_reason'] ?? '')) !== ''): ?>
+                                <p class="res-cancel-note"><?= nl2br(e(trim((string) $item['cancellation_reason']))) ?></p>
+                            <?php endif; ?>
                         </div>
                         <div class="res-actions">
                             <span class="badge <?= e($statusClass) ?>"><?= e($statusLabel) ?></span>

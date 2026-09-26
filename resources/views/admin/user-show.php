@@ -315,14 +315,45 @@ foreach ($plans as $plan) {
     <h3>Rezervace</h3>
     <div class="table-wrap">
         <table>
-            <thead><tr><th>Začátek</th><th>Stav</th><th>Osob</th><th>Cena</th></tr></thead>
+            <thead><tr><th>Začátek</th><th>Stav</th><th>Osob</th><th>Cena</th><th></th></tr></thead>
             <tbody>
-            <?php foreach (array_slice($reservations, 0, 12) as $res): ?>
+            <?php
+            $resTones = [
+                'pending_payment' => ['Čeká na platbu', 'badge-warn'],
+                'confirmed' => ['Potvrzeno', 'badge-ok'],
+                'cancelled' => ['Zrušeno', 'badge-bad'],
+                'completed' => ['Proběhlo', 'badge-done'],
+                'expired' => ['Vypršelo', 'badge-muted'],
+                'no_show' => ['Nedorazil', 'badge-bad'],
+            ];
+            foreach (array_slice($reservations, 0, 12) as $res):
+                $resStatus = (string) ($res['status'] ?? '');
+                [$resLabel, $resClass] = $resTones[$resStatus] ?? [$resStatus, 'badge-muted'];
+                $resReason = trim((string) ($res['cancellation_reason'] ?? ''));
+                $canCancelRes = in_array($resStatus, ['confirmed', 'pending_payment'], true) && !empty($res['public_id']);
+                $resWhen = format_datetime((string) $res['starts_at']);
+            ?>
             <tr>
-                <td><?= e(format_datetime((string) $res['starts_at'])) ?></td>
-                <td><?= e((string) $res['status']) ?></td>
-                <td><?= (int) ($res['persons'] ?? 1) ?></td>
-                <td><?= e(number_format((float) ($res['price'] ?? 0), 0, ',', ' ')) ?> Kč</td>
+                <td>
+                    <?= e($resWhen) ?>
+                    <?php if ($resReason !== ''): ?>
+                        <span class="ares-reason"><?= nl2br(e($resReason)) ?></span>
+                    <?php endif; ?>
+                </td>
+                <td><span class="badge <?= e($resClass) ?>"><?= e($resLabel) ?></span></td>
+                <td><?= (int) ($res['guest_count'] ?? $res['persons'] ?? 1) ?></td>
+                <td><?= e(money_format_czk($res['price'] ?? 0)) ?></td>
+                <td class="interest-actions">
+                    <?php if ($canCancelRes): ?>
+                        <button
+                            type="button"
+                            class="btn btn-danger btn-sm"
+                            data-cust-open="cancel-reservation"
+                            data-name="<?= e($resWhen) ?>"
+                            data-action="<?= e(url('/user/sprava/rezervace/' . $res['public_id'] . '/zrusit')) ?>"
+                        >Zrušit</button>
+                    <?php endif; ?>
+                </td>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -364,6 +395,12 @@ foreach ($plans as $plan) {
 </form>
 <form method="post" action="<?= e(url('/user/sprava/zakaznici/' . $pid . '/clenstvi/reset')) ?>" hidden data-cust-form="reset-membership">
     <?= csrf_field() ?>
+</form>
+<form method="post" hidden data-cust-form="cancel-reservation">
+    <?= csrf_field() ?>
+    <input type="hidden" name="redirect" value="customer">
+    <input type="hidden" name="customer" value="<?= e($pid) ?>">
+    <input type="hidden" name="cancellation_reason" value="" data-cust-reason-field>
 </form>
 
 <div class="cancel-modal" data-cust-modal hidden>

@@ -116,7 +116,7 @@ final class AdminController extends Controller
             'title' => 'Přehled správy',
             'stats' => $stats,
             'chart' => $chart,
-            'pageScripts' => ['js/rev-charts.js', 'js/admin-dash.js'],
+            'pageScripts' => ['js/rev-charts.js', 'js/admin-dash.js', 'js/customers.js'],
         ]);
     }
 
@@ -173,6 +173,146 @@ final class AdminController extends Controller
             )),
             'pageScripts' => ['js/customers.js'],
         ]);
+    }
+
+    public function reservations(Request $request): never
+    {
+        if (is_admin_user() && admin_view_mode() === 'user') {
+            $this->redirect('/user');
+        }
+        $filter = (string) $request->query('stav', 'nadchazejici');
+        $allowed = ['nadchazejici', 'dnes', 'zrusene', 'vse'];
+        if (!in_array($filter, $allowed, true)) {
+            $filter = 'nadchazejici';
+        }
+        $q = trim((string) $request->query('q', ''));
+        if (mb_strlen($q) > 120) {
+            $q = mb_substr($q, 0, 120);
+        }
+        $db = $this->app->db();
+        $now = Clock::utc();
+        $todayStart = Clock::toUtc(Clock::nowLocal()->setTime(0, 0))->format('Y-m-d H:i:s');
+        $todayEnd = Clock::toUtc(Clock::nowLocal()->setTime(0, 0)->modify('+1 day'))->format('Y-m-d H:i:s');
+
+        $sql = "SELECT r.public_id, r.starts_at, r.ends_at, r.buffer_minutes, r.status, r.guest_count, r.price,
+                       r.cancellation_reason,
+                       u.first_name, u.last_name, u.username, u.email, u.public_id AS user_public_id,
+                       rm.name AS room_name
+                FROM reservations r
+                LEFT JOIN users u ON u.id = r.user_id
+                LEFT JOIN rooms rm ON rm.id = r.room_id
+                WHERE r.status <> 'expired'";
+        $params = [];
+        if ($filter === 'nadchazejici') {
+            $sql .= " AND r.status IN ('confirmed', 'pending_payment') AND r.ends_at >= :now";
+            $params['now'] = $now;
+        } elseif ($filter === 'dnes') {
+            $sql .= ' AND r.starts_at >= :a AND r.starts_at < :b';
+            $params['a'] = $todayStart;
+            $params['b'] = $todayEnd;
+        } elseif ($filter === 'zrusene') {
+            $sql .= " AND r.status = 'cancelled'";
+        }
+        if ($q !== '') {
+            $sql .= ' AND (u.email LIKE :q OR u.username LIKE :q2 OR u.first_name LIKE :q3 OR u.last_name LIKE :q4)';
+            $like = '%' . $q . '%';
+            $params['q'] = $like;
+            $params['q2'] = $like;
+            $params['q3'] = $like;
+            $params['q4'] = $like;
+        }
+        $sql .= match ($filter) {
+            'nadchazejici', 'dnes' => ' ORDER BY r.starts_at ASC',
+            'zrusene' => ' ORDER BY r.cancelled_at DESC, r.starts_at DESC',
+            default => ' ORDER BY r.starts_at DESC',
+        };
+        $sql .= ' LIMIT 200';
+
+        $counts = $db->fetch(
+            "SELECT
+                SUM(r.status IN ('confirmed', 'pending_payment') AND r.ends_at >= :now) AS nadchazejici,
+                SUM(r.starts_at >= :a AND r.starts_at < :b AND r.status <> 'expired') AS dnes,
+                SUM(r.status = 'cancelled') AS zrusene,
+                SUM(r.status <> 'expired') AS vse
+             FROM reservations r",
+            ['now' => $now, 'a' => $todayStart, 'b' => $todayEnd]
+        ) ?: [];
+
+        $this->view('admin/reservations', [
+            'title' => 'Rezervace',
+            'rows' => $db->fetchAll($sql, $params),
+            'filter' => $filter,
+            'q' => $q,
+            'counts' => $counts,
+            'pageScripts' => ['js/customers.js'],
+        ]);
+    }
+
+    public function cancelReservation(Request $request, array $params): never
+    {
+        $actor = $this->requireUser();
+        $reason = trim((string) $request->input('cancellation_reason', ''));
+        if (mb_strlen($reason) > 255) {
+            $this->flashError('Komentář může mít nejvýš 255 znaků.');
+            $this->redirectAfterReservationCancel($request);
+        }
+        try {
+            $outcome = ReservationService::make($this->app->db())->cancel(
+                $actor,
+                (string) $params['id'],
+                true,
+                $reason !== '' ? $reason : null
+            );
+            (new AuditService($this->app->db()))->log(
+                (int) $actor['id'],
+                'reservation.cancel',
+                'reservation',
+                (string) $params['id'],
+                null,
+                $reason !== '' ? $reason : 'cancelled',
+                $request->ip()
+            );
+            $this->flashSuccess(match ($outcome) {
+                'refunded' => 'Rezervace byla zrušena. Peníze se vrací zákazníkovi.',
+                'late' => 'Rezervace byla zrušena. Na vrácení peněz už není nárok.',
+                'entry' => 'Rezervace byla zrušena. Vstup se vrátil do členství.',
+                'entries' => 'Rezervace byla zrušena. Vstupy se vrátily do členství.',
+                default => 'Rezervace byla zrušena.',
+            });
+        } catch (HttpException $e) {
+            $this->flashError($e->getMessage());
+        }
+        $this->redirectAfterReservationCancel($request);
+    }
+
+    private function redirectAfterReservationCancel(Request $request): never
+    {
+        $back = (string) $request->input('redirect', 'list');
+        if ($back === 'dashboard') {
+            $this->redirect('/user/sprava');
+        }
+        if ($back === 'customer') {
+            $customer = (string) $request->input('customer', '');
+            if (preg_match('/^[0-9a-fA-F-]{36}$/', $customer) === 1) {
+                $this->redirect('/user/sprava/zakaznici/' . $customer);
+            }
+        }
+        $stav = (string) $request->input('stav', 'nadchazejici');
+        if (!in_array($stav, ['nadchazejici', 'dnes', 'zrusene', 'vse'], true)) {
+            $stav = 'nadchazejici';
+        }
+        $q = trim((string) $request->input('q', ''));
+        if (mb_strlen($q) > 120) {
+            $q = mb_substr($q, 0, 120);
+        }
+        $query = [];
+        if ($stav !== 'nadchazejici') {
+            $query['stav'] = $stav;
+        }
+        if ($q !== '') {
+            $query['q'] = $q;
+        }
+        $this->redirect('/user/sprava/rezervace' . ($query !== [] ? '?' . http_build_query($query) : ''));
     }
 
     public function userUpdate(Request $request, array $params): never

@@ -52,6 +52,10 @@ $homeLabel = $adminUi ? 'PRIVOFIT – správa' : 'PRIVOFIT – přehled';
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 11 12 4l8 7v9H4z"/></svg>
                 <span>Přehled</span>
             </a>
+            <a class="side-link <?= user_active('/user/sprava/rezervace', true) ?>" href="<?= e(url('/user/sprava/rezervace')) ?>" title="Rezervace">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
+                <span>Rezervace</span>
+            </a>
             <a class="side-link <?= user_active('/user/sprava/zakaznici', true) ?>" href="<?= e(url('/user/sprava/zakaznici')) ?>" title="Zákazníci">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="16" cy="9" r="2.5"/><path d="M3 19c1.2-3.2 10.8-3.2 12 0M14 19c.4-2 5.6-2.4 7 0"/></svg>
                 <span>Zákazníci</span>

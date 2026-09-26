@@ -365,7 +365,7 @@ final class ReservationService
         }
     }
 
-    public function cancel(array $user, string $publicId, bool $admin = false): string
+    public function cancel(array $user, string $publicId, bool $admin = false, ?string $reason = null): string
     {
         $reservation = $this->owned($user, $publicId, $admin);
         if (($reservation['status'] ?? '') === 'cancelled') {
@@ -378,9 +378,14 @@ final class ReservationService
         if (!$admin && $starts <= Clock::nowUtc()) {
             throw new HttpException(422, 'Termín už začal, nelze ho zrušit.');
         }
-        $money = $this->settleMoney($reservation);
+        $reason = trim((string) $reason);
+        if ($reason !== '') {
+            $reason = mb_substr($reason, 0, 255);
+        }
+        $money = $this->settleMoney($reservation, $admin);
         $this->db->update('reservations', [
             'status' => 'cancelled',
+            'cancellation_reason' => $reason !== '' ? $reason : null,
             'cancelled_at' => Clock::utc(),
             'cancelled_by' => (int) $user['id'],
             'updated_at' => Clock::utc(),
@@ -402,16 +407,21 @@ final class ReservationService
         } catch (\Throwable) {
         }
         try {
-            $recipient = $user['email'] ?? null;
-            if (!$recipient) {
-                $owner = $this->db->fetch('SELECT email, first_name FROM users WHERE id = :id', ['id' => (int) $reservation['user_id']]);
-                $recipient = $owner['email'] ?? null;
+            $owner = $this->db->fetch(
+                'SELECT email, first_name FROM users WHERE id = :id',
+                ['id' => (int) $reservation['user_id']]
+            );
+            $recipient = is_array($owner) ? ($owner['email'] ?? null) : null;
+            if (!is_string($recipient) || $recipient === '') {
+                $recipient = $user['email'] ?? null;
             }
+            $firstName = is_array($owner) ? (string) ($owner['first_name'] ?? '') : (string) ($user['first_name'] ?? '');
             if (is_string($recipient) && $recipient !== '') {
                 $this->mail->queue('reservation-cancelled', $recipient, [
                     'subject' => 'Zrušení rezervace PRIVOFIT',
-                    'first_name' => $user['first_name'] ?? '',
+                    'first_name' => $firstName,
                     'starts_at' => Clock::format($reservation['starts_at']),
+                    'reason' => $reason,
                 ], (int) $reservation['user_id']);
             }
         } catch (\Throwable) {
@@ -428,7 +438,7 @@ final class ReservationService
     }
 
     /** @param array<string, mixed> $reservation */
-    private function settleMoney(array $reservation): string
+    private function settleMoney(array $reservation, bool $forceRefund = false): string
     {
         if ((float) ($reservation['price'] ?? 0) <= 0) {
             return !empty($reservation['membership_id']) ? 'entry' : 'unpaid';
@@ -444,7 +454,7 @@ final class ReservationService
             return 'unpaid';
         }
         $paidAt = new \DateTimeImmutable((string) $payment['paid_at'], new \DateTimeZone('UTC'));
-        if (Clock::nowUtc()->getTimestamp() > $paidAt->getTimestamp() + self::REFUND_SECONDS) {
+        if (!$forceRefund && Clock::nowUtc()->getTimestamp() > $paidAt->getTimestamp() + self::REFUND_SECONDS) {
             return 'late';
         }
         $reference = trim((string) ($payment['provider_reference'] ?? ''));

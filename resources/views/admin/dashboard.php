@@ -182,6 +182,7 @@ $statusClass = $occupied ? 'is-busy' : 'is-free';
                                 <?php endif; ?>
                                 <span><?= e((string) ($row['room_name'] ?? 'Studio')) ?><?= $pending ? ' · čeká na platbu' : '' ?></span>
                             </div>
+                            <div class="adash-tl-side">
                             <?php if ($isLive): ?>
                                 <span class="badge badge-warn">Teď</span>
                             <?php elseif ($pending): ?>
@@ -191,6 +192,16 @@ $statusClass = $occupied ? 'is-busy' : 'is-free';
                             <?php else: ?>
                                 <span class="badge badge-ok">Čeká</span>
                             <?php endif; ?>
+                            <?php if (in_array((string) ($row['status'] ?? ''), ['confirmed', 'pending_payment'], true) && !empty($row['public_id'])): ?>
+                                <button
+                                    type="button"
+                                    class="btn btn-danger btn-sm"
+                                    data-cust-open="cancel-reservation"
+                                    data-name="<?= e($name . ' · ' . $rs->format('H:i') . '–' . $endClock) ?>"
+                                    data-action="<?= e(url('/user/sprava/rezervace/' . $row['public_id'] . '/zrusit')) ?>"
+                                >Zrušit</button>
+                            <?php endif; ?>
+                            </div>
                         </li>
                     <?php endforeach; ?>
                 </ul>
@@ -270,6 +281,7 @@ $statusClass = $occupied ? 'is-busy' : 'is-free';
     </div>
 
     <nav class="adash-links" aria-label="Rychlé odkazy">
+        <a href="<?= e(url('/user/sprava/rezervace')) ?>"><strong>Rezervace</strong><span>Zrušení termínů</span></a>
         <a href="<?= e(url('/user/sprava/trzby')) ?>"><strong>Tržby</strong><span>Platby a grafy</span></a>
         <a href="<?= e(url('/user/sprava/zakaznici')) ?>"><strong>Zákazníci</strong><span><?= (int) ($stats['customers'] ?? 0) ?> účtů</span></a>
         <a href="<?= e(url('/user/studio')) ?>"><strong>Studia</strong><span>Prostory</span></a>
@@ -277,4 +289,27 @@ $statusClass = $occupied ? 'is-busy' : 'is-free';
         <a href="<?= e(url('/user/sprava/zajem')) ?>"><strong>Zájem</strong><span><?= (int) ($stats['interest'] ?? 0) ?> leadů</span></a>
         <a href="<?= e(url('/user/sprava/nastaveni')) ?>"><strong>Nastavení</strong><span>Pravidla</span></a>
     </nav>
+</div>
+
+<form method="post" hidden data-cust-form="cancel-reservation">
+    <?= csrf_field() ?>
+    <input type="hidden" name="redirect" value="dashboard">
+    <input type="hidden" name="cancellation_reason" value="" data-cust-reason-field>
+</form>
+
+<div class="cancel-modal" data-cust-modal hidden>
+    <div class="cancel-modal-backdrop" data-cust-close></div>
+    <section class="cancel-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adash-cancel-title">
+        <p class="eyebrow" data-cust-eyebrow>Rezervace</p>
+        <h2 id="adash-cancel-title" data-cust-title>Zrušit rezervaci?</h2>
+        <p class="muted" data-cust-body></p>
+        <div class="field" data-cust-reason-wrap hidden>
+            <label for="adash-cancel-reason">Komentář pro zákazníka</label>
+            <textarea id="adash-cancel-reason" data-cust-reason rows="3" maxlength="255" placeholder="Volitelné — proč se termín ruší. Zákazník to uvidí."></textarea>
+        </div>
+        <div class="cancel-actions">
+            <button type="button" class="btn btn-secondary" data-cust-close>Zpět</button>
+            <button type="button" class="btn btn-danger" data-cust-confirm>Zrušit rezervaci</button>
+        </div>
+    </section>
 </div>

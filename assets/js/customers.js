@@ -90,11 +90,19 @@
       confirm: "Smazat",
       danger: true,
     },
+    "cancel-reservation": {
+      eyebrow: "Rezervace",
+      title: "Zrušit rezervaci?",
+      body: (name) =>
+        `Termín ${name} se uvolní a zákazník dostane e-mail. Komentář uvidí u zrušené rezervace. Zaplacená částka i vstup z členství se vrací.`,
+      confirm: "Zrušit rezervaci",
+      danger: true,
+    },
   };
 
   const reasonWrap = modal.querySelector("[data-cust-reason-wrap]");
   const reasonInput = modal.querySelector("[data-cust-reason]");
-  const needsReason = (kind) => kind === "block" || kind === "delete";
+  const needsReason = (kind) => kind === "block" || kind === "delete" || kind === "cancel-reservation";
 
   const close = () => {
     if (pending?.revert) pending.revert();
@@ -117,12 +125,19 @@
       confirmBtn.className = cfg.danger ? "btn btn-danger" : "btn btn-primary";
     }
     if (reasonWrap) reasonWrap.hidden = !needsReason(kind);
+    const reasonLabel = reasonWrap?.querySelector("label");
+    if (reasonLabel) {
+      reasonLabel.textContent = kind === "cancel-reservation" ? "Komentář pro zákazníka" : "Zpráva pro uživatele";
+    }
     if (reasonInput) {
       reasonInput.value = "";
+      reasonInput.maxLength = kind === "cancel-reservation" ? 255 : 2000;
       reasonInput.placeholder =
         kind === "delete"
           ? "Volitelné — např. důvod smazání účtu."
-          : "Volitelné — důvod blokace uvidí uživatel při odhlášení.";
+          : kind === "cancel-reservation"
+            ? "Volitelné — proč se termín ruší. Zákazník to uvidí."
+            : "Volitelné — důvod blokace uvidí uživatel při odhlášení.";
     }
     pending = {
       kind,
