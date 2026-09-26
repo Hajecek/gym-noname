@@ -153,16 +153,6 @@ final class Seeder
                 ]);
             }
         }
-        $pages = [
-            'home.hero' => ['Tvoje fitko. Tvůj prostor.', 'Trénuj bez čekání na stroje, bez přeplněných prostor a bez kompromisů. Rezervuj si vlastní fitness studio a užij si trénink přesně podle sebe.'],
-            'obchodni-podminky' => ['Obchodní podmínky', 'Doplňte kompletní obchodní podmínky v administraci před spuštěním provozu.'],
-            'ochrana-udaju' => ['Ochrana osobních údajů', 'PRIVOFIT zpracovává osobní údaje v rozsahu potřebném pro vedení účtu, rezervace, platby a vstup. Logy přístupů se uchovávají po omezenou dobu. Údaje lze exportovat nebo požádat o výmaz v profilu.'],
-        ];
-        foreach ($pages as $slug => [$title, $body]) {
-            if (!$this->db->fetch('SELECT id FROM page_contents WHERE slug = :s', ['s' => $slug])) {
-                $this->db->insert('page_contents', ['slug' => $slug, 'title' => $title, 'body_html' => $body]);
-            }
-        }
     }
 
     private function settings(): void

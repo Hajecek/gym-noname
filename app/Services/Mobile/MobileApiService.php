@@ -115,7 +115,6 @@ final class MobileApiService
 
     public function gymInfo(): array
     {
-        $hero = $this->content->page('home.hero', 'PRIVOFIT', 'Soukromé fitness studio.');
         $contact = $this->content->contact();
         $announcements = [];
         foreach ($this->content->faqs() as $faq) {
@@ -124,10 +123,9 @@ final class MobileApiService
                 break;
             }
         }
-        $title = trim((string) ($hero['title'] ?? ''));
         return [
-            'name' => $title !== '' ? $title : (string) config('app.name', 'PRIVOFIT'),
-            'description' => trim(strip_tags((string) ($hero['body_html'] ?? ''))),
+            'name' => (string) config('app.name', 'PRIVOFIT'),
+            'description' => 'Soukromé fitness studio. Tvůj prostor. Tvůj trénink.',
             'openingHours' => (string) ($contact['hours'] ?? 'Podle rezervací'),
             'announcements' => $announcements,
         ];

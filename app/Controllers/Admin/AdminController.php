@@ -262,9 +262,6 @@ final class AdminController extends Controller
         $content = new ContentService($this->app->db());
         $this->view('admin/content', [
             'title' => 'Obsah webu',
-            'hero' => $content->page('home.hero'),
-            'terms' => $content->page('obchodni-podminky'),
-            'privacy' => $content->page('ochrana-udaju'),
             'faqs' => $content->allFaqs(),
             'contact' => $content->contact(),
         ]);
@@ -272,16 +269,12 @@ final class AdminController extends Controller
 
     public function saveContent(Request $request): never
     {
-        $content = new ContentService($this->app->db());
-        $content->savePage('home.hero', (string) $request->input('hero_title'), (string) $request->input('hero_body'), $this->app->auth()->id());
-        $content->savePage('obchodni-podminky', 'Obchodní podmínky', (string) $request->input('terms'), $this->app->auth()->id());
-        $content->savePage('ochrana-udaju', 'Ochrana osobních údajů', (string) $request->input('privacy'), $this->app->auth()->id());
         $this->app->settings()->set('contact.address', (string) $request->input('address'));
         $this->app->settings()->set('contact.email', (string) $request->input('email'));
         $this->app->settings()->set('contact.phone', (string) $request->input('phone'));
         $this->app->settings()->set('contact.hours', (string) $request->input('hours'));
         $this->app->settings()->set('contact.map_embed', (string) $request->input('map_embed'));
-        $this->flashSuccess('Obsah byl uložen.');
+        $this->flashSuccess('Kontaktní údaje byly uloženy.');
         bump_live();
         $this->redirect('/user/sprava/obsah');
     }

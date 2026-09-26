@@ -5,43 +5,50 @@ declare(strict_types=1);
 namespace App\Services\Content;
 
 use App\Core\Database;
+use App\Core\HttpException;
 
 final class ContentService
 {
+    private const DOCUMENTS = [
+        'obchodni-podminky',
+        'ochrana-udaju',
+    ];
+
     public function __construct(private readonly Database $db)
     {
     }
 
+    /** @return array{slug:string,title:string,body_html:string} */
     public function page(string $slug, ?string $defaultTitle = null, ?string $defaultBody = null): array
     {
-        $page = $this->db->fetch('SELECT * FROM page_contents WHERE slug = :s', ['s' => $slug]);
-        if ($page) {
-            return $page;
+        $slug = strtolower(trim($slug));
+        if (!in_array($slug, self::DOCUMENTS, true)) {
+            if ($defaultTitle !== null || $defaultBody !== null) {
+                return [
+                    'slug' => $slug,
+                    'title' => $defaultTitle ?? $slug,
+                    'body_html' => $defaultBody ?? '',
+                ];
+            }
+            throw new HttpException(404, 'Dokument nebyl nalezen.');
         }
+
+        $file = dirname(__DIR__, 3) . '/resources/content/' . $slug . '.php';
+        if (!is_file($file)) {
+            throw new HttpException(404, 'Dokument nebyl nalezen.');
+        }
+
+        /** @var mixed $data */
+        $data = require $file;
+        if (!is_array($data)) {
+            throw new HttpException(500, 'Dokument má neplatný formát.');
+        }
+
         return [
             'slug' => $slug,
-            'title' => $defaultTitle ?? $slug,
-            'body_html' => $defaultBody ?? '',
+            'title' => (string) ($data['title'] ?? $defaultTitle ?? $slug),
+            'body_html' => (string) ($data['body'] ?? $data['body_html'] ?? $defaultBody ?? ''),
         ];
-    }
-
-    public function savePage(string $slug, string $title, string $body, ?int $userId): void
-    {
-        $existing = $this->db->fetch('SELECT id FROM page_contents WHERE slug = :s', ['s' => $slug]);
-        if ($existing) {
-            $this->db->update('page_contents', [
-                'title' => $title,
-                'body_html' => $body,
-                'updated_by' => $userId,
-            ], 'slug = :s', ['s' => $slug]);
-            return;
-        }
-        $this->db->insert('page_contents', [
-            'slug' => $slug,
-            'title' => $title,
-            'body_html' => $body,
-            'updated_by' => $userId,
-        ]);
     }
 
     public function faqs(): array
