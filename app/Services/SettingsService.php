@@ -19,17 +19,26 @@ final class SettingsService
     public function get(string $key, mixed $default = null): mixed
     {
         $all = $this->all();
-        if (!array_key_exists($key, $all) || $all[$key] === null) {
+        if (!array_key_exists($key, $all) || $all[$key] === null || $all[$key] === '' || $all[$key] === 'null') {
             return $default;
         }
         $value = $all[$key];
         $decoded = json_decode($value, true);
-        return json_last_error() === JSON_ERROR_NONE ? $decoded : $value;
+        if (json_last_error() === JSON_ERROR_NONE) {
+            return $decoded === null ? $default : $decoded;
+        }
+        return $value;
     }
 
     public function set(string $key, mixed $value, bool $secret = false): void
     {
+        if ($value === null) {
+            $value = '';
+        }
         $stored = is_string($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE);
+        if ($stored === false) {
+            $stored = '';
+        }
         $existing = $this->db->fetch('SELECT setting_key FROM app_settings WHERE setting_key = :k', ['k' => $key]);
         if ($existing) {
             $this->db->update('app_settings', [

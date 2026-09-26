@@ -129,12 +129,25 @@ final class Request
         if (array_key_exists($key, $_POST)) {
             return $_POST[$key];
         }
+        // PHP převádí tečky v name="a.b" na podtržítka (a_b).
+        if (str_contains($key, '.')) {
+            $underscored = str_replace('.', '_', $key);
+            if (array_key_exists($underscored, $_POST)) {
+                return $_POST[$underscored];
+            }
+        }
         $json = $this->json();
         if (array_key_exists($key, $json)) {
             return $json[$key];
         }
         if (array_key_exists($key, $_GET)) {
             return $_GET[$key];
+        }
+        if (str_contains($key, '.')) {
+            $underscored = str_replace('.', '_', $key);
+            if (array_key_exists($underscored, $_GET)) {
+                return $_GET[$underscored];
+            }
         }
         return $default;
     }

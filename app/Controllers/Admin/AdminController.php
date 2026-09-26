@@ -373,8 +373,19 @@ final class AdminController extends Controller
         if (!$this->app->auth()->hasRole('admin')) {
             throw new HttpException(403);
         }
-        foreach (['reservation.slot_minutes', 'reservation.min_minutes', 'reservation.max_minutes', 'reservation.buffer_minutes', 'reservation.cancellation_hours', 'access.early_minutes', 'access.late_minutes'] as $key) {
-            $this->app->settings()->set($key, $request->input($key));
+        $keys = [
+            'reservation.slot_minutes' => 15,
+            'reservation.min_minutes' => 60,
+            'reservation.max_minutes' => 180,
+            'reservation.buffer_minutes' => 15,
+            'reservation.cancellation_hours' => 12,
+            'access.early_minutes' => 5,
+            'access.late_minutes' => 5,
+        ];
+        foreach ($keys as $key => $default) {
+            $raw = $request->input($key, $request->input(str_replace('.', '_', $key), $default));
+            $value = max(0, (int) $raw);
+            $this->app->settings()->set($key, (string) $value);
         }
         (new AuditService($this->app->db()))->log($this->app->auth()->id(), 'settings.update', 'app_settings', null, null, $request->all(), $request->ip());
         $this->flashSuccess('Nastavení bylo uloženo.');
