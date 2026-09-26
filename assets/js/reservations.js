@@ -190,6 +190,7 @@
 
   const hourState = (row) => {
     if (row.kind === "buffer") return "buffer";
+    if (row.mine || row.kind === "mine") return "mine";
     if (inRange(row)) return "selected";
     const extra = extensionRow();
     if (extra && row.start === extra.start) return "add";
@@ -199,6 +200,7 @@
   };
 
   const hourMeta = (kind) => {
+    if (kind === "mine") return "Tvoje";
     if (kind === "past") return "Už bylo";
     if (kind === "busy") return "Obsazeno";
     if (kind === "selected") return "Vybrané";
@@ -211,7 +213,7 @@
     const kind = hourState(row);
     if (kind === "buffer") return "";
     const selected = kind === "selected";
-    const disabled = kind === "busy" || kind === "past";
+    const disabled = kind === "busy" || kind === "past" || kind === "mine";
     return (
       '<button type="button" class="hour-row is-' + kind + '"' +
       ' data-hour-start="' + row.start + '"' +
@@ -446,9 +448,11 @@
         today ? "is-today" : "",
         info.closed ? "is-closed" : "",
         info.free > 0 && !disabled ? "is-free" : "",
+        info.mine ? "is-mine" : "",
         disabled ? "is-disabled" : "",
       ].filter(Boolean).join(" ");
-      html += '<button type="button" class="' + classes + '" data-cal-day="' + value + '"' + (disabled ? " disabled" : "") + ">" + day + "</button>";
+      const label = info.mine ? day + ", tvoje rezervace" : String(day);
+      html += '<button type="button" class="' + classes + '" data-cal-day="' + value + '" aria-label="' + label + '"' + (disabled ? " disabled" : "") + ">" + day + "</button>";
     }
     calGrid.innerHTML = html;
   };

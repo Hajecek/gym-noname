@@ -72,7 +72,7 @@ $payload = [
                 <span>Po</span><span>Út</span><span>St</span><span>Čt</span><span>Pá</span><span>So</span><span>Ne</span>
             </div>
             <div class="cal-grid" data-cal-grid></div>
-            <p class="cal-legend muted">Zelená tečka = volný termín</p>
+            <p class="cal-legend muted"><i class="cal-key is-free"></i> Volný termín <i class="cal-key is-mine"></i> Tvoje rezervace</p>
             <button type="button" class="cal-modal-close" data-cal-close>Zavřít</button>
         </section>
     </div>

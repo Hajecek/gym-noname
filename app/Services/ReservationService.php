@@ -29,7 +29,7 @@ final class ReservationService
         return new self($db, $settings, new MembershipService($db), new MailService($db));
     }
 
-    public function availability(string $localDate, ?int $roomId = null): array
+    public function availability(string $localDate, ?int $roomId = null, ?int $userId = null): array
     {
         $room = $this->room($roomId);
         $slotMinutes = $this->slotMinutes();
@@ -95,14 +95,18 @@ final class ReservationService
                 continue;
             }
             $utcStart = Clock::toUtc($cursor);
+            $blockEndUtc = Clock::toUtc($blockEnd);
             $past = $utcStart <= Clock::nowUtc();
             $free = in_array($minMinutes, $availableFor, true);
-            $taken = $this->overlapsBody($occupied, $utcStart, Clock::toUtc($blockEnd));
-            if (!$free && !$past && !$taken) {
+            $taken = $this->overlapsBody($occupied, $utcStart, $blockEndUtc);
+            $mine = $userId !== null && $this->overlapsOwned($occupied, $utcStart, $blockEndUtc, $userId);
+            if (!$free && !$past && !$taken && !$mine) {
                 continue;
             }
             $kind = 'free';
-            if ($past) {
+            if ($mine) {
+                $kind = 'mine';
+            } elseif ($past) {
                 $kind = 'past';
             } elseif (!$free) {
                 $kind = 'busy';
@@ -112,7 +116,8 @@ final class ReservationService
                 'end' => $blockEnd->format('H:i'),
                 'start_at' => $utcStart->format('Y-m-d H:i:s'),
                 'past' => $past,
-                'available' => $free,
+                'available' => $free && !$mine,
+                'mine' => $mine,
                 'kind' => $kind,
                 'fits' => $fits,
                 'available_for' => $availableFor,
@@ -126,8 +131,8 @@ final class ReservationService
         ];
     }
 
-    /** @return list<array{date:string,closed:bool,free:int}> */
-    public function monthOverview(int $year, int $month, ?int $roomId = null): array
+    /** @return list<array{date:string,closed:bool,free:int,mine:bool}> */
+    public function monthOverview(int $year, int $month, ?int $roomId = null, ?int $userId = null): array
     {
         if ($month < 1 || $month > 12 || $year < 2020 || $year > 2100) {
             throw new HttpException(422, 'Neplatný měsíc.');
@@ -154,19 +159,19 @@ final class ReservationService
         ) as $row) {
             $exceptions[(string) $row['exception_date']] = $row;
         }
-        $occupied = $this->occupiedIntervals(
-            (int) $room['id'],
-            Clock::toUtc($start->modify('-6 hours'))->format('Y-m-d H:i:s'),
-            Clock::toUtc($end->modify('+6 hours'))->format('Y-m-d H:i:s')
-        );
+        $rangeFrom = Clock::toUtc($start->modify('-6 hours'))->format('Y-m-d H:i:s');
+        $rangeTo = Clock::toUtc($end->modify('+6 hours'))->format('Y-m-d H:i:s');
+        $occupied = $this->occupiedIntervals((int) $room['id'], $rangeFrom, $rangeTo);
+        $mineDates = $this->ownedDates((int) $room['id'], $rangeFrom, $rangeTo, $userId);
         $nowUtc = Clock::nowUtc();
         $days = [];
         for ($day = 1; $day <= $last; $day++) {
             $localDay = $start->setDate($year, $month, $day);
             $date = $localDay->format('Y-m-d');
+            $mine = isset($mineDates[$date]);
             $hours = $this->hoursFromMaps($weekHours, $exceptions[$date] ?? null, (int) $localDay->format('N'));
             if ($hours['closed']) {
-                $days[] = ['date' => $date, 'closed' => true, 'free' => 0];
+                $days[] = ['date' => $date, 'closed' => true, 'free' => 0, 'mine' => $mine];
                 continue;
             }
             $open = Clock::parseLocal($date . ' ' . $hours['opens_at']);
@@ -183,7 +188,7 @@ final class ReservationService
                     $free++;
                 }
             }
-            $days[] = ['date' => $date, 'closed' => false, 'free' => $free];
+            $days[] = ['date' => $date, 'closed' => false, 'free' => $free, 'mine' => $mine];
         }
         return $days;
     }
@@ -843,13 +848,49 @@ final class ReservationService
     private function occupiedIntervals(int $roomId, string $from, string $to): array
     {
         $reservations = $this->db->fetchAll(
-            "SELECT id, starts_at, ends_at, buffer_minutes
+            "SELECT id, user_id, starts_at, ends_at, buffer_minutes
              FROM reservations
              WHERE room_id = :rid AND status IN ('pending_payment', 'confirmed')
                AND starts_at < :to AND ends_at > :from",
             ['rid' => $roomId, 'from' => $from, 'to' => $to]
         );
         return $reservations;
+    }
+
+    /** @return array<string, true> */
+    private function ownedDates(int $roomId, string $from, string $to, ?int $userId): array
+    {
+        if ($userId === null || $userId <= 0) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT starts_at FROM reservations
+             WHERE room_id = :rid AND user_id = :uid
+               AND status IN ('pending_payment', 'confirmed')
+               AND starts_at < :to AND ends_at > :from",
+            ['rid' => $roomId, 'uid' => $userId, 'from' => $from, 'to' => $to]
+        );
+        $dates = [];
+        foreach ($rows as $row) {
+            $dates[Clock::toLocal((string) $row['starts_at'])->format('Y-m-d')] = true;
+        }
+        return $dates;
+    }
+
+    /** @param list<array<string, mixed>> $occupied */
+    private function overlapsOwned(array $occupied, \DateTimeImmutable $start, \DateTimeImmutable $end, int $userId): bool
+    {
+        foreach ($occupied as $item) {
+            if ((int) ($item['user_id'] ?? 0) !== $userId) {
+                continue;
+            }
+            $existingStart = new \DateTimeImmutable((string) $item['starts_at'], new \DateTimeZone('UTC'));
+            $existingEnd = new \DateTimeImmutable((string) $item['ends_at'], new \DateTimeZone('UTC'));
+            if ($start < $existingEnd && $end > $existingStart) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function overlaps(array $occupied, \DateTimeImmutable $start, \DateTimeImmutable $end, int $buffer): bool

@@ -35,7 +35,7 @@ final class ReservationController extends Controller
         }
         $this->view('user/reservations', [
             'title' => 'Rezervace',
-            'availability' => $service->availability($date, $roomId),
+            'availability' => $service->availability($date, $roomId, (int) $user['id']),
             'date' => $date,
             'today' => Clock::nowLocal()->format('Y-m-d'),
             'membership_covers' => $covers,
@@ -48,19 +48,19 @@ final class ReservationController extends Controller
 
     public function availability(Request $request): never
     {
-        $this->requireUser();
+        $user = $this->requireUser();
         $service = ReservationService::make($this->app->db());
         $date = (string) $request->query('date', Clock::nowLocal()->format('Y-m-d'));
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             $this->jsonError('Neplatné datum.', 422);
         }
         $room = $service->roomByPublicId((string) $request->query('room', ''));
-        $this->jsonOk($service->availability($date, $room ? (int) $room['id'] : null));
+        $this->jsonOk($service->availability($date, $room ? (int) $room['id'] : null, (int) $user['id']));
     }
 
     public function calendar(Request $request): never
     {
-        $this->requireUser();
+        $user = $this->requireUser();
         $service = ReservationService::make($this->app->db());
         $year = (int) $request->query('year', Clock::nowLocal()->format('Y'));
         $month = (int) $request->query('month', Clock::nowLocal()->format('n'));
@@ -68,7 +68,7 @@ final class ReservationController extends Controller
         $this->jsonOk([
             'year' => $year,
             'month' => $month,
-            'days' => $service->monthOverview($year, $month, $room ? (int) $room['id'] : null),
+            'days' => $service->monthOverview($year, $month, $room ? (int) $room['id'] : null, (int) $user['id']),
         ]);
     }
 
