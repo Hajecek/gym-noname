@@ -12,6 +12,7 @@ use App\Services\Access\AccessControlService;
 use App\Services\AppPushService;
 use App\Services\AuditService;
 use App\Services\Auth\AuthService;
+use App\Services\Billing\PaymentService;
 use App\Services\Content\ContentService;
 use App\Services\MembershipService;
 use App\Services\ReservationService;
@@ -30,7 +31,7 @@ final class AdminController extends Controller
         $now = Clock::utc();
 
         $todayReservations = $db->fetchAll(
-            "SELECT r.id, r.public_id, r.starts_at, r.ends_at, r.status, r.guest_count,
+            "SELECT r.id, r.public_id, r.starts_at, r.ends_at, r.buffer_minutes, r.status, r.guest_count,
                     u.first_name, u.last_name, u.username, u.public_id AS user_public_id,
                     rm.name AS room_name
              FROM reservations r
@@ -71,19 +72,31 @@ final class AdminController extends Controller
             'next' => $next,
             'today_list' => $todayReservations,
             'denied_list' => $recentDenied,
-            'revenue' => (string) $db->fetchColumn("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'paid' AND paid_at >= :a AND paid_at < :b", [
-                'a' => Clock::toUtc(Clock::nowLocal()->modify('-30 days')->setTime(0, 0))->format('Y-m-d H:i:s'),
-                'b' => Clock::toUtc(Clock::nowLocal()->setTime(0, 0)->modify('+1 day'))->format('Y-m-d H:i:s'),
-            ]),
-            'revenue_today' => (string) $db->fetchColumn("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'paid' AND paid_at >= :a AND paid_at < :b", ['a' => $todayStart, 'b' => $todayEnd]),
-            'revenue_yesterday' => (string) $db->fetchColumn("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'paid' AND paid_at >= :a AND paid_at < :b", [
-                'a' => Clock::toUtc(Clock::nowLocal()->modify('-1 day')->setTime(0, 0))->format('Y-m-d H:i:s'),
-                'b' => $todayStart,
-            ]),
-            'revenue_count_30' => (int) $db->fetchColumn("SELECT COUNT(*) FROM payments WHERE status = 'paid' AND paid_at >= :a AND paid_at < :b", [
-                'a' => Clock::toUtc(Clock::nowLocal()->modify('-30 days')->setTime(0, 0))->format('Y-m-d H:i:s'),
-                'b' => Clock::toUtc(Clock::nowLocal()->setTime(0, 0)->modify('+1 day'))->format('Y-m-d H:i:s'),
-            ]),
+            'revenue' => (string) $db->fetchColumn(
+                'SELECT COALESCE(SUM(amount),0) FROM payments WHERE ' . PaymentService::revenueSql() . ' AND paid_at >= :a AND paid_at < :b',
+                [
+                    'a' => Clock::toUtc(Clock::nowLocal()->modify('-30 days')->setTime(0, 0))->format('Y-m-d H:i:s'),
+                    'b' => Clock::toUtc(Clock::nowLocal()->setTime(0, 0)->modify('+1 day'))->format('Y-m-d H:i:s'),
+                ]
+            ),
+            'revenue_today' => (string) $db->fetchColumn(
+                'SELECT COALESCE(SUM(amount),0) FROM payments WHERE ' . PaymentService::revenueSql() . ' AND paid_at >= :a AND paid_at < :b',
+                ['a' => $todayStart, 'b' => $todayEnd]
+            ),
+            'revenue_yesterday' => (string) $db->fetchColumn(
+                'SELECT COALESCE(SUM(amount),0) FROM payments WHERE ' . PaymentService::revenueSql() . ' AND paid_at >= :a AND paid_at < :b',
+                [
+                    'a' => Clock::toUtc(Clock::nowLocal()->modify('-1 day')->setTime(0, 0))->format('Y-m-d H:i:s'),
+                    'b' => $todayStart,
+                ]
+            ),
+            'revenue_count_30' => (int) $db->fetchColumn(
+                'SELECT COUNT(*) FROM payments WHERE ' . PaymentService::revenueSql() . ' AND paid_at >= :a AND paid_at < :b',
+                [
+                    'a' => Clock::toUtc(Clock::nowLocal()->modify('-30 days')->setTime(0, 0))->format('Y-m-d H:i:s'),
+                    'b' => Clock::toUtc(Clock::nowLocal()->setTime(0, 0)->modify('+1 day'))->format('Y-m-d H:i:s'),
+                ]
+            ),
             'entries' => (int) $db->fetchColumn("SELECT COUNT(*) FROM access_logs WHERE authorization_result = 'granted' AND created_at >= :a", ['a' => $todayStart]),
             'failed_access' => (int) $db->fetchColumn("SELECT COUNT(*) FROM access_logs WHERE authorization_result = 'denied' AND created_at >= :a", ['a' => $todayStart]),
             'door' => AccessControlService::make($db)->doorStatus(),
@@ -504,7 +517,7 @@ final class AdminController extends Controller
              LEFT JOIN users u ON u.id = p.user_id
              LEFT JOIN reservations r ON r.id = p.reservation_id
              LEFT JOIN memberships m ON m.id = p.membership_id
-             WHERE p.status = 'paid'
+             WHERE " . PaymentService::revenueSql('p') . "
                AND p.paid_at >= :from
                AND p.paid_at < :to
              ORDER BY p.paid_at DESC
@@ -570,9 +583,9 @@ final class AdminController extends Controller
         }
 
         $rows = $this->app->db()->fetchAll(
-            "SELECT amount, paid_at, reservation_id, membership_id
+            'SELECT amount, paid_at, reservation_id, membership_id, provider
              FROM payments
-             WHERE status = 'paid' AND paid_at >= :a AND paid_at < :b",
+             WHERE ' . PaymentService::revenueSql() . ' AND paid_at >= :a AND paid_at < :b',
             [
                 'a' => Clock::toUtc($fromLocal)->format('Y-m-d H:i:s'),
                 'b' => Clock::toUtc($toExclusiveLocal)->format('Y-m-d H:i:s'),

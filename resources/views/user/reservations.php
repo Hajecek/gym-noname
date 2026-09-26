@@ -14,6 +14,7 @@ $payload = [
     'today' => $today,
     'availability' => $availability,
     'membership_covers' => !empty($membership_covers),
+    'entries_remaining' => $entries_remaining,
 ];
 ?>
 <div class="page-head">
@@ -108,6 +109,7 @@ $payload = [
         <input type="hidden" name="duration" value="<?= (int) $min ?>">
         <input type="hidden" name="guests" value="1">
         <input type="hidden" name="room" value="<?= e((string) ($room['public_id'] ?? '')) ?>">
+        <input type="hidden" name="pay" value="0">
     </form>
 </div>
 
@@ -130,6 +132,9 @@ $payload = [
             <strong data-guest-count>1</strong>
             <button type="button" data-guest-plus aria-label="Více osob">+</button>
         </div>
-        <button type="submit" class="btn btn-primary" data-confirm form="book-form">Zaplatit</button>
+        <div class="booker-actions">
+            <button type="submit" class="btn btn-secondary" data-pay form="book-form">Zaplatit</button>
+            <button type="submit" class="btn btn-primary" data-confirm form="book-form">Rezervovat</button>
+        </div>
     </div>
 </div>

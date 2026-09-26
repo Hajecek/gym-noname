@@ -140,4 +140,67 @@ final class PaymentService
             ['id' => $userId]
         );
     }
+
+    /** Darované / nepeněžní platby se do tržeb nepočítají. */
+    public static function countsAsRevenue(array $payment): bool
+    {
+        $amount = (float) ($payment['amount'] ?? 0);
+        if ($amount <= 0) {
+            return false;
+        }
+        $provider = strtolower((string) ($payment['provider'] ?? ''));
+        if (in_array($provider, ['admin', 'membership', 'comp', 'gift'], true)) {
+            return false;
+        }
+        return true;
+    }
+
+    /** SQL podmínka pro skutečné tržby (prefix sloupce např. "p."). */
+    public static function revenueSql(string $alias = ''): string
+    {
+        $col = $alias !== '' ? rtrim($alias, '.') . '.' : '';
+        return $col . "status = 'paid'
+            AND " . $col . "amount > 0
+            AND LOWER(" . $col . "provider) NOT IN ('admin', 'membership', 'comp', 'gift')
+            AND (
+                " . $col . "membership_id IS NULL
+                OR NOT EXISTS (
+                    SELECT 1 FROM membership_transactions mt
+                    WHERE mt.membership_id = " . $col . "membership_id
+                      AND mt.created_by IS NOT NULL
+                      AND mt.type IN ('purchase', 'admin_adjust')
+                )
+            )";
+    }
+
+    public function recordAdminGrant(int $userId, int $membershipId): array
+    {
+        $now = Clock::utc();
+        $id = (int) $this->db->insert('payments', [
+            'public_id' => Crypto::uuid(),
+            'user_id' => $userId,
+            'membership_id' => $membershipId,
+            'provider' => 'admin',
+            'provider_reference' => 'grant',
+            'amount' => '0.00',
+            'currency' => 'CZK',
+            'status' => 'paid',
+            'paid_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        return $this->db->fetch('SELECT * FROM payments WHERE id = :id', ['id' => $id]) ?? [];
+    }
+
+    public function cancelPendingMembershipPayments(int $userId): void
+    {
+        $this->db->query(
+            "UPDATE payments
+             SET status = 'cancelled', updated_at = :now
+             WHERE user_id = :uid
+               AND membership_id IS NOT NULL
+               AND status IN ('pending', 'authorized')",
+            ['uid' => $userId, 'now' => Clock::utc()]
+        );
+    }
 }

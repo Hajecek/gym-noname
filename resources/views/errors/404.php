@@ -1,1 +1,0 @@
-<section class="section"><div class="container card"><h1>Stránka nebyla nalezena</h1><p class="muted">Požadovaná stránka neexistuje.</p><a class="btn btn-primary" href="<?= e(url('/')) ?>">Zpět na úvod</a></div></section>

@@ -111,6 +111,9 @@ final class Application
                     $target = '/user' . substr($path, 4);
                     Response::redirect($this->url($target === '/user' ? '/user' : $target), $request->method() === 'GET' ? 301 : 307);
                 }
+                if ($request->method() === 'GET' && !$request->wantsJson()) {
+                    Response::redirect($this->url('/404'));
+                }
                 $this->abort(404);
             }
 
@@ -223,16 +226,23 @@ final class Application
             Response::error($message !== '' ? $message : $fallback, $status);
         }
 
-        $view = match ($status) {
-            403 => 'errors/403',
-            404 => 'errors/404',
-            default => 'errors/500',
+        $heading = match ($status) {
+            401 => 'Přihlášení',
+            403 => 'Přístup odepřen',
+            404 => 'Špatná adresa',
+            422 => 'Neplatný požadavek',
+            429 => 'Příliš mnoho požadavků',
+            503 => 'Nedostupné',
+            default => 'Chyba',
         };
-        Response::html(View::render($view, [
-            'title' => 'Chyba',
+        Response::html(View::render('errors/page', [
+            'title' => $heading . ' | PRIVOFIT',
+            'description' => $heading,
             'message' => $message,
             'status' => $status,
-            'page' => 'inner',
+            'debug' => (bool) $this->config('app.debug', false),
+            'page' => 'error',
+            'bodyClass' => 'standalone-error',
         ], 'layouts/brand'), $status);
     }
 
@@ -273,12 +283,14 @@ final class Application
         error_reporting(E_ALL);
         set_exception_handler(function (Throwable $e): void {
             Logger::error($e->getMessage(), ['file' => $e->getFile(), 'line' => $e->getLine()]);
-            if ($this->config('app.debug')) {
+            $debug = (bool) $this->config('app.debug', false);
+            try {
+                $this->abort(500, $debug ? $e->getMessage() : 'Došlo k neočekávané chybě.');
+            } catch (Throwable) {
                 http_response_code(500);
-                echo 'Chyba: ' . e($e->getMessage());
+                echo $debug ? ('Chyba: ' . e($e->getMessage())) : 'Došlo k neočekávané chybě.';
                 exit;
             }
-            $this->abort(500, 'Došlo k neočekávané chybě.');
         });
     }
 }

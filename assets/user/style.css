@@ -1551,7 +1551,13 @@ body.cal-open { overflow: hidden; }
   background: transparent;
 }
 .booker-guests strong { color: var(--fog); min-width: 1ch; text-align: center; }
-.booker-bar .btn { min-height: 44px; padding: 0 18px; flex-shrink: 0; }
+.booker-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.booker-bar .btn { min-height: 44px; padding: 0 18px; flex-shrink: 0; white-space: nowrap; }
 body.user-app:has(.booker-bar.is-on) .app-main { padding-bottom: 140px; }
 .res-filters {
   display: flex;
@@ -1736,7 +1742,10 @@ a.card:hover { color: inherit; border-color: #c6f21a88; }
   }
   .booker-bar-copy { flex: 1 1 calc(100% - 52px); }
   .booker-guests { margin-left: auto; }
+  .booker-actions { width: 100%; }
+  .booker-actions .btn,
   .booker-bar .btn { width: 100%; }
+  body.user-app:has(.booker-bar.is-on) .app-main { padding-bottom: 220px; }
   .res-card { grid-template-columns: 64px minmax(0, 1fr); }
   .res-actions { grid-column: 2; justify-content: flex-start; }
 }

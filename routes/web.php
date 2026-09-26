@@ -17,6 +17,9 @@ use App\Middleware\GuestMiddleware;
 $router = app()->router();
 
 $router->get('/', [PublicController::class, 'home']);
+$router->get('/404', static function (): never {
+    app()->abort(404);
+});
 $router->get('/cenik', [PublicController::class, 'pricing']);
 $router->get('/faq', [PublicController::class, 'faq']);
 $router->get('/kontakt', [PublicController::class, 'contact']);

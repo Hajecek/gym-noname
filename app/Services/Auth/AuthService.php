@@ -1041,15 +1041,17 @@ final class AuthService
             $this->db->query(
                 "UPDATE reservations
                  SET status = 'cancelled',
-                     cancelled_at = :now,
+                     cancelled_at = :cancelled_at,
                      cancellation_reason = :reason,
-                     updated_at = :now
+                     updated_at = :updated_at
                  WHERE user_id = :uid
                    AND status IN ('pending_payment', 'confirmed')
-                   AND starts_at > :now",
+                   AND starts_at > :starts_after",
                 [
                     'uid' => $id,
-                    'now' => $now,
+                    'cancelled_at' => $now,
+                    'updated_at' => $now,
+                    'starts_after' => $now,
                     'reason' => 'Účet byl smazán.',
                 ]
             );

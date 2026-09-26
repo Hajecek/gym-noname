@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Core\Crypto;
 use App\Core\Database;
 use App\Core\HttpException;
+use App\Services\Billing\PaymentService;
 use App\Support\Clock;
 
 final class MembershipService
@@ -40,15 +41,16 @@ final class MembershipService
         );
     }
 
-    public function coversBooking(?array $membership): bool
+    public function coversBooking(?array $membership, int $needed = 1): bool
     {
         if (!$membership || ($membership['status'] ?? '') !== 'active') {
             return false;
         }
+        $needed = max(1, $needed);
         if ($membership['entries_remaining'] === null) {
             return in_array((string) ($membership['plan_type'] ?? ''), ['monthly', 'lifetime'], true);
         }
-        return (int) $membership['entries_remaining'] > 0;
+        return (int) $membership['entries_remaining'] >= $needed;
     }
 
     public function beginPurchase(int $userId, string $planPublicId): array
@@ -177,24 +179,26 @@ final class MembershipService
         );
     }
 
-    public function restoreEntry(int $membershipId, ?int $actorId = null): void
+    public function restoreEntry(int $membershipId, ?int $actorId = null, int $count = 1): int
     {
+        $count = max(1, $count);
         $membership = $this->db->fetch('SELECT * FROM memberships WHERE id = :id FOR UPDATE', ['id' => $membershipId]);
         if (!$membership || $membership['status'] !== 'active' || $membership['entries_remaining'] === null) {
-            return;
+            return 0;
         }
         $this->db->update('memberships', [
-            'entries_remaining' => (int) $membership['entries_remaining'] + 1,
+            'entries_remaining' => (int) $membership['entries_remaining'] + $count,
             'updated_at' => Clock::utc(),
         ], 'id = :id', ['id' => $membershipId]);
         $this->db->insert('membership_transactions', [
             'membership_id' => $membershipId,
             'type' => 'refund',
-            'entries_delta' => 1,
-            'note' => 'Vrácení vstupu po zrušení rezervace',
+            'entries_delta' => $count,
+            'note' => $count === 1 ? 'Vrácení vstupu po zrušení rezervace' : 'Vrácení vstupů po zrušení rezervace',
             'created_by' => $actorId,
             'created_at' => Clock::utc(),
         ]);
+        return $count;
     }
 
     public function remainingEntries(int $userId): ?int
@@ -215,6 +219,8 @@ final class MembershipService
         if (!$plan) {
             throw new HttpException(404, 'Tarif nebyl nalezen.');
         }
+        $payments = new PaymentService($this->db);
+        $payments->cancelPendingMembershipPayments($userId);
         $this->db->update(
             'memberships',
             ['status' => 'cancelled', 'updated_at' => Clock::utc()],
@@ -235,34 +241,43 @@ final class MembershipService
             'created_at' => Clock::utc(),
             'updated_at' => Clock::utc(),
         ]);
+        $gifted = $actorId !== null;
         $this->db->insert('membership_transactions', [
             'membership_id' => $id,
-            'type' => 'purchase',
+            'type' => $gifted ? 'admin_adjust' : 'purchase',
             'entries_delta' => (int) ($plan['entries'] ?? 0),
-            'note' => 'Aktivace tarifu ' . $plan['name'],
+            'note' => $gifted
+                ? ('Darováno administrátorem: ' . $plan['name'])
+                : ('Aktivace tarifu ' . $plan['name']),
             'created_by' => $actorId,
             'created_at' => Clock::utc(),
         ]);
+        if ($gifted) {
+            // 0 Kč — darované členství se do tržeb nepočítá
+            $payments->recordAdminGrant($userId, $id);
+        }
         return $this->db->fetch('SELECT * FROM memberships WHERE id = :id', ['id' => $id]) ?? [];
     }
 
-    public function consumeEntry(int $membershipId, ?int $actorId = null): void
+    public function consumeEntry(int $membershipId, ?int $actorId = null, int $count = 1): void
     {
+        $count = max(1, $count);
         $membership = $this->db->fetch('SELECT * FROM memberships WHERE id = :id FOR UPDATE', ['id' => $membershipId]);
         if (!$membership || $membership['status'] !== 'active') {
             throw new HttpException(400, 'Členství není aktivní.');
         }
         if ($membership['entries_remaining'] !== null) {
-            if ((int) $membership['entries_remaining'] < 1) {
-                throw new HttpException(400, 'Nemáte zbývající vstupy.');
+            if ((int) $membership['entries_remaining'] < $count) {
+                throw new HttpException(400, 'Na tenhle termín nemáš dost vstupů.');
             }
             $this->db->update('memberships', [
-                'entries_remaining' => (int) $membership['entries_remaining'] - 1,
+                'entries_remaining' => (int) $membership['entries_remaining'] - $count,
             ], 'id = :id', ['id' => $membershipId]);
             $this->db->insert('membership_transactions', [
                 'membership_id' => $membershipId,
                 'type' => 'entry_use',
-                'entries_delta' => -1,
+                'entries_delta' => -$count,
+                'note' => $count === 1 ? 'Odečet vstupu za rezervaci' : 'Odečet vstupů za rezervaci',
                 'created_by' => $actorId,
                 'created_at' => Clock::utc(),
             ]);

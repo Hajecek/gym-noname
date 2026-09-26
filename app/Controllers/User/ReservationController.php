@@ -29,12 +29,17 @@ final class ReservationController extends Controller
         $memberships = new MembershipService($this->app->db());
         $membership = $memberships->activeForUser((int) $user['id']);
         $covers = $memberships->coversBooking($membership);
+        $entriesRemaining = 0;
+        if ($membership) {
+            $entriesRemaining = $membership['entries_remaining'] === null ? null : (int) $membership['entries_remaining'];
+        }
         $this->view('user/reservations', [
             'title' => 'Rezervace',
             'availability' => $service->availability($date, $roomId),
             'date' => $date,
             'today' => Clock::nowLocal()->format('Y-m-d'),
             'membership_covers' => $covers,
+            'entries_remaining' => $entriesRemaining,
             'rooms' => $rooms,
             'room' => $room,
             'pageScripts' => ['js/reservations.js'],
@@ -76,17 +81,22 @@ final class ReservationController extends Controller
         $room = $service->roomByPublicId((string) $request->input('room', ''));
         $roomQuery = $room ? '&room=' . rawurlencode((string) $room['public_id']) : '';
         $back = '/user/rezervace' . ($date !== '' ? '?date=' . rawurlencode($date) . $roomQuery : '');
+        $duration = (int) $request->input('duration', 60);
+        $pay = in_array((string) $request->input('pay', '0'), ['1', 'true', 'pay'], true);
+        $membership = (new MembershipService($this->app->db()))->activeForUser((int) $user['id']);
+        $unlimited = $membership && $membership['entries_remaining'] === null;
         try {
             $reservation = $service->create(
                 $user,
                 $start,
-                (int) $request->input('duration', 60),
+                $duration,
                 (int) $request->input('guests', 1),
-                $room ? (int) $room['id'] : null
+                $room ? (int) $room['id'] : null,
+                $pay
             );
             if (($reservation['status'] ?? '') === 'confirmed' || (float) ($reservation['price'] ?? 0) <= 0) {
                 $this->flashSuccess(!empty($reservation['membership_id'])
-                    ? 'Rezervace je potvrzená. Vstup se odečetl z členství.'
+                    ? $this->membershipBookedMessage(max(1, intdiv($duration, 60)), $unlimited)
                     : 'Rezervace je potvrzená.');
                 if ($request->wantsJson()) {
                     $this->jsonOk(['redirect' => $this->app->url($back)]);
@@ -144,6 +154,7 @@ final class ReservationController extends Controller
                 'refunded' => 'Rezervace byla zrušena. Peníze se vrací.',
                 'late' => 'Rezervace byla zrušena. Na vrácení peněz už není nárok.',
                 'entry' => 'Rezervace byla zrušena. Vstup se vrátil do členství.',
+                'entries' => 'Rezervace byla zrušena. Vstupy se vrátily do členství.',
                 default => 'Rezervace byla zrušena.',
             });
         } catch (HttpException $e) {
@@ -238,5 +249,19 @@ final class ReservationController extends Controller
             ],
             'sections' => $sections,
         ]);
+    }
+
+    private function membershipBookedMessage(int $blocks, bool $unlimited): string
+    {
+        if ($unlimited) {
+            return 'Rezervace je potvrzená. Platí tvoje členství.';
+        }
+        if ($blocks === 1) {
+            return 'Rezervace je potvrzená. Odečetl se 1 vstup z členství.';
+        }
+        if ($blocks <= 4) {
+            return 'Rezervace je potvrzená. Odečetly se ' . $blocks . ' vstupy z členství.';
+        }
+        return 'Rezervace je potvrzená. Odečetlo se ' . $blocks . ' vstupů z členství.';
     }
 }

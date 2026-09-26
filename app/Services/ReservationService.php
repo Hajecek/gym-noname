@@ -254,8 +254,13 @@ final class ReservationService
         }
 
         $price = $this->priceForDuration($durationMinutes, $this->hourlyFromHours($hours), $guestCount);
+        $blocks = max(1, intdiv($durationMinutes, $durationStep));
         $membership = $this->memberships->activeForUser((int) $user['id']);
-        $useMembership = !$paidCheckout && $this->memberships->coversBooking($membership);
+        $canCover = $this->memberships->coversBooking($membership, $blocks);
+        if (!$paidCheckout && !$canCover && $this->memberships->coversBooking($membership, 1)) {
+            throw new HttpException(422, 'Na ' . $this->blocksPhrase($blocks) . ' nemáš dost vstupů. Můžeš termín zaplatit.');
+        }
+        $useMembership = !$paidCheckout && $canCover;
 
         $this->expireHolds();
         $this->ensureOccupancyTable();
@@ -266,7 +271,7 @@ final class ReservationService
         }
 
         try {
-            $reservation = $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $startLocal, $open, $buffer, $durationStep, $guestCount, $price, $membership, $useMembership, $ignoreReservationIds) {
+            $reservation = $this->db->transaction(function (Database $db) use ($room, $user, $startUtc, $endUtc, $startLocal, $open, $buffer, $durationStep, $guestCount, $price, $membership, $useMembership, $ignoreReservationIds, $blocks) {
                 $db->query('SELECT id FROM rooms WHERE id = :id FOR UPDATE', ['id' => (int) $room['id']]);
                 $db->query(
                     "SELECT id FROM reservations
@@ -293,7 +298,7 @@ final class ReservationService
                 $status = $useMembership ? 'confirmed' : 'pending_payment';
                 $membershipId = $useMembership ? (int) $membership['id'] : null;
                 if ($useMembership && $membership['entries_remaining'] !== null) {
-                    $this->memberships->consumeEntry((int) $membership['id'], (int) $user['id']);
+                    $this->memberships->consumeEntry((int) $membership['id'], (int) $user['id'], $blocks);
                 }
 
                 $id = (int) $db->insert('reservations', [
@@ -381,9 +386,14 @@ final class ReservationService
             'updated_at' => Clock::utc(),
         ], 'id = :id', ['id' => (int) $reservation['id']]);
         $this->releaseOccupancy((int) $reservation['id']);
+        $restored = 0;
         if (!empty($reservation['membership_id']) && (float) ($reservation['price'] ?? 0) <= 0) {
             try {
-                $this->memberships->restoreEntry((int) $reservation['membership_id'], (int) $user['id']);
+                $restored = $this->memberships->restoreEntry(
+                    (int) $reservation['membership_id'],
+                    (int) $user['id'],
+                    $this->entryBlocksFromReservation($reservation)
+                );
             } catch (\Throwable) {
             }
         }
@@ -408,6 +418,12 @@ final class ReservationService
             // zrušení platí i bez e-mailu
         }
         $this->touchLive();
+        if ($money === 'entry' && $restored > 1) {
+            return 'entries';
+        }
+        if ($money === 'entry' && $restored === 0) {
+            return 'unpaid';
+        }
         return $money;
     }
 
@@ -1236,6 +1252,31 @@ final class ReservationService
     private function durationStep(): int
     {
         return 60;
+    }
+
+    private function blocksPhrase(int $blocks): string
+    {
+        if ($blocks === 1) {
+            return '1 blok';
+        }
+        if ($blocks >= 2 && $blocks <= 4) {
+            return $blocks . ' bloky';
+        }
+        return $blocks . ' bloků';
+    }
+
+    /** Kolik vstupů rezervace sebrala: jeden blok = jeden vstup. */
+    private function entryBlocksFromReservation(array $reservation): int
+    {
+        $start = new \DateTimeImmutable((string) $reservation['starts_at'], new \DateTimeZone('UTC'));
+        $end = new \DateTimeImmutable((string) $reservation['ends_at'], new \DateTimeZone('UTC'));
+        $train = (int) round(($end->getTimestamp() - $start->getTimestamp()) / 60);
+        $buffer = (int) ($reservation['buffer_minutes'] ?? $this->bufferMinutes());
+        $block = $this->durationStep() + max(0, $buffer);
+        if ($block < 1) {
+            return 1;
+        }
+        return max(1, (int) round(($train + max(0, $buffer)) / $block));
     }
 
     /** Kolik celých bloků (1 h + úklid) rezervace zabere. Dva a tři bloky se nesčítají do jednoho úklidu. */

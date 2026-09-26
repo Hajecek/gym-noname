@@ -14,6 +14,12 @@ $testMode = !empty($door['test_mode']);
 $nowLocal = \App\Support\Clock::nowLocal();
 $chartJson = json_encode($chart, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP) ?: '{}';
 $breakdown = is_array($chart['breakdown'] ?? null) ? $chart['breakdown'] : [];
+$dayNames = [1 => 'pondělí', 2 => 'úterý', 3 => 'středa', 4 => 'čtvrtek', 5 => 'pátek', 6 => 'sobota', 7 => 'neděle'];
+$todayLabel = ($dayNames[(int) $nowLocal->format('N')] ?? '') . ' ' . $nowLocal->format('j. n. Y');
+
+$blockEnd = static function (string $endsAt, mixed $buffer): \DateTimeImmutable {
+    return \App\Support\Clock::toLocal($endsAt)->modify('+' . max(0, (int) $buffer) . ' minutes');
+};
 
 $guestName = '';
 $slotLabel = '';
@@ -21,8 +27,9 @@ if ($reservation) {
     $guestName = trim((string) (($reservation['first_name'] ?? '') . ' ' . ($reservation['last_name'] ?? '')));
     if (!empty($reservation['starts_at']) && !empty($reservation['ends_at'])) {
         $start = \App\Support\Clock::toLocal((string) $reservation['starts_at']);
-        $end = \App\Support\Clock::toLocal((string) $reservation['ends_at']);
-        $slotLabel = $start->format('H:i') . '–' . $end->format('H:i');
+        $end = $blockEnd((string) $reservation['ends_at'], $reservation['buffer_minutes'] ?? 15);
+        $endClock = $end->format('Y-m-d') === $start->format('Y-m-d') ? $end->format('H:i') : $end->format('j. n. H:i');
+        $slotLabel = $start->format('H:i') . '–' . $endClock;
     }
 }
 
@@ -30,7 +37,10 @@ $nextLabel = '';
 if ($next && !empty($next['starts_at'])) {
     $ns = \App\Support\Clock::toLocal((string) $next['starts_at']);
     $nextName = trim((string) (($next['first_name'] ?? '') . ' ' . ($next['last_name'] ?? '')));
-    $nextLabel = $ns->format('H:i') . ($nextName !== '' ? ' · ' . $nextName : '');
+    $nextWhen = $ns->format('Y-m-d') === $nowLocal->format('Y-m-d')
+        ? $ns->format('H:i')
+        : ($dayNames[(int) $ns->format('N')] ?? '') . ' ' . $ns->format('j. n.') . ' ' . $ns->format('H:i');
+    $nextLabel = $nextWhen . ($nextName !== '' ? ' · ' . $nextName : '');
 }
 
 $statusText = $occupied ? 'Obsazeno' : 'Volno';
@@ -41,7 +51,7 @@ $statusClass = $occupied ? 'is-busy' : 'is-free';
         <div class="adash-hero-copy">
             <p class="eyebrow">SPRÁVA</p>
             <h1>Přehled</h1>
-            <p class="muted"><?= e($nowLocal->format('l j. n. Y')) ?> · <?= e($nowLocal->format('H:i')) ?></p>
+            <p class="muted"><?= e($todayLabel) ?> · <?= e($nowLocal->format('H:i')) ?></p>
         </div>
         <div class="adash-live <?= e($statusClass) ?>">
             <span class="adash-live-pulse" aria-hidden="true"></span>
@@ -152,7 +162,8 @@ $statusClass = $occupied ? 'is-busy' : 'is-free';
                     <?php foreach ($todayList as $row): ?>
                         <?php
                         $rs = \App\Support\Clock::toLocal((string) $row['starts_at']);
-                        $re = \App\Support\Clock::toLocal((string) $row['ends_at']);
+                        $re = $blockEnd((string) $row['ends_at'], $row['buffer_minutes'] ?? 15);
+                        $endClock = $re->format('Y-m-d') === $rs->format('Y-m-d') ? $re->format('H:i') : $re->format('j. n. H:i');
                         $name = trim((string) (($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')));
                         if ($name === '') {
                             $name = (string) ($row['username'] ?? 'Zákazník');
@@ -162,7 +173,7 @@ $statusClass = $occupied ? 'is-busy' : 'is-free';
                         $pending = ($row['status'] ?? '') === 'pending_payment';
                         ?>
                         <li class="adash-tl<?= $isLive ? ' is-live' : ($isPast ? ' is-past' : '') ?>">
-                            <time><?= e($rs->format('H:i')) ?><span>–<?= e($re->format('H:i')) ?></span></time>
+                            <time><?= e($rs->format('H:i')) ?><span>–<?= e($endClock) ?></span></time>
                             <div>
                                 <?php if (!empty($row['user_public_id'])): ?>
                                     <a href="<?= e(url('/user/sprava/zakaznici/' . $row['user_public_id'])) ?>"><?= e($name) ?></a>

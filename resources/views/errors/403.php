@@ -1,1 +1,0 @@
-<section class="section"><div class="container card"><h1>Přístup odepřen</h1><p class="muted"><?= e($message ?: 'K této sekci nemáte oprávnění.') ?></p><a class="btn btn-primary" href="<?= e(url('/user')) ?>">Zpět</a></div></section>

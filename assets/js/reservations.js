@@ -24,6 +24,8 @@
   const barTime = bar?.querySelector("[data-bar-time]");
   const barMeta = bar?.querySelector("[data-bar-meta]");
   const confirmBtn = bar?.querySelector("[data-confirm]");
+  const payBtn = bar?.querySelector("[data-pay]");
+  const payInput = form?.querySelector('[name="pay"]');
   const guestCountEl = bar?.querySelector("[data-guest-count]");
   const calendar = root.querySelector("[data-calendar]");
   const calModal = root.querySelector("[data-cal-modal]");
@@ -89,6 +91,19 @@
   };
 
   const membershipCovers = !!payload.membership_covers;
+  const unlimitedMembership = membershipCovers && payload.entries_remaining === null;
+  const entriesLeft = unlimitedMembership ? Number.POSITIVE_INFINITY : Number(payload.entries_remaining || 0);
+  const canCover = (count) => membershipCovers && entriesLeft >= count;
+  const deductPhrase = (count) => {
+    if (count === 1) return "odečte se 1 vstup";
+    if (count >= 2 && count <= 4) return "odečtou se " + count + " vstupy";
+    return "odečte se " + count + " vstupů";
+  };
+  const remainPhrase = (count) => {
+    if (count === 1) return "zbývá 1 vstup";
+    if (count >= 2 && count <= 4) return "zbývají " + count + " vstupy";
+    return "zbývá " + count + " vstupů";
+  };
   const availableFor = (slot) => (slot.available_for || []).map((item) => Number(item));
   const bookableRows = () => (state.availability.slots || []).filter((slot) => slot.kind !== "buffer");
   const blockMinutes = () => step() + buffer();
@@ -168,7 +183,9 @@
     if (startInput) startInput.value = first ? state.date + " " + first.start : "";
     if (durationInput) durationInput.value = String(duration || minMinutes());
     if (guestsInput) guestsInput.value = String(state.guests);
-    if (confirmBtn) confirmBtn.disabled = !first;
+    const ready = !!first;
+    if (confirmBtn) confirmBtn.disabled = !ready;
+    if (payBtn) payBtn.disabled = !ready;
   };
 
   const hourState = (row) => {
@@ -283,14 +300,30 @@
     const end = occupyEnd();
     const count = state.hours;
     const price = rate() * count;
+    const covered = canCover(count);
     if (barTime) barTime.textContent = first.start + "–" + end;
     if (barMeta) {
-      barMeta.textContent = membershipCovers
-        ? blocksWord(count) + " · odečte se 1 vstup"
-        : blocksWord(count) + " · " + money(price);
+      if (covered && unlimitedMembership) {
+        barMeta.textContent = blocksWord(count) + " · neomezené členství, nebo " + money(price);
+      } else if (covered) {
+        barMeta.textContent = blocksWord(count) + " · " + deductPhrase(count) + ", nebo " + money(price);
+      } else if (membershipCovers) {
+        barMeta.textContent = blocksWord(count) + " · " + money(price) + " · na členství " + remainPhrase(entriesLeft);
+      } else {
+        barMeta.textContent = blocksWord(count) + " · " + money(price);
+      }
     }
     if (guestCountEl) guestCountEl.textContent = String(state.guests);
-    if (confirmBtn) confirmBtn.textContent = membershipCovers ? "Rezervovat" : "Zaplatit " + money(price);
+    if (confirmBtn) {
+      confirmBtn.hidden = !covered;
+      confirmBtn.textContent = "Rezervovat";
+    }
+    if (payBtn) {
+      payBtn.hidden = false;
+      payBtn.textContent = "Zaplatit " + money(price);
+      payBtn.classList.toggle("btn-primary", !covered);
+      payBtn.classList.toggle("btn-secondary", covered);
+    }
     bar.querySelectorAll("[data-hours]").forEach((btn) => {
       const value = parseInt(btn.getAttribute("data-hours") || "1", 10);
       const allowed = availableFor(first).includes(value * step());
@@ -486,7 +519,10 @@
       return;
     }
     event.preventDefault();
+    const paying = event.submitter ? event.submitter.hasAttribute("data-pay") : !canCover(state.hours);
+    if (payInput) payInput.value = paying ? "1" : "0";
     if (confirmBtn) confirmBtn.disabled = true;
+    if (payBtn) payBtn.disabled = true;
     try {
       const response = await fetch(form.action, {
         method: "POST",
@@ -518,7 +554,7 @@
       throw new Error(body.message || "Rezervaci se nepodařilo dokončit.");
     } catch (error) {
       if (barMeta) barMeta.textContent = error.message || "Rezervaci se nepodařilo dokončit.";
-      if (confirmBtn) confirmBtn.disabled = false;
+      updateForm();
     }
   });
 
