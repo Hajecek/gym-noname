@@ -225,14 +225,14 @@ final class MobileApiService
         return $this->reservations->gymsForApp();
     }
 
-    public function slots(string $gymId = ''): array
+    public function slots(array $user, string $gymId = ''): array
     {
-        return $this->reservations->availableSlotsForApp(14, $gymId);
+        return $this->reservations->availableSlotsForApp(14, $gymId, (int) $user['id']);
     }
 
-    public function quote(array $user, array $slotIds): array
+    public function quote(array $user, array $slotIds, int $guests = 1): array
     {
-        $resolved = $this->reservations->resolveSlotIds($slotIds);
+        $resolved = $this->pricedSlots($this->reservations->resolveSlotIds($slotIds), $guests);
         $sum = 0.0;
         foreach ($resolved as $slot) {
             $sum += (float) ($slot['price'] ?? 0);
@@ -250,20 +250,26 @@ final class MobileApiService
             $sum = 0.0;
         }
         $count = max(1, count($resolved));
+        $maxPersons = 1;
+        foreach ($resolved as $slot) {
+            $maxPersons = max($maxPersons, (int) ($slot['maxPersons'] ?? 1));
+        }
         return [
             'slots' => $resolved,
             'pricePerSlot' => number_format($sum / $count, 2, '.', ''),
             'total' => number_format($sum, 2, '.', ''),
             'currencyCode' => 'CZK',
+            'guests' => $this->clampGuests($guests, $maxPersons),
+            'maxPersons' => $maxPersons,
         ];
     }
 
-    public function reserve(array $user, string $slotId, string $requestId): array
+    public function reserve(array $user, string $slotId, string $requestId, int $guests = 1): array
     {
         if ($cached = $this->idempotent($user, $requestId)) {
             return $cached;
         }
-        $reservation = $this->reservations->createFromSlotId($user, $slotId, false);
+        $reservation = $this->reservations->createFromSlotId($user, $slotId, false, [], $guests);
         $payload = $this->reservationPayload($reservation, $user);
         $this->storeIdempotent($user, $requestId, 'reservations', $payload);
         return $payload;
@@ -280,7 +286,7 @@ final class MobileApiService
         return $payload;
     }
 
-    public function payAndReserve(array $user, array $slotIds, string $requestId, array $applePay): array
+    public function payAndReserve(array $user, array $slotIds, string $requestId, array $applePay, int $guests = 1): array
     {
         $this->ensureCheckoutSchema();
         if ($cached = $this->idempotent($user, $requestId)) {
@@ -293,16 +299,30 @@ final class MobileApiService
             return $payload;
         }
 
-        $quote = $this->quote($user, $slotIds);
+        $quote = $this->quote($user, $slotIds, $guests);
         $count = count($quote['slots']);
         $unit = (float) $quote['pricePerSlot'];
         $total = (string) ($quote['total'] ?? number_format($unit * $count, 2, '.', ''));
+        $bookedGuests = (int) ($quote['guests'] ?? 1);
         $holds = [];
         try {
             $this->reservations->releasePendingForSlots($user, $slotIds);
-            $holds = $this->reservations->createFromSlotIds($user, $slotIds, true);
+            $holds = $this->reservations->createFromSlotIds($user, $slotIds, true, [], $bookedGuests);
 
             $settlement = $this->settleCheckout($user, $unit, $count, $total, $requestId, $applePay, $holds);
+            if ($settlement['provider'] === 'membership') {
+                $membership = $this->memberships->activeForUser((int) $user['id']);
+                $membershipId = $membership ? (int) $membership['id'] : null;
+                foreach ($holds as $i => $hold) {
+                    $this->db->update('reservations', [
+                        'price' => '0.00',
+                        'membership_id' => $membershipId,
+                        'updated_at' => Clock::utc(),
+                    ], 'id = :id', ['id' => (int) $hold['id']]);
+                    $holds[$i]['price'] = '0.00';
+                    $holds[$i]['membership_id'] = $membershipId;
+                }
+            }
             $confirmed = [];
             foreach ($holds as $hold) {
                 $confirmed[] = $this->reservations->confirmPending($hold, $user);
@@ -551,9 +571,10 @@ final class MobileApiService
 
     private function reservationPayload(array $row, array $user): array
     {
-        if (empty($row['room_name'])) {
-            $room = $this->db->fetch('SELECT name FROM rooms WHERE id = :id', ['id' => (int) $row['room_id']]);
-            $row['room_name'] = $room['name'] ?? 'Studio';
+        if (empty($row['room_name']) || empty($row['room_public_id'])) {
+            $room = $this->db->fetch('SELECT name, public_id FROM rooms WHERE id = :id', ['id' => (int) $row['room_id']]);
+            $row['room_name'] = $row['room_name'] ?? ($room['name'] ?? 'Studio');
+            $row['room_public_id'] = $row['room_public_id'] ?? ($room['public_id'] ?? '');
         }
         $starts = new \DateTimeImmutable($row['starts_at'], new \DateTimeZone('UTC'));
         $canCancel = in_array($row['status'], ['confirmed', 'pending_payment'], true)
@@ -565,9 +586,36 @@ final class MobileApiService
             'room' => (string) $row['room_name'],
             'canCancel' => $canCancel,
             'bufferMinutes' => (int) ($row['buffer_minutes'] ?? 15),
+            'guestCount' => max(1, (int) ($row['guest_count'] ?? 1)),
             'price' => number_format((float) ($row['price'] ?? 0), 2, '.', ''),
             'currencyCode' => (string) ($row['currency'] ?? 'CZK'),
+            'gymID' => (string) ($row['room_public_id'] ?? ''),
         ];
+    }
+
+    /** @param list<array<string, mixed>> $slots @return list<array<string, mixed>> */
+    private function pricedSlots(array $slots, int $guests): array
+    {
+        $maxPersons = 1;
+        foreach ($slots as $slot) {
+            $maxPersons = max($maxPersons, (int) ($slot['maxPersons'] ?? 1));
+        }
+        $guests = $this->clampGuests($guests, $maxPersons);
+        return array_map(static function (array $slot) use ($guests): array {
+            $one = (float) ($slot['price'] ?? 0);
+            $two = (float) ($slot['priceTwo'] ?? $one);
+            $slot['price'] = number_format($guests >= 2 ? $two : $one, 2, '.', '');
+            return $slot;
+        }, $slots);
+    }
+
+    private function clampGuests(int $guests, int $maxPersons): int
+    {
+        $maxPersons = max(1, $maxPersons);
+        if ($guests < 1 || $guests > $maxPersons) {
+            throw new HttpException(422, 'Neplatný počet osob.');
+        }
+        return $guests;
     }
 
     private function doorReceipt(array $row): array

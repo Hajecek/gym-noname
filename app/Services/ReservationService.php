@@ -990,13 +990,13 @@ final class ReservationService
         return $sqlState === '23000' || $driver === 1062;
     }
 
-    public function slotPrice(?\DateTimeImmutable $localStart = null): string
+    public function slotPrice(?\DateTimeImmutable $localStart = null, int $guestCount = 1): string
     {
         $hourly = null;
         if ($localStart !== null) {
             $hourly = $this->hourlyFromHours($this->hoursForDate($this->room(), $localStart));
         }
-        return $this->priceForDuration($this->settings->int('reservation.min_minutes', 60), $hourly);
+        return $this->priceForDuration($this->settings->int('reservation.min_minutes', 60), $hourly, $guestCount);
     }
 
     /** @return list<array{id:string,name:string,address:string,latitude:float,longitude:float}> */
@@ -1023,7 +1023,7 @@ final class ReservationService
     }
 
     /** @return list<array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,currencyCode:string,gymID:string}> */
-    public function availableSlotsForApp(int $days = 14, string $gymPublicId = ''): array
+    public function availableSlotsForApp(int $days = 14, string $gymPublicId = '', ?int $userId = null): array
     {
         if ($gymPublicId !== '') {
             $room = $this->roomByPublicId($gymPublicId);
@@ -1041,16 +1041,22 @@ final class ReservationService
         $day = Clock::nowLocal()->setTime(0, 0);
         for ($i = 0; $i < $days; $i++) {
             $date = $day->modify('+' . $i . ' days')->format('Y-m-d');
-            $availability = $this->availability($date, (int) $room['id']);
+            $availability = $this->availability($date, (int) $room['id'], $userId);
             if (!empty($availability['closed'])) {
                 continue;
             }
             foreach ($availability['slots'] as $slot) {
-                if (empty($slot['available']) || ($slot['kind'] ?? '') === 'buffer') {
+                $mine = !empty($slot['mine']);
+                if (($slot['kind'] ?? '') === 'buffer' || ($slot['kind'] ?? '') === 'past') {
+                    continue;
+                }
+                if (empty($slot['available']) && !$mine) {
                     continue;
                 }
                 $start = new \DateTimeImmutable((string) $slot['start_at'], new \DateTimeZone('UTC'));
-                $out[] = $this->slotAppPayload($room['public_id'] . '_' . $start->format('YmdHis'), $start, (string) $room['name'], (string) $room['public_id']);
+                $payload = $this->slotAppPayload($room['public_id'] . '_' . $start->format('YmdHis'), $start, (string) $room['name'], (string) $room['public_id'], $room);
+                $payload['mine'] = $mine;
+                $out[] = $payload;
             }
         }
         return $out;
@@ -1069,9 +1075,9 @@ final class ReservationService
         return $resolved;
     }
 
-    public function createFromSlotId(array $user, string $slotId, bool $paidCheckout, array $ignoreReservationIds = []): array
+    public function createFromSlotId(array $user, string $slotId, bool $paidCheckout, array $ignoreReservationIds = [], int $guestCount = 1): array
     {
-        $created = $this->createFromSlotIds($user, [$slotId], $paidCheckout, $ignoreReservationIds);
+        $created = $this->createFromSlotIds($user, [$slotId], $paidCheckout, $ignoreReservationIds, $guestCount);
         return $created[0];
     }
 
@@ -1080,7 +1086,7 @@ final class ReservationService
      * @param list<int> $ignoreReservationIds
      * @return list<array<string, mixed>>
      */
-    public function createFromSlotIds(array $user, array $slotIds, bool $paidCheckout, array $ignoreReservationIds = []): array
+    public function createFromSlotIds(array $user, array $slotIds, bool $paidCheckout, array $ignoreReservationIds = [], int $guestCount = 1): array
     {
         $groups = $this->groupConsecutiveSlots($this->resolveSlotIds($slotIds));
         $created = [];
@@ -1093,7 +1099,7 @@ final class ReservationService
                 $user,
                 $group['local_start'],
                 $group['duration'],
-                1,
+                max(1, $guestCount),
                 $room ? (int) $room['id'] : null,
                 $paidCheckout,
                 $ignore
@@ -1261,27 +1267,42 @@ final class ReservationService
         if (!$start) {
             throw new HttpException(422, 'Neplatný čas termínu.');
         }
-        return $this->slotAppPayload($slotId, $start, (string) $room['name']);
+        return $this->slotAppPayload($slotId, $start, (string) $room['name'], (string) $room['public_id'], $room);
     }
 
     /**
-     * @return array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,currencyCode:string,gymID:string}
+     * @param array<string, mixed>|null $room
+     * @return array{id:string,start:string,end:string,room:string,bufferMinutes:int,price:string,priceTwo:string,maxPersons:int,mine:bool,currencyCode:string,gymID:string}
      */
-    private function slotAppPayload(string $slotId, \DateTimeImmutable $startUtc, string $roomName, string $gymId = ''): array
+    private function slotAppPayload(string $slotId, \DateTimeImmutable $startUtc, string $roomName, string $gymId = '', ?array $room = null): array
     {
         $startUtc = $startUtc->setTimezone(new \DateTimeZone('UTC'));
         $duration = $this->settings->int('reservation.min_minutes', 60);
         $end = $startUtc->modify('+' . $duration . ' minutes');
         $local = Clock::toLocal($startUtc->format('Y-m-d H:i:s'));
+        $gym = $gymId !== '' ? $gymId : $this->roomPublicIdFromSlot($slotId);
+        if ($room === null && $gym !== '') {
+            $room = $this->roomByPublicId($gym);
+        }
+        $hourly = null;
+        if (is_array($room)) {
+            $hourly = $this->hourlyFromHours($this->hoursForDate($room, $local));
+        }
+        $maxPersons = max(1, (int) ($room['max_persons'] ?? 2));
+        $priceOne = $this->priceForDuration($duration, $hourly, 1);
+        $priceTwo = $this->priceForDuration($duration, $hourly, min(2, $maxPersons));
         return [
             'id' => $slotId,
             'start' => Clock::iso($startUtc->format('Y-m-d H:i:s')),
             'end' => Clock::iso($end->format('Y-m-d H:i:s')),
             'room' => $roomName,
             'bufferMinutes' => $this->bufferMinutes(),
-            'price' => $this->slotPrice($local),
+            'price' => $priceOne,
+            'priceTwo' => $priceTwo,
+            'maxPersons' => $maxPersons,
+            'mine' => false,
             'currencyCode' => 'CZK',
-            'gymID' => $gymId !== '' ? $gymId : $this->roomPublicIdFromSlot($slotId),
+            'gymID' => $gym,
         ];
     }
 

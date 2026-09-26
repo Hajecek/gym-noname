@@ -23,7 +23,7 @@ final class ReservationsController extends Controller
             if ($gymId === '') {
                 $gymId = trim((string) $request->query('gym_id', ''));
             }
-            $this->send($this->api()->slots($gymId));
+            $this->send($this->api()->slots($this->requireUser(), $gymId));
         } catch (HttpException $e) {
             if ($e->status === 404) {
                 $this->send([]);
@@ -35,7 +35,11 @@ final class ReservationsController extends Controller
     public function quote(Request $request): never
     {
         try {
-            $this->send($this->api()->quote($this->requireUser(), $this->stringList($request, 'slotIDs', 'slot_ids')));
+            $this->send($this->api()->quote(
+                $this->requireUser(),
+                $this->stringList($request, 'slotIDs', 'slot_ids'),
+                $this->guests($request)
+            ));
         } catch (HttpException $e) {
             $this->jsonError($e->getMessage(), $e->status);
         }
@@ -46,7 +50,7 @@ final class ReservationsController extends Controller
         try {
             $slot = $this->str($request, 'slotID', 'slot_id');
             $requestId = $this->str($request, 'requestID', 'request_id');
-            $this->send($this->api()->reserve($this->requireUser(), $slot, $requestId), 201);
+            $this->send($this->api()->reserve($this->requireUser(), $slot, $requestId, $this->guests($request)), 201);
         } catch (HttpException $e) {
             $this->jsonError($e->getMessage(), $e->status);
         }
@@ -60,7 +64,8 @@ final class ReservationsController extends Controller
                 $this->requireUser(),
                 $this->stringList($request, 'slotIDs', 'slot_ids'),
                 $this->str($request, 'requestID', 'request_id'),
-                $applePay
+                $applePay,
+                $this->guests($request)
             ));
         } catch (HttpException $e) {
             $this->jsonError($e->getMessage(), $e->status);
@@ -111,5 +116,11 @@ final class ReservationsController extends Controller
             \App\Core\Logger::error('API reservations/cancel', ['error' => $e->getMessage()]);
             $this->jsonError('Rezervaci se nepodařilo zrušit.', 500);
         }
+    }
+
+    private function guests(Request $request): int
+    {
+        $raw = $request->input('guests', $request->input('guestCount', 1));
+        return max(1, (int) $raw);
     }
 }
