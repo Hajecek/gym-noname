@@ -57,6 +57,37 @@
   const hourlyTwo = () => Number(state.availability.hourly_price_two || 200);
   const rate = () => (state.guests >= 2 ? hourlyTwo() : hourly());
   const buffer = () => Number(state.availability.buffer_minutes || 15);
+  const feeBps = Number(payload.stripeFee?.basisPoints ?? 315);
+  const feeFixedMinor = Number(payload.stripeFee?.fixedMinor ?? 650);
+  const processorFee = (amountMinor) => {
+    const product = amountMinor * feeBps;
+    const percent = Math.floor(product / 10000) + (product % 10000 >= 5000 ? 1 : 0);
+    return percent + feeFixedMinor;
+  };
+  const cover = (netCrowns) => {
+    const netMinor = Math.max(0, Math.round(Number(netCrowns) * 100));
+    if (netMinor === 0 || (feeBps <= 0 && feeFixedMinor <= 0)) {
+      return { netMinor, feeMinor: 0, chargeMinor: netMinor };
+    }
+    let charge = netMinor + feeFixedMinor;
+    if (feeBps > 0) {
+      const denom = 10000 - feeBps;
+      const numer = (netMinor + feeFixedMinor) * 10000;
+      charge = Math.floor((numer + denom - 1) / denom);
+    }
+    const netOf = (amountMinor) => amountMinor - processorFee(amountMinor);
+    while (charge > netMinor && netOf(charge - 1) >= netMinor) charge -= 1;
+    while (netOf(charge) < netMinor) charge += 1;
+    return { netMinor, feeMinor: charge - netMinor, chargeMinor: charge };
+  };
+  const moneyMinor = (minor) => {
+    const whole = minor % 100 === 0;
+    const formatted = (minor / 100).toLocaleString("cs-CZ", {
+      minimumFractionDigits: whole ? 0 : 2,
+      maximumFractionDigits: whole ? 0 : 2,
+    });
+    return formatted + "\u00a0Kč";
+  };
 
   const pad = (n) => String(n).padStart(2, "0");
   const money = (n) => Math.round(Number(n) || 0).toLocaleString("cs-CZ") + "\u00a0Kč";
@@ -302,17 +333,21 @@
     const end = occupyEnd();
     const count = state.hours;
     const price = rate() * count;
+    const priced = cover(price);
+    const priceLabel = priced.feeMinor > 0
+      ? money(price) + " + poplatek karty " + moneyMinor(priced.feeMinor)
+      : money(price);
     const covered = canCover(count);
     if (barTime) barTime.textContent = first.start + "–" + end;
     if (barMeta) {
       if (covered && unlimitedMembership) {
-        barMeta.textContent = blocksWord(count) + " · neomezené členství, nebo " + money(price);
+        barMeta.textContent = blocksWord(count) + " · neomezené členství, nebo " + priceLabel;
       } else if (covered) {
-        barMeta.textContent = blocksWord(count) + " · " + deductPhrase(count) + ", nebo " + money(price);
+        barMeta.textContent = blocksWord(count) + " · " + deductPhrase(count) + ", nebo " + priceLabel;
       } else if (membershipCovers) {
-        barMeta.textContent = blocksWord(count) + " · " + money(price) + " · na členství " + remainPhrase(entriesLeft);
+        barMeta.textContent = blocksWord(count) + " · " + priceLabel + " · na členství " + remainPhrase(entriesLeft);
       } else {
-        barMeta.textContent = blocksWord(count) + " · " + money(price);
+        barMeta.textContent = blocksWord(count) + " · " + priceLabel;
       }
     }
     if (guestCountEl) guestCountEl.textContent = String(state.guests);
@@ -322,7 +357,7 @@
     }
     if (payBtn) {
       payBtn.hidden = false;
-      payBtn.textContent = "Zaplatit " + money(price);
+      payBtn.textContent = "Zaplatit " + moneyMinor(priced.chargeMinor);
       payBtn.classList.toggle("btn-primary", !covered);
       payBtn.classList.toggle("btn-secondary", covered);
     }

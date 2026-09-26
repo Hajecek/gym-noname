@@ -197,7 +197,12 @@ $tabs = [
                             <?php endif; ?>
                         </td>
                         <td><span class="badge <?= e($typeClass) ?>"><?= e($type) ?></span></td>
-                        <td><strong><?= e(money_format_czk($payment['amount'] ?? 0)) ?></strong></td>
+                        <td>
+                            <strong><?= e(money_format_czk($payment['amount'] ?? 0)) ?></strong>
+                            <?php if ((float) ($payment['fee_amount'] ?? 0) > 0): ?>
+                                <div class="muted">zákazník <?= e(number_format((float) ($payment['charged_amount'] ?? 0), 2, ',', ' ')) ?> Kč</div>
+                            <?php endif; ?>
+                        </td>
                         <td class="muted"><?= e((string) ($payment['provider'] ?? '—')) ?></td>
                     </tr>
                 <?php endforeach; ?>

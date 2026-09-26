@@ -32,7 +32,8 @@ final class CheckoutService
         if ((float) $amount <= 0) {
             throw new HttpException(422, 'Tuto rezervaci není potřeba platit.');
         }
-        $payment = $this->payments->createStripeHold($user, $amount, (int) $reservation['id']);
+        $priced = StripeFee::cover($amount);
+        $payment = $this->payments->createStripeHold($user, $priced['net'], (int) $reservation['id'], $priced['fee'], $priced['charge']);
         $localStart = Clock::format((string) $reservation['starts_at'], 'j. n. Y H:i');
         $localEnd = Clock::format((string) $reservation['ends_at'], 'H:i');
         $date = Clock::format((string) $reservation['starts_at'], 'Y-m-d');
@@ -41,7 +42,7 @@ final class CheckoutService
         $expires = time() + 35 * 60;
         try {
             $session = StripeGateway::fromConfig()->createCheckoutSession(
-                (int) round(((float) $amount) * 100),
+                $priced['netMinor'],
                 'czk',
                 'PRIVOFIT rezervace ' . $localStart . '–' . $localEnd,
                 $success,
@@ -51,8 +52,11 @@ final class CheckoutService
                     'payment' => (string) $payment['public_id'],
                     'reservation' => (string) $reservation['public_id'],
                     'user' => (string) ($user['public_id'] ?? $user['id']),
+                    'net' => $priced['net'],
+                    'fee' => $priced['fee'],
                 ],
                 $expires,
+                $priced['feeMinor'],
             );
         } catch (HttpException $e) {
             $this->reservations->failPending($reservation);
@@ -68,13 +72,14 @@ final class CheckoutService
         if ((float) $amount <= 0) {
             throw new HttpException(422, 'Tenhle tarif nemá cenu k zaplacení.');
         }
-        $payment = $this->payments->createStripeMembership($user, $amount, (int) $membership['id']);
+        $priced = StripeFee::cover($amount);
+        $payment = $this->payments->createStripeMembership($user, $priced['net'], (int) $membership['id'], $priced['fee'], $priced['charge']);
         $entries = $membership['entries'] === null ? 'neomezené vstupy' : ((int) $membership['entries'] . ' vstupů');
         $success = $app->absoluteUrl('/user/clenstvi/platba') . '?session_id={CHECKOUT_SESSION_ID}';
         $cancel = $app->absoluteUrl('/user/clenstvi/platba/zruseno') . '?platba=' . rawurlencode((string) $payment['public_id']);
         try {
             $session = StripeGateway::fromConfig()->createCheckoutSession(
-                (int) round(((float) $amount) * 100),
+                $priced['netMinor'],
                 'czk',
                 'PRIVOFIT ' . (string) ($membership['plan_name'] ?? 'členství') . ' · ' . $entries,
                 $success,
@@ -84,8 +89,11 @@ final class CheckoutService
                     'payment' => (string) $payment['public_id'],
                     'membership' => (string) $membership['public_id'],
                     'user' => (string) ($user['public_id'] ?? $user['id']),
+                    'net' => $priced['net'],
+                    'fee' => $priced['fee'],
                 ],
                 time() + 35 * 60,
+                $priced['feeMinor'],
             );
         } catch (HttpException $e) {
             (new MembershipService($this->db))->cancelPending((int) $membership['id'], (int) $user['id']);

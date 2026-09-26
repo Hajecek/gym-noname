@@ -35,7 +35,7 @@ final class PaymentService
         return $this->db->fetch('SELECT * FROM payments WHERE id = :id', ['id' => $id]) ?? [];
     }
 
-    public function createStripeMembership(array $user, string $amount, int $membershipId): array
+    public function createStripeMembership(array $user, string $amount, int $membershipId, string $fee = '0.00', string $charged = ''): array
     {
         $id = (int) $this->db->insert('payments', [
             'public_id' => Crypto::uuid(),
@@ -43,6 +43,8 @@ final class PaymentService
             'membership_id' => $membershipId,
             'provider' => 'stripe',
             'amount' => $amount,
+            'fee_amount' => $fee,
+            'charged_amount' => $charged !== '' ? $charged : $amount,
             'currency' => 'CZK',
             'status' => 'pending',
             'created_at' => Clock::utc(),
@@ -51,7 +53,7 @@ final class PaymentService
         return $this->db->fetch('SELECT * FROM payments WHERE id = :id', ['id' => $id]) ?? [];
     }
 
-    public function createStripeHold(array $user, string $amount, int $reservationId): array
+    public function createStripeHold(array $user, string $amount, int $reservationId, string $fee = '0.00', string $charged = ''): array
     {
         $id = (int) $this->db->insert('payments', [
             'public_id' => Crypto::uuid(),
@@ -59,6 +61,8 @@ final class PaymentService
             'reservation_id' => $reservationId,
             'provider' => 'stripe',
             'amount' => $amount,
+            'fee_amount' => $fee,
+            'charged_amount' => $charged !== '' ? $charged : $amount,
             'currency' => 'CZK',
             'status' => 'pending',
             'created_at' => Clock::utc(),

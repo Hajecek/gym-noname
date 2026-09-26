@@ -63,6 +63,12 @@ $daysLabel = static function (array $plan): string {
             <h2><?= e($plan['name']) ?></h2>
             <p class="plan-entries"><?= e($entriesLabel($plan)) ?></p>
             <p class="plan-price"><?= e(money_format_czk($plan['price'])) ?></p>
+            <?php
+            $cardFee = \App\Services\Billing\StripeFee::cover((string) $plan['price']);
+            if ((float) $cardFee['fee'] > 0):
+            ?>
+                <p class="muted">K zaplacení <?= e(number_format((float) $cardFee['charge'], 2, ',', ' ')) ?> Kč, z toho poplatek karty <?= e(number_format((float) $cardFee['fee'], 2, ',', ' ')) ?> Kč.</p>
+            <?php endif; ?>
             <ul>
                 <li><?= e($daysLabel($plan)) ?></li>
                 <li>Rezervace dne bez další platby</li>

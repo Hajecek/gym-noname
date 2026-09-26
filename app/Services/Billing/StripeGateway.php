@@ -42,6 +42,7 @@ final class StripeGateway
         string $idempotencyKey,
         array $metadata = [],
         ?int $expiresAt = null,
+        int $feeMinor = 0,
     ): array {
         $this->assertAmount($amountMinor);
         $fields = [
@@ -57,6 +58,12 @@ final class StripeGateway
             'line_items[0][price_data][unit_amount]' => (string) $amountMinor,
             'line_items[0][price_data][product_data][name]' => $description,
         ] + $this->metadataFields($metadata);
+        if ($feeMinor > 0) {
+            $fields['line_items[1][quantity]'] = '1';
+            $fields['line_items[1][price_data][currency]'] = strtolower($currency);
+            $fields['line_items[1][price_data][unit_amount]'] = (string) $feeMinor;
+            $fields['line_items[1][price_data][product_data][name]'] = 'Poplatek za platbu kartou';
+        }
         if ($expiresAt !== null) {
             $fields['expires_at'] = (string) $expiresAt;
         }

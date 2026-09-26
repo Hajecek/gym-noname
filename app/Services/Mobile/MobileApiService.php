@@ -12,6 +12,7 @@ use App\Core\Request;
 use App\Services\Access\AccessControlService;
 use App\Services\Auth\AuthService;
 use App\Services\Billing\PaymentService;
+use App\Services\Billing\StripeFee;
 use App\Services\Billing\StripeGateway;
 use App\Services\Content\ContentService;
 use App\Services\MembershipService;
@@ -254,10 +255,19 @@ final class MobileApiService
         foreach ($resolved as $slot) {
             $maxPersons = max($maxPersons, (int) ($slot['maxPersons'] ?? 1));
         }
+        $serviceTotal = number_format($sum, 2, '.', '');
+        $priced = $sum > 0 ? StripeFee::cover($serviceTotal) : [
+            'net' => '0.00',
+            'fee' => '0.00',
+            'charge' => '0.00',
+            'chargeMinor' => 0,
+        ];
         return [
             'slots' => $resolved,
             'pricePerSlot' => number_format($sum / $count, 2, '.', ''),
-            'total' => number_format($sum, 2, '.', ''),
+            'total' => $priced['charge'],
+            'serviceTotal' => $priced['net'],
+            'processingFee' => $priced['fee'],
             'currencyCode' => 'CZK',
             'guests' => $this->clampGuests($guests, $maxPersons),
             'maxPersons' => $maxPersons,
@@ -302,14 +312,16 @@ final class MobileApiService
         $quote = $this->quote($user, $slotIds, $guests);
         $count = count($quote['slots']);
         $unit = (float) $quote['pricePerSlot'];
-        $total = (string) ($quote['total'] ?? number_format($unit * $count, 2, '.', ''));
+        $net = (string) ($quote['serviceTotal'] ?? '0.00');
+        $charge = (string) ($quote['total'] ?? $net);
+        $fee = (string) ($quote['processingFee'] ?? '0.00');
         $bookedGuests = (int) ($quote['guests'] ?? 1);
         $holds = [];
         try {
             $this->reservations->releasePendingForSlots($user, $slotIds);
             $holds = $this->reservations->createFromSlotIds($user, $slotIds, true, [], $bookedGuests);
 
-            $settlement = $this->settleCheckout($user, $unit, $count, $total, $requestId, $applePay, $holds);
+            $settlement = $this->settleCheckout($user, $unit, $count, $charge, $requestId, $applePay, $holds);
             if ($settlement['provider'] === 'membership') {
                 $membership = $this->memberships->activeForUser((int) $user['id']);
                 $membershipId = $membership ? (int) $membership['id'] : null;
@@ -335,12 +347,17 @@ final class MobileApiService
                 'reservation_id' => $firstId,
                 'provider' => $settlement['provider'],
                 'provider_reference' => $settlement['reference'],
-                'amount' => $total,
+                'amount' => $settlement['provider'] === 'stripe' ? $net : $charge,
+                'fee_amount' => $settlement['provider'] === 'stripe' ? $fee : '0.00',
+                'charged_amount' => $charge,
                 'currency' => 'CZK',
                 'status' => 'paid',
                 'metadata_json' => json_encode([
                     'reservations' => array_column($confirmed, 'public_id'),
                     'settlement' => $settlement['provider'],
+                    'net' => $net,
+                    'fee' => $fee,
+                    'charged' => $charge,
                 ], JSON_UNESCAPED_UNICODE),
                 'paid_at' => Clock::utc(),
                 'created_at' => Clock::utc(),
@@ -719,7 +736,7 @@ final class MobileApiService
         try {
             return (int) $this->db->insert('payments', $data);
         } catch (\Throwable) {
-            unset($data['client_request_id'], $data['metadata_json']);
+            unset($data['client_request_id'], $data['metadata_json'], $data['fee_amount'], $data['charged_amount']);
             return (int) $this->db->insert('payments', $data);
         }
     }
@@ -746,6 +763,8 @@ final class MobileApiService
         );
         $this->trySql('ALTER TABLE payments ADD COLUMN client_request_id CHAR(36) DEFAULT NULL AFTER public_id');
         $this->trySql('ALTER TABLE payments ADD COLUMN metadata_json MEDIUMTEXT DEFAULT NULL AFTER status');
+        $this->trySql('ALTER TABLE payments ADD COLUMN fee_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER amount');
+        $this->trySql('ALTER TABLE payments ADD COLUMN charged_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER fee_amount');
     }
 
     private function trySql(string $sql): void

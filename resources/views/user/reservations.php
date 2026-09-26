@@ -15,6 +15,7 @@ $payload = [
     'availability' => $availability,
     'membership_covers' => !empty($membership_covers),
     'entries_remaining' => $entries_remaining,
+    'stripeFee' => \App\Services\Billing\StripeFee::rates(),
 ];
 ?>
 <div class="page-head">
