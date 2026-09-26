@@ -119,9 +119,14 @@ if (isLogin || isRegister) {
   password.autocomplete = isRegister ? "new-password" : "current-password";
   const authBottom = document.getElementById("auth-bottom");
   if (authBottom) {
-    authBottom.innerHTML = isRegister
-      ? 'Už máš svůj účet? <a href="' + APP_BASE + 'prihlaseni">Přihlas se</a>'
-      : 'Ještě nemáš účet? <a href="' + APP_BASE + 'registrace">Začni tady</a>';
+    if (isMfa) {
+      authBottom.hidden = true;
+    } else {
+      authBottom.hidden = false;
+      authBottom.innerHTML = isRegister
+        ? 'Už máš svůj účet? <a href="' + APP_BASE + 'prihlaseni">Přihlas se</a>'
+        : 'Ještě nemáš účet? <a href="' + APP_BASE + 'registrace">Začni tady</a>';
+    }
   }
   const input = (name) => form.querySelector('[name="' + name + '"]');
   const avatarInput = form.querySelector("[data-avatar-input]");

@@ -116,7 +116,7 @@ $oldEmail = old('email');
                 </div>
                 <p id="form-status" class="form-status" role="status" tabindex="-1" hidden></p>
             </form>
-            <p class="auth-bottom" id="auth-bottom" hidden></p>
+            <p class="auth-bottom" id="auth-bottom">Už máš svůj účet? <a href="<?= e(url('/prihlaseni')) ?>">Přihlas se</a></p>
         </div>
     </section>
 </main>

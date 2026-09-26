@@ -82,7 +82,7 @@
                 </div>
                 <p id="form-status" class="form-status" role="status" tabindex="-1" hidden></p>
             </form>
-            <p class="auth-bottom" id="auth-bottom" hidden>Ještě nemáš účet? <a href="<?= e(url('/registrace')) ?>">Začni tady</a></p>
+            <p class="auth-bottom" id="auth-bottom"<?= $mfa ? ' hidden' : '' ?>>Ještě nemáš účet? <a href="<?= e(url('/registrace')) ?>">Začni tady</a></p>
             <p class="auth-forgot"><a href="<?= e(url('/zapomenute-heslo')) ?>">Zapomenuté heslo</a></p>
         </div>
     </section>
